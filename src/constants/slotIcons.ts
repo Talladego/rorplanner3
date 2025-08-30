@@ -1,0 +1,30 @@
+import { EquipSlot } from '../types/index';
+
+export const DEFAULT_SLOT_ICONS: Record<EquipSlot, string> = {
+  [EquipSlot.HELM]: 'https://armory.returnofreckoning.com/icon/12',
+  [EquipSlot.SHOULDER]: 'https://armory.returnofreckoning.com/icon/13',
+  [EquipSlot.BACK]: 'https://armory.returnofreckoning.com/icon/16',
+  [EquipSlot.BODY]: 'https://armory.returnofreckoning.com/icon/9',
+  [EquipSlot.GLOVES]: 'https://armory.returnofreckoning.com/icon/10',
+  [EquipSlot.BELT]: 'https://armory.returnofreckoning.com/icon/17',
+  [EquipSlot.BOOTS]: 'https://armory.returnofreckoning.com/icon/11',
+  [EquipSlot.MAIN_HAND]: 'https://armory.returnofreckoning.com/icon/6',
+  [EquipSlot.OFF_HAND]: 'https://armory.returnofreckoning.com/icon/7',
+  [EquipSlot.RANGED_WEAPON]: 'https://armory.returnofreckoning.com/icon/8',
+  [EquipSlot.JEWELLERY1]: 'https://armory.returnofreckoning.com/icon/20',
+  [EquipSlot.JEWELLERY2]: 'https://armory.returnofreckoning.com/icon/20',
+  [EquipSlot.JEWELLERY3]: 'https://armory.returnofreckoning.com/icon/20',
+  [EquipSlot.JEWELLERY4]: 'https://armory.returnofreckoning.com/icon/20',
+  [EquipSlot.EVENT]: 'https://armory.returnofreckoning.com/icon/20',
+  [EquipSlot.POCKET1]: 'https://armory.returnofreckoning.com/icon/36',
+  [EquipSlot.POCKET2]: 'https://armory.returnofreckoning.com/icon/36',
+  // Additional slots that might not have specific icons
+  [EquipSlot.NONE]: 'https://armory.returnofreckoning.com/icon/20',
+  [EquipSlot.EITHER_HAND]: 'https://armory.returnofreckoning.com/icon/6',
+  [EquipSlot.STANDARD]: 'https://armory.returnofreckoning.com/icon/20',
+  [EquipSlot.TROPHY1]: 'https://armory.returnofreckoning.com/icon/20',
+  [EquipSlot.TROPHY2]: 'https://armory.returnofreckoning.com/icon/20',
+  [EquipSlot.TROPHY3]: 'https://armory.returnofreckoning.com/icon/20',
+  [EquipSlot.TROPHY4]: 'https://armory.returnofreckoning.com/icon/20',
+  [EquipSlot.TROPHY5]: 'https://armory.returnofreckoning.com/icon/20',
+};

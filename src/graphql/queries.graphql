@@ -1,0 +1,138 @@
+query GetCharacter($id: ID!) {
+  character(id: $id) {
+    id
+    name
+    level
+    renownRank
+    career
+    items {
+      equipSlot
+      item {
+        id
+        name
+        description
+        type
+        slot
+        rarity
+        armor
+        dps
+        speed
+        levelRequirement
+        renownRankRequirement
+        itemLevel
+        uniqueEquipped
+        stats {
+          stat
+          value
+          percentage
+        }
+        careerRestriction
+        raceRestriction
+        iconUrl
+        talismanSlots
+      }
+      talismans {
+        id
+        name
+        description
+        type
+        slot
+        rarity
+        armor
+        dps
+        speed
+        levelRequirement
+        renownRankRequirement
+        itemLevel
+        uniqueEquipped
+        stats {
+          stat
+          value
+          percentage
+        }
+        careerRestriction
+        raceRestriction
+        iconUrl
+        talismanSlots
+      }
+    }
+  }
+}
+
+query GetItems($slot: EquipSlot, $usableByCareer: Career, $levelRequirement: Int, $renownRankRequirement: Int, $first: Int, $after: String) {
+  items(
+    where: { 
+      slot: { eq: $slot },
+      type: { neq: NONE },
+      levelRequirement: { lte: $levelRequirement },
+      renownRankRequirement: { lte: $renownRankRequirement }
+    }, 
+    usableByCareer: $usableByCareer, 
+    first: $first, 
+    after: $after,
+    order: [
+      { rarity: DESC },
+      { itemLevel: DESC },
+      { name: ASC }
+    ]
+  ) {
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+    edges {
+      cursor
+      node {
+        id
+        name
+        description
+        type
+        slot
+        rarity
+        armor
+        dps
+        speed
+        levelRequirement
+        renownRankRequirement
+        itemLevel
+        uniqueEquipped
+        stats {
+          stat
+          value
+          percentage
+        }
+        careerRestriction
+        raceRestriction
+        iconUrl
+        talismanSlots
+      }
+    }
+    nodes {
+      id
+      name
+      description
+      type
+      slot
+      rarity
+      armor
+      dps
+      speed
+      levelRequirement
+      renownRankRequirement
+      itemLevel
+      uniqueEquipped
+      stats {
+        stat
+        value
+        percentage
+      }
+      careerRestriction
+      raceRestriction
+      iconUrl
+      talismanSlots
+    }
+    totalCount
+  }
+}
