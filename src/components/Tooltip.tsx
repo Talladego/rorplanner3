@@ -1,7 +1,7 @@
-'use client';
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Item } from '../types';
+import { getItemColor } from '../utils/rarityColors';
+import { formatItemTypeName, formatRarityName, formatStatName } from '../utils/formatters';
 
 interface TooltipProps {
   children: React.ReactNode;
@@ -19,10 +19,29 @@ export default function Tooltip({ children, item, className = '' }: TooltipProps
     if (!item) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
-    setPosition({
-      x: rect.left + rect.width / 2,
-      y: rect.top - 10, // Position above the element
-    });
+    const tooltipWidth = 320; // Approximate tooltip width
+    const tooltipHeight = 200; // Approximate tooltip height
+    const margin = 10;
+
+    let x = rect.right + margin; // Position to the right
+    let y = rect.top; // Align with top of element
+
+    // Check if tooltip would go off-screen to the right
+    if (x + tooltipWidth > window.innerWidth) {
+      x = rect.left - tooltipWidth - margin; // Position to the left instead
+    }
+
+    // Check if tooltip would go off-screen at the bottom
+    if (y + tooltipHeight > window.innerHeight) {
+      y = window.innerHeight - tooltipHeight - margin; // Move up to fit
+    }
+
+    // Ensure tooltip doesn't go off-screen at the top
+    if (y < margin) {
+      y = margin;
+    }
+
+    setPosition({ x, y });
     setIsVisible(true);
   };
 
@@ -69,7 +88,6 @@ export default function Tooltip({ children, item, className = '' }: TooltipProps
           style={{
             left: position.x,
             top: position.y,
-            transform: 'translateX(-50%) translateY(-100%)',
           }}
         >
           {/* Item Header */}
@@ -80,8 +98,8 @@ export default function Tooltip({ children, item, className = '' }: TooltipProps
               className="w-8 h-8 rounded object-contain"
             />
             <div>
-              <h3 className="font-bold text-sm">{item.name}</h3>
-              <p className="text-xs text-gray-300">{item.type} - {item.rarity}</p>
+              <h3 className="font-bold text-sm" style={{ color: getItemColor(item) }}>{item.name}</h3>
+              <p className="text-xs text-gray-300">{formatItemTypeName(item.type)} - {formatRarityName(item.rarity)}</p>
             </div>
           </div>
 
@@ -126,7 +144,7 @@ export default function Tooltip({ children, item, className = '' }: TooltipProps
                 <div className="ml-2">
                   {item.stats.map((stat, index) => (
                     <div key={index} className="text-xs">
-                      {stat.stat}: {stat.percentage ? `${stat.value}%` : stat.value}
+                      {formatStatName(stat.stat)}: {stat.percentage ? `${stat.value}%` : stat.value}
                     </div>
                   ))}
                 </div>

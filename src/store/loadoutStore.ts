@@ -184,7 +184,7 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     };
 
     Object.values(current.items).forEach(({ item, talismans }) => {
-      if (item) {
+      if (item && item.stats) {
         item.stats.forEach(({ stat, value }) => {
           const key = mapStatToKey(stat);
           if (key && stats[key] !== undefined) {
@@ -192,16 +192,19 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
           }
         });
       }
-      talismans.forEach((talisman) => {
-        if (talisman) {
-          talisman.stats.forEach(({ stat, value }) => {
-            const key = mapStatToKey(stat);
-            if (key && stats[key] !== undefined) {
-              stats[key] += value;
-            }
-          });
-        }
-      });
+      // Safely iterate over talismans if they exist
+      if (talismans && Array.isArray(talismans)) {
+        talismans.forEach((talisman) => {
+          if (talisman && talisman.stats) {
+            talisman.stats.forEach(({ stat, value }) => {
+              const key = mapStatToKey(stat);
+              if (key && stats[key] !== undefined) {
+                stats[key] += value;
+              }
+            });
+          }
+        });
+      }
     });
     return { statsSummary: stats };
   }),

@@ -1,18 +1,18 @@
-'use client';
-
 import React, { useState } from 'react';
 import { EquipSlot, Item } from '../types';
 import { loadoutService } from '../services/loadoutService';
 import { useLoadoutData } from '../hooks/useLoadoutData';
 import EquipmentSelector from './EquipmentSelector';
 import { DEFAULT_SLOT_ICONS } from '../constants/slotIcons';
-import { formatSlotName } from '../utils/formatters';
 import Tooltip from './Tooltip';
+import { getItemColor } from '../utils/rarityColors';
 
 export default function EquipmentPanel() {
   const { currentLoadout } = useLoadoutData();
   const [selectedSlot, setSelectedSlot] = useState<EquipSlot | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [talismanSlot, setTalismanSlot] = useState<{ slot: EquipSlot; index: number } | null>(null);
 
   const handleSlotClick = (slot: EquipSlot) => {
     setSelectedSlot(slot);
@@ -34,8 +34,14 @@ export default function EquipmentPanel() {
   };
 
   const handleTalismanClick = (slot: EquipSlot, index: number) => {
-    // Placeholder: Open talisman selection
-    alert(`Select talisman for ${formatSlotName(slot)} slot ${index}`);
+    setTalismanSlot({ slot, index });
+    setIsModalOpen(true);
+  };
+
+  const handleTalismanSelect = (talisman: Item) => {
+    if (talismanSlot) {
+      loadoutService.updateTalisman(talismanSlot.slot, talismanSlot.index, talisman);
+    }
   };
 
   const handleTalismanRightClick = (e: React.MouseEvent, slot: EquipSlot, index: number) => {
@@ -77,59 +83,72 @@ export default function EquipmentPanel() {
           const slotData = currentLoadout.items[slot];
           return (
             <div key={slot} className="relative">
-              <Tooltip item={slotData.item}>
-                <div
-                  className="equipment-slot"
-                  onClick={() => handleSlotClick(slot)}
-                  onContextMenu={(e) => handleSlotRightClick(e, slot)}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="equipment-icon">
+              <div className="equipment-slot">
+                <div className="flex items-start gap-2">
+                  <Tooltip item={slotData.item}>
+                    <div
+                      className="equipment-icon cursor-pointer"
+                      onClick={() => handleSlotClick(slot)}
+                      onContextMenu={(e) => handleSlotRightClick(e, slot)}
+                    >
                       {slotData.item ? (
                         <img src={slotData.item.iconUrl} alt={slotData.item.name} className="w-full h-full object-contain rounded" />
                       ) : (
                         <img src={DEFAULT_SLOT_ICONS[slot]} alt={`${slot} slot`} className="w-full h-full object-contain rounded opacity-50" />
                       )}
                     </div>
-                    <div className="equipment-text">
-                      <p className="equipment-slot-name">{formatSlotName(slot)}</p>
-                      {slotData.item && (
-                        <p className="equipment-item-name">{slotData.item.name}</p>
-                      )}
-                    </div>
+                  </Tooltip>
+                  <div className="equipment-text">
+                    {slotData.item && (
+                      <p className="equipment-item-name" style={{ color: getItemColor(slotData.item) }}>{slotData.item.name}</p>
+                    )}
+                    {/* Talisman slots */}
+                    {slotData.item && slotData.item.talismanSlots > 0 && (
+                      <div className="flex justify-start mt-1 gap-1">
+                        {Array.from({ length: slotData.item.talismanSlots }, (_, i) => (
+                          <div key={i} className="talisman-slot">
+                            {slotData.talismans[i] ? (
+                              <Tooltip item={slotData.talismans[i]}>
+                                <img
+                                  src={slotData.talismans[i]!.iconUrl}
+                                  alt={slotData.talismans[i]!.name}
+                                  className="w-full h-full object-contain rounded cursor-pointer"
+                                  onClick={() => handleTalismanClick(slot, i)}
+                                  onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
+                                />
+                              </Tooltip>
+                            ) : (
+                              <img
+                                src="https://armory.returnofreckoning.com/icon/1"
+                                alt="Empty talisman slot"
+                                className="w-full h-full object-contain rounded cursor-pointer opacity-50"
+                                onClick={() => handleTalismanClick(slot, i)}
+                                onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              </Tooltip>
-              {/* Talisman slots */}
-              {slotData.item && slotData.item.talismanSlots > 0 && (
-                <div className="flex justify-center mt-1 gap-1">
-                  {Array.from({ length: slotData.item.talismanSlots }, (_, i) => (
-                    <Tooltip key={i} item={slotData.talismans[i]}>
-                      <div
-                        className="talisman-slot"
-                        onClick={() => handleTalismanClick(slot, i)}
-                        onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
-                      >
-                        {slotData.talismans[i] ? (
-                          <img src={slotData.talismans[i]!.iconUrl} alt={slotData.talismans[i]!.name} className="w-full h-full object-contain rounded" />
-                        ) : (
-                          <span className="text-xs text-muted">T</span>
-                        )}
-                      </div>
-                    </Tooltip>
-                  ))}
-                </div>
-              )}
+              </div>
             </div>
           );
         })}
       </div>
-      {selectedSlot && (
+      {(selectedSlot || talismanSlot) && (
         <EquipmentSelector
-          slot={selectedSlot}
+          slot={selectedSlot || talismanSlot!.slot}
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onSelect={handleItemSelect}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedSlot(null);
+            setTalismanSlot(null);
+          }}
+          onSelect={talismanSlot ? handleTalismanSelect : handleItemSelect}
+          isTalismanMode={!!talismanSlot}
+          holdingItemLevelReq={talismanSlot ? currentLoadout?.items[talismanSlot.slot].item?.levelRequirement : undefined}
         />
       )}
     </div>

@@ -136,3 +136,78 @@ query GetItems($slot: EquipSlot, $usableByCareer: Career, $levelRequirement: Int
     totalCount
   }
 }
+
+query GetTalismans($itemLevel: Byte, $first: Int, $after: String) {
+  items(
+    where: {
+      type: { eq: ENHANCEMENT },
+      itemLevel: { eq: $itemLevel }
+    },
+    first: $first,
+    after: $after,
+    order: [
+      { rarity: DESC },
+      { itemLevel: DESC },
+      { name: ASC }
+    ]
+  ) {
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+    edges {
+      cursor
+      node {
+        id
+        name
+        description
+        type
+        slot
+        rarity
+        armor
+        dps
+        speed
+        levelRequirement
+        renownRankRequirement
+        itemLevel
+        uniqueEquipped
+        stats {
+          stat
+          value
+          percentage
+        }
+        careerRestriction
+        raceRestriction
+        iconUrl
+        talismanSlots
+      }
+    }
+    nodes {
+      id
+      name
+      description
+      type
+      slot
+      rarity
+      armor
+      dps
+      speed
+      levelRequirement
+      renownRankRequirement
+      itemLevel
+      uniqueEquipped
+      stats {
+        stat
+        value
+        percentage
+      }
+      careerRestriction
+      raceRestriction
+      iconUrl
+      talismanSlots
+    }
+    totalCount
+  }
+}

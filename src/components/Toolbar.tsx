@@ -1,9 +1,8 @@
-'use client';
-
 import { useState, ChangeEvent, useEffect } from 'react';
 import { Career } from '../types';
 import { loadoutService } from '../services/loadoutService';
 import { CareerChangedEvent, LevelChangedEvent, RenownRankChangedEvent } from '../types/events';
+import { formatCareerName } from '../utils/formatters';
 
 export default function Toolbar() {
   const [selectedCareer, setSelectedCareer] = useState<Career | ''>('');
@@ -91,7 +90,7 @@ export default function Toolbar() {
             <option value="">Select Career</option>
             {Object.values(Career).map((career) => (
               <option key={career} value={career}>
-                {career.replace(/_/g, ' ')}
+                {formatCareerName(career)}
               </option>
             ))}
           </select>
