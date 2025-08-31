@@ -3,20 +3,20 @@
 import { useLoadoutStore } from '../store/loadoutStore';
 import client from '../lib/apollo-client';
 import { gql } from '@apollo/client';
-import { EquipSlot, Item, Career, LoadoutItem } from '../types';
+import { EquipSlot, Item, Career, LoadoutItem, Stat } from '../types';
 import { loadoutEventEmitter } from './loadoutEventEmitter';
 import { LoadoutEvents, LoadoutEventType } from '../types/events';
 
 const SEARCH_CHARACTERS = gql`
-  query SearchCharacters($name: String!) {
+  query GetCharacters($name: String!) {
     characters(where: { name: { eq: $name } }, first: 10) {
       edges {
         node {
           id
           name
+          career
           level
           renownRank
-          career
         }
       }
     }
@@ -56,6 +56,10 @@ const GET_CHARACTER = gql`
           raceRestriction
           iconUrl
           talismanSlots
+          itemSet {
+            id
+            name
+          }
         }
         talismans {
           id
@@ -80,17 +84,79 @@ const GET_CHARACTER = gql`
           raceRestriction
           iconUrl
           talismanSlots
+          itemSet {
+            id
+            name
+          }
         }
       }
     }
   }
 `;
 
+const GET_ITEMS_WITH_CAREER_WITH_STATS = gql`
+  query GetItemsWithCareerWithStats($slot: EquipSlot, $usableByCareer: Career, $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!]) {
+    items(where: {
+      slot: { eq: $slot },
+      type: { neq: NONE },
+      levelRequirement: { lte: $levelRequirement },
+      renownRankRequirement: { lte: $renownRankRequirement },
+      name: { contains: $nameFilter }
+    }, usableByCareer: $usableByCareer, hasStats: $hasStats, first: $first, after: $after, order: [
+      { rarity: DESC },
+      { itemLevel: DESC },
+      { name: ASC }
+    ]) {
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+      edges {
+        cursor
+        node {
+          id
+          name
+          description
+          type
+          slot
+          rarity
+          armor
+          dps
+          speed
+          levelRequirement
+          renownRankRequirement
+          itemLevel
+          uniqueEquipped
+          stats {
+            stat
+            value
+            percentage
+          }
+          careerRestriction
+          raceRestriction
+          iconUrl
+          talismanSlots
+          itemSet {
+            id
+            name
+          }
+        }
+      }
+      totalCount
+    }
+  }
+`;
+
 const GET_ITEMS_WITH_CAREER = gql`
-  query GetItemsWithCareer($slot: EquipSlot, $usableByCareer: Career, $first: Int, $after: String) {
+  query GetItemsWithCareer($slot: EquipSlot, $usableByCareer: Career, $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String) {
     items(where: { 
       slot: { eq: $slot },
-      type: { neq: NONE }
+      type: { neq: NONE },
+      levelRequirement: { lte: $levelRequirement },
+      renownRankRequirement: { lte: $renownRankRequirement },
+      name: { contains: $nameFilter }
     }, usableByCareer: $usableByCareer, first: $first, after: $after, order: [
       { rarity: DESC },
       { itemLevel: DESC },
@@ -127,6 +193,10 @@ const GET_ITEMS_WITH_CAREER = gql`
           raceRestriction
           iconUrl
           talismanSlots
+          itemSet {
+            id
+            name
+          }
         }
       }
       nodes {
@@ -152,6 +222,99 @@ const GET_ITEMS_WITH_CAREER = gql`
         raceRestriction
         iconUrl
         talismanSlots
+          itemSet {
+            id
+            name
+          }
+      }
+      totalCount
+    }
+  }
+`;
+
+const GET_ITEMS_WITHOUT_CAREER_WITH_STATS = gql`
+  query GetItemsWithoutCareerWithStats($slot: EquipSlot, $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!]) {
+    items(
+      where: { 
+        slot: { eq: $slot },
+        type: { neq: NONE },
+        levelRequirement: { lte: $levelRequirement },
+        renownRankRequirement: { lte: $renownRankRequirement },
+        name: { contains: $nameFilter }
+      }, 
+      hasStats: $hasStats,
+      first: $first, 
+      after: $after,
+      order: [
+        { rarity: DESC },
+        { itemLevel: DESC },
+        { name: ASC }
+      ]
+    ) {
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+      edges {
+        cursor
+        node {
+          id
+          name
+          description
+          type
+          slot
+          rarity
+          armor
+          dps
+          speed
+          levelRequirement
+          renownRankRequirement
+          itemLevel
+          uniqueEquipped
+          stats {
+            stat
+            value
+            percentage
+          }
+          careerRestriction
+          raceRestriction
+          iconUrl
+          talismanSlots
+          itemSet {
+            id
+            name
+          }
+        }
+      }
+      nodes {
+        id
+        name
+        description
+        type
+        slot
+        rarity
+        armor
+        dps
+        speed
+        levelRequirement
+        renownRankRequirement
+        itemLevel
+        uniqueEquipped
+        stats {
+          stat
+          value
+          percentage
+        }
+        careerRestriction
+        raceRestriction
+        iconUrl
+        talismanSlots
+        itemSet {
+          id
+          name
+        }
       }
       totalCount
     }
@@ -159,13 +322,14 @@ const GET_ITEMS_WITH_CAREER = gql`
 `;
 
 const GET_ITEMS_WITHOUT_CAREER = gql`
-  query GetItemsWithoutCareer($slot: EquipSlot, $levelRequirement: Int, $renownRankRequirement: Int, $first: Int, $after: String) {
+  query GetItemsWithoutCareer($slot: EquipSlot, $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String) {
     items(
       where: { 
         slot: { eq: $slot },
         type: { neq: NONE },
         levelRequirement: { lte: $levelRequirement },
-        renownRankRequirement: { lte: $renownRankRequirement }
+        renownRankRequirement: { lte: $renownRankRequirement },
+        name: { contains: $nameFilter }
       }, 
       first: $first, 
       after: $after,
@@ -206,6 +370,10 @@ const GET_ITEMS_WITHOUT_CAREER = gql`
           raceRestriction
           iconUrl
           talismanSlots
+          itemSet {
+            id
+            name
+          }
         }
       }
       nodes {
@@ -231,6 +399,97 @@ const GET_ITEMS_WITHOUT_CAREER = gql`
         raceRestriction
         iconUrl
         talismanSlots
+          itemSet {
+            id
+            name
+          }
+      }
+      totalCount
+    }
+  }
+`;
+
+const GET_TALISMANS = gql`
+  query GetTalismans($itemLevel: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!]) {
+    items(
+      where: {
+        type: { eq: ENHANCEMENT },
+        itemLevel: { lte: $itemLevel },
+        name: { contains: $nameFilter }
+      },
+      hasStats: $hasStats,
+      first: $first,
+      after: $after,
+      order: [
+        { rarity: DESC },
+        { itemLevel: DESC },
+        { name: ASC }
+      ]
+    ) {
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+      edges {
+        cursor
+        node {
+          id
+          name
+          description
+          type
+          slot
+          rarity
+          armor
+          dps
+          speed
+          levelRequirement
+          renownRankRequirement
+          itemLevel
+          uniqueEquipped
+          stats {
+            stat
+            value
+            percentage
+          }
+          careerRestriction
+          raceRestriction
+          iconUrl
+          talismanSlots
+          itemSet {
+            id
+            name
+          }
+        }
+      }
+      nodes {
+        id
+        name
+        description
+        type
+        slot
+        rarity
+        armor
+        dps
+        speed
+        levelRequirement
+        renownRankRequirement
+        itemLevel
+        uniqueEquipped
+        stats {
+          stat
+          value
+          percentage
+        }
+        careerRestriction
+        raceRestriction
+        iconUrl
+        talismanSlots
+          itemSet {
+            id
+            name
+          }
       }
       totalCount
     }
@@ -280,14 +539,14 @@ export const loadoutService = {
   },
 
   // 3. Fetch items for equipment selection
-  async getItemsForSlot(slot: EquipSlot, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80): Promise<any> {
+  async getItemsForSlot(slot: EquipSlot, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[]): Promise<any> {
     try {
       let query;
       let variables: any = { 
         slot, 
         first: limit,
-        levelRequirement,
-        renownRankRequirement
+        nameFilter: nameFilter || '',
+        hasStats: hasStats && hasStats.length > 0 ? hasStats : null
       };
 
       if (after) {
@@ -295,10 +554,20 @@ export const loadoutService = {
       }
 
       if (career) {
-        query = GET_ITEMS_WITH_CAREER;
+        query = hasStats && hasStats.length > 0 ? GET_ITEMS_WITH_CAREER_WITH_STATS : GET_ITEMS_WITH_CAREER;
         variables.usableByCareer = career;
+        variables.levelRequirement = levelRequirement;
+        variables.renownRankRequirement = renownRankRequirement;
+        if (hasStats && hasStats.length > 0) {
+          variables.hasStats = hasStats;
+        }
       } else {
-        query = GET_ITEMS_WITHOUT_CAREER;
+        query = hasStats && hasStats.length > 0 ? GET_ITEMS_WITHOUT_CAREER_WITH_STATS : GET_ITEMS_WITHOUT_CAREER;
+        variables.levelRequirement = levelRequirement;
+        variables.renownRankRequirement = renownRankRequirement;
+        if (hasStats && hasStats.length > 0) {
+          variables.hasStats = hasStats;
+        }
       }
 
       const { data } = await client.query({
@@ -308,6 +577,31 @@ export const loadoutService = {
       return (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
     } catch (error) {
       console.error('Failed to fetch items for slot:', error);
+      throw error;
+    }
+  },
+
+  // 3.5. Fetch talismans for item level
+  async getTalismansForItemLevel(itemLevel: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[]): Promise<any> {
+    try {
+      const variables: any = {
+        itemLevel,
+        first: limit,
+        nameFilter: nameFilter || '',
+        hasStats: hasStats || []
+      };
+
+      if (after) {
+        variables.after = after;
+      }
+
+      const { data } = await client.query({
+        query: GET_TALISMANS,
+        variables,
+      });
+      return (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
+    } catch (error) {
+      console.error('Failed to fetch talismans for item level:', error);
       throw error;
     }
   },
@@ -453,52 +747,57 @@ export const loadoutService = {
         return acc;
       }, {} as Record<EquipSlot, LoadoutItem>);
 
-      character.items.forEach(({ equipSlot, item, talismans }: any) => {
-        if (item) {
-          items[equipSlot as EquipSlot] = {
-            item: {
-              id: item.id,
-              name: item.name,
-              description: item.description,
-              type: item.type,
-              slot: item.slot,
-              rarity: item.rarity,
-              armor: item.armor,
-              dps: item.dps,
-              speed: item.speed,
-              levelRequirement: item.levelRequirement,
-              renownRankRequirement: item.renownRankRequirement,
-              itemLevel: item.itemLevel,
-              uniqueEquipped: item.uniqueEquipped,
-              stats: item.stats.map((s: any) => ({ stat: s.stat, value: s.value, percentage: s.percentage })),
-              careerRestriction: item.careerRestriction,
-              raceRestriction: item.raceRestriction,
-              iconUrl: item.iconUrl,
-              talismanSlots: item.talismanSlots,
-            },
-            talismans: talismans.map((t: any) => t ? {
-              id: t.id,
-              name: t.name,
-              description: t.description,
-              type: t.type,
-              slot: t.slot,
-              rarity: t.rarity,
-              armor: t.armor,
-              dps: t.dps,
-              speed: t.speed,
-              levelRequirement: t.levelRequirement,
-              renownRankRequirement: t.renownRankRequirement,
-              itemLevel: t.itemLevel,
-              uniqueEquipped: t.uniqueEquipped,
-              stats: t.stats.map((s: any) => ({ stat: s.stat, value: s.value, percentage: s.percentage })),
-              careerRestriction: t.careerRestriction,
-              raceRestriction: t.raceRestriction,
-              iconUrl: t.iconUrl,
-              talismanSlots: t.talismanSlots,
-            } : null),
-          };
-        }
-      });
+      // Safely iterate over character items if they exist
+      if (character.items && Array.isArray(character.items)) {
+        character.items.forEach(({ equipSlot, item, talismans }: any) => {
+          if (item) {
+            items[equipSlot as EquipSlot] = {
+              item: {
+                id: item.id,
+                name: item.name,
+                description: item.description,
+                type: item.type,
+                slot: item.slot,
+                rarity: item.rarity,
+                armor: item.armor,
+                dps: item.dps,
+                speed: item.speed,
+                levelRequirement: item.levelRequirement,
+                renownRankRequirement: item.renownRankRequirement,
+                itemLevel: item.itemLevel,
+                uniqueEquipped: item.uniqueEquipped,
+                stats: item.stats ? item.stats.map((s: any) => ({ stat: s.stat, value: s.value, percentage: s.percentage })) : [],
+                careerRestriction: item.careerRestriction,
+                raceRestriction: item.raceRestriction,
+                iconUrl: item.iconUrl,
+                talismanSlots: item.talismanSlots,
+                itemSet: item.itemSet,
+              },
+              talismans: talismans && Array.isArray(talismans) ? talismans.map((t: any) => t ? {
+                id: t.id,
+                name: t.name,
+                description: t.description,
+                type: t.type,
+                slot: t.slot,
+                rarity: t.rarity,
+                armor: t.armor,
+                dps: t.dps,
+                speed: t.speed,
+                levelRequirement: t.levelRequirement,
+                renownRankRequirement: t.renownRankRequirement,
+                itemLevel: t.itemLevel,
+                uniqueEquipped: t.uniqueEquipped,
+                stats: t.stats ? t.stats.map((s: any) => ({ stat: s.stat, value: s.value, percentage: s.percentage })) : [],
+                careerRestriction: t.careerRestriction,
+                raceRestriction: t.raceRestriction,
+                iconUrl: t.iconUrl,
+                talismanSlots: t.talismanSlots,
+                itemSet: t.itemSet,
+              } : null) : [],
+            };
+          }
+        });
+      }
 
       // Create the loadout using the service (this emits LOADOUT_CREATED event)
       const loadoutId = loadoutService.createLoadout(`Imported from ${character.name}`);
@@ -510,11 +809,14 @@ export const loadoutService = {
       // Set all the items
       Object.entries(items).forEach(([slot, loadoutItem]) => {
         loadoutService.updateItem(slot as EquipSlot, loadoutItem.item);
-        loadoutItem.talismans.forEach((talisman, index) => {
-          if (talisman) {
-            loadoutService.updateTalisman(slot as EquipSlot, index, talisman);
-          }
-        });
+        // Safely iterate over talismans if they exist
+        if (loadoutItem.talismans && Array.isArray(loadoutItem.talismans)) {
+          loadoutItem.talismans.forEach((talisman, index) => {
+            if (talisman) {
+              loadoutService.updateTalisman(slot as EquipSlot, index, talisman);
+            }
+          });
+        }
       });
 
       // Stats will be recalculated automatically by the updateItem/updateTalisman methods
