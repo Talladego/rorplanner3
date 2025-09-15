@@ -42,6 +42,10 @@ export function formatCareerName(career: Career): string {
   return formatEnumValue(career);
 }
 
+export function formatRaceName(race: string): string {
+  return formatEnumValue(race);
+}
+
 export function formatRarityName(rarity: ItemRarity): string {
   return formatEnumValue(rarity);
 }

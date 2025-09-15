@@ -74,6 +74,12 @@ const GET_CHARACTER = gql`
               }
             }
           }
+          abilities {
+            name
+          }
+          buffs {
+            name
+          }
         }
         talismans {
           id
@@ -184,6 +190,12 @@ const GET_ITEMS_WITH_CAREER_WITH_STATS = gql`
               }
             }
           }
+          abilities {
+            name
+          }
+          buffs {
+            name
+          }
         }
       }
       totalCount
@@ -237,6 +249,12 @@ const GET_ITEMS_WITH_CAREER = gql`
           talismanSlots
           itemSet {
             id
+            name
+          }
+          abilities {
+            name
+          }
+          buffs {
             name
           }
         }
@@ -399,6 +417,12 @@ const GET_ITEMS_WITHOUT_CAREER_WITH_STATS = gql`
             }
           }
         }
+        abilities {
+          name
+        }
+        buffs {
+          name
+        }
       }
       totalCount
     }
@@ -471,6 +495,12 @@ const GET_ITEMS_WITHOUT_CAREER = gql`
                 }
               }
             }
+          }
+          abilities {
+            name
+          }
+          buffs {
+            name
           }
         }
       }
@@ -582,10 +612,15 @@ const GET_TALISMANS = gql`
                 }
                 ... on Ability {
                   name
-                  description
                 }
               }
             }
+          }
+          abilities {
+            name
+          }
+          buffs {
+            name
           }
         }
       }
@@ -625,10 +660,15 @@ const GET_TALISMANS = gql`
                 }
                 ... on Ability {
                   name
-                  description
                 }
               }
             }
+          }
+          abilities {
+            name
+          }
+          buffs {
+            name
           }
       }
       totalCount
@@ -912,6 +952,8 @@ export const loadoutService = {
                 iconUrl: item.iconUrl,
                 talismanSlots: item.talismanSlots,
                 itemSet: item.itemSet,
+                abilities: item.abilities,
+                buffs: item.buffs,
               },
               talismans: talismans && Array.isArray(talismans) ? talismans.map((t: any) => t ? {
                 id: t.id,
@@ -933,6 +975,8 @@ export const loadoutService = {
                 iconUrl: t.iconUrl,
                 talismanSlots: t.talismanSlots,
                 itemSet: t.itemSet,
+                abilities: t.abilities || [],
+                buffs: t.buffs || [],
               } : null) : [],
             };
           }
@@ -972,6 +1016,89 @@ export const loadoutService = {
   // Initialize stats on service load
   initializeStats() {
     this.getStatsSummary();
+  },
+
+  // Get count of equipped items for a specific set
+  getEquippedSetItemsCount(setName: string): number {
+    const loadout = this.getCurrentLoadout();
+    if (!loadout) return 0;
+
+    let count = 0;
+    Object.values(loadout.items).forEach(loadoutItem => {
+      if (loadoutItem.item && loadoutItem.item.itemSet && loadoutItem.item.itemSet.name === setName) {
+        count++;
+      }
+    });
+    return count;
+  },
+
+  // Fetch single item with full details (including descriptions)
+  async getItemWithDetails(itemId: string): Promise<Item | null> {
+    try {
+      const query = gql`
+        query GetItem($id: ID!) {
+          item(id: $id) {
+            id
+            name
+            description
+            type
+            slot
+            rarity
+            armor
+            dps
+            speed
+            levelRequirement
+            renownRankRequirement
+            itemLevel
+            uniqueEquipped
+            stats {
+              stat
+              value
+              percentage
+            }
+            careerRestriction
+            raceRestriction
+            iconUrl
+            talismanSlots
+            itemSet {
+              id
+              name
+              bonuses {
+                itemsRequired
+                bonus {
+                  ... on ItemStat {
+                    stat
+                    value
+                    percentage
+                  }
+                  ... on Ability {
+                    name
+                    description
+                  }
+                }
+              }
+            }
+            abilities {
+              name
+              description
+            }
+            buffs {
+              name
+              description
+            }
+          }
+        }
+      `;
+
+      const { data } = await client.query({
+        query,
+        variables: { id: itemId },
+      });
+      return (data as any).item || null;
+    } catch (error) {
+      console.error('Failed to fetch item details:', error);
+      throw error;
+    }
   },
 };
 

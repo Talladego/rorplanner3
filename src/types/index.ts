@@ -283,8 +283,8 @@ export interface Item {
   talismanSlots: number;
   itemSet: ItemSet | null;
   talismans?: (Item | null)[]; // Array of talisman items
-  abilities?: string[]; // Array of ability descriptions
-  buffs?: string[]; // Array of buff descriptions
+  abilities: Ability[]; // Array of ability objects
+  buffs: Ability[]; // Array of buff objects
 }
 
 export interface LoadoutItem {

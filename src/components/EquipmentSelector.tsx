@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { EquipSlot, Item, Stat } from '../types';
 import { useLoadoutData } from '../hooks/useLoadoutData';
 import { loadoutService } from '../services/loadoutService';
@@ -67,7 +67,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   }, [isOpen, onClose]);
 
   // Fetch items for current page
-  const fetchItems = async (after?: string, filter?: string, stats?: Stat[]) => {
+  const fetchItems = useCallback(async (after?: string, filter?: string, stats?: Stat[]) => {
     if (isTalismanMode) {
       if (!holdingItemLevelReq) return;
     } else {
@@ -135,7 +135,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
     } finally {
       setLoading(false);
     }
-  };
+  }, [isTalismanMode, holdingItemLevelReq, career, currentLoadout, slot]);
 
   // Reset when modal opens
   useEffect(() => {
@@ -146,7 +146,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
       setStatsFilter([]);
       fetchItems(undefined, '', []); // Explicitly no cursor for first page
     }
-  }, [isOpen, career, slot]);
+  }, [isOpen, career, slot, fetchItems]);
 
   const handleNameFilterChange = (value: string) => {
     setNameFilter(value);

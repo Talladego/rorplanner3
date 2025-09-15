@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Item, ItemSetBonusValue, ItemStat, Ability } from '../types';
 import { getItemColor } from '../utils/rarityColors';
-import { formatItemTypeName, formatStatName, formatSlotName, formatCareerName, formatToTitleCase } from '../utils/formatters';
+import { formatItemTypeName, formatStatName, formatSlotName, formatCareerName, formatRaceName } from '../utils/formatters';
+import { loadoutService } from '../services/loadoutService';
 
 interface TooltipProps {
   children: React.ReactNode;
@@ -13,11 +14,40 @@ interface TooltipProps {
 export default function Tooltip({ children, item, className = '', isTalismanTooltip = false }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [detailedItem, setDetailedItem] = useState<Item | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
 
+  // Reset detailed item data when item prop changes
+  useEffect(() => {
+    if (item && detailedItem && detailedItem.id !== item.id) {
+      setDetailedItem(null);
+      setIsLoadingDetails(false);
+    }
+  }, [item?.id]);
+
   const handleMouseEnter = (e: React.MouseEvent) => {
     if (!item) return;
+
+    // Check if we need to fetch detailed item data
+    const needsDetails = !item.abilities?.some(a => a.description) || !item.buffs?.some(b => b.description);
+    const hasCorrectDetails = detailedItem && detailedItem.id === item.id;
+    
+    if (needsDetails && !hasCorrectDetails && !isLoadingDetails) {
+      setIsLoadingDetails(true);
+      // Fetch detailed data asynchronously without blocking tooltip display
+      loadoutService.getItemWithDetails(item.id)
+        .then(fullItem => {
+          setDetailedItem(fullItem);
+        })
+        .catch(error => {
+          console.error('Failed to fetch item details for tooltip:', error);
+        })
+        .finally(() => {
+          setIsLoadingDetails(false);
+        });
+    }
 
     const rect = e.currentTarget.getBoundingClientRect();
     const margin = 10;
@@ -126,11 +156,13 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
 
   // Helper for rendering talisman slots
   const renderTalismanSlots = () => {
+    if (!displayItem) return null;
+    
     const slots = [];
-    for (let i = 0; i < item.talismanSlots; i++) {
-      const talisman = item.talismans?.[i];
+    for (let i = 0; i < displayItem.talismanSlots; i++) {
+      const talisman = displayItem.talismans?.[i];
       slots.push(
-        <div key={i} className="flex items-center gap-2 mb-1">
+        <div key={i} className="flex items-center gap-2 mb-0.5">
           <div className="flex items-center gap-1">
             <img
               src={talisman?.iconUrl || 'https://armory.returnofreckoning.com/icon/1'}
@@ -140,15 +172,18 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
             <span className="text-xs">
               {talisman ? (
                 <>
-                  {talisman.stats && talisman.stats.length > 0 ? (
-                    talisman.stats.map((stat: ItemStat, idx: number) => (
-                      <span key={idx}>
-                        +{stat.value} {formatStatName(stat.stat)}{stat.percentage ? '%' : ''}
-                        {idx < talisman.stats.length - 1 && <span className="text-gray-400 mx-1">/</span>}
-                      </span>
-                    ))
-                  ) : (
-                    talisman.name
+                  <span style={{ color: getItemColor(talisman) }}>{talisman.name}</span>
+                  {talisman.stats && talisman.stats.length > 0 && (
+                    <span className="text-gray-400">
+                      {' ('}
+                      {talisman.stats.map((stat: ItemStat, idx: number) => (
+                        <span key={idx}>
+                          +{stat.value} {formatStatName(stat.stat)}{stat.percentage ? '%' : ''}
+                          {idx < talisman.stats.length - 1 && <span className="mx-1">/</span>}
+                        </span>
+                      ))}
+                      {')'}
+                    </span>
                   )}
                 </>
               ) : (
@@ -166,6 +201,9 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
     return <div className={className}>{children}</div>;
   }
 
+  // Use detailed item data if available, otherwise use the provided item
+  const displayItem = detailedItem || item;
+
   return (
     <>
       <div
@@ -180,41 +218,41 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
       {isVisible && (
         <div
           ref={tooltipRef}
-          className="fixed z-50 bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-3 max-w-xs pointer-events-none"
+          className="fixed z-50 bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 max-w-xs pointer-events-none"
           style={{
             left: position.x,
             top: position.y,
           }}
         >
           {/* 1. Item Name */}
-          <div className="mb-2">
-            <h3 className="font-bold text-base" style={{ color: getItemColor(item) }}>{item.name}</h3>
+          <div className="mb-1">
+            <p className="equipment-item-name" style={{ color: getItemColor(displayItem) }}>{displayItem.name}</p>
           </div>
 
           {/* 2. Item Description */}
-          {item.description && (
-            <div className="mb-3">
-              <p className="text-xs text-gray-200 leading-tight">{item.description}</p>
+          {displayItem.description && (
+            <div className="mb-2">
+              <p className="text-xs text-gray-400 italic leading-tight">{displayItem.description}</p>
             </div>
           )}
 
           {/* 3. Item Info (slot, type, iLvl) */}
-          <div className="mb-3">
-            <div className="text-xs text-gray-200 space-y-1">
-              <div>Slot: {formatSlotName(item.slot)}</div>
-              <div>Type: {formatItemTypeName(item.type)}</div>
-              {item.itemLevel > 0 && <div>Item Level: {item.itemLevel}</div>}
-              {item.uniqueEquipped && <div className="text-yellow-400">Unique-Equipped</div>}
+          <div className="mb-2">
+            <div className="text-xs text-gray-200 space-y-0.5">
+              <div>Slot: {formatSlotName(displayItem.slot)}</div>
+              <div>Type: {formatItemTypeName(displayItem.type)}</div>
+              {displayItem.itemLevel > 0 && <div>Item Level: {displayItem.itemLevel}</div>}
+              {displayItem.uniqueEquipped && <div>Unique-Equipped</div>}
             </div>
           </div>
 
           {/* 4. Item Stats (armor, dps, speed, stats) */}
-          <div className="mb-3">
-            <div className="text-xs text-gray-200 space-y-1">
-              {item.armor > 0 && <div>{item.armor} Armor</div>}
-              {item.dps > 0 && <div>{(item.dps / 10).toFixed(1)} DPS</div>}
-              {item.speed > 0 && <div>{(item.speed / 100).toFixed(1)} Speed</div>}
-              {item.stats && item.stats.length > 0 && item.stats.map((stat: ItemStat, idx: number) => (
+          <div className="mb-2">
+            <div className="text-xs text-yellow-400 space-y-0.5">
+              {displayItem.armor > 0 && <div>{displayItem.armor} Armor</div>}
+              {displayItem.dps > 0 && <div>{(displayItem.dps / 10).toFixed(1)} DPS</div>}
+              {displayItem.speed > 0 && <div>{(displayItem.speed / 100).toFixed(1)} Speed</div>}
+              {displayItem.stats && displayItem.stats.length > 0 && displayItem.stats.map((stat: ItemStat, idx: number) => (
                 <div key={idx}>
                   {stat.value > 0 ? '+' : ''}{stat.value} {formatStatName(stat.stat)}{stat.percentage ? '%' : ''}
                 </div>
@@ -222,9 +260,27 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
             </div>
           </div>
 
+          {/* 4.5. Item Abilities and Buffs */}
+          {(displayItem.abilities && displayItem.abilities.length > 0) || (displayItem.buffs && displayItem.buffs.length > 0) ? (
+            <div className="mb-2">
+              <div className="text-xs text-green-400 space-y-0.5">
+                {displayItem.abilities && displayItem.abilities.length > 0 && displayItem.abilities.map((ability, idx: number) => (
+                  <div key={`ability-${idx}`}>
+                    <div className="text-green-400 text-xs italic">+ {ability.description || ability.name}</div>
+                  </div>
+                ))}
+                {displayItem.buffs && displayItem.buffs.length > 0 && displayItem.buffs.map((buff, idx: number) => (
+                  <div key={`buff-${idx}`}>
+                    <div className="text-green-400 text-xs italic">+ {buff.description || buff.name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {/* 5. Item Talismans */}
-          {!isTalismanTooltip && item.talismanSlots > 0 && item.talismans && item.talismans.length > 0 && (
-            <div className="mb-3">
+          {!isTalismanTooltip && displayItem.talismanSlots > 0 && displayItem.talismans && displayItem.talismans.length > 0 && (
+            <div className="mb-2">
               <div className="text-xs text-gray-200">
                 {renderTalismanSlots()}
               </div>
@@ -232,16 +288,19 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           )}
 
           {/* 6. Item Set and Set Bonuses */}
-          {item.itemSet && (
-            <div className="mb-3">
+          {displayItem.itemSet && (
+            <div className="mb-2">
               <div className="text-xs text-gray-200">
-                <div className="font-medium text-yellow-400 mb-2">{item.itemSet.name}</div>
+                <div className="font-medium text-green-400 mb-1">{displayItem.itemSet.name}</div>
                 {/* Render set bonuses with piece counts */}
-                {item.itemSet.bonuses && item.itemSet.bonuses.length > 0 ? (
-                  <div className="space-y-1">
-                    {item.itemSet.bonuses.map((bonus, idx: number) => {
-                      const formatBonusValue = (bonusValue: ItemSetBonusValue): string => {
-                        if (!bonusValue) return 'No bonus data';
+                {displayItem.itemSet.bonuses && displayItem.itemSet.bonuses.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {displayItem.itemSet.bonuses.map((bonus, idx: number) => {
+                      const equippedCount = loadoutService.getEquippedSetItemsCount(displayItem.itemSet!.name);
+                      const isActive = equippedCount >= bonus.itemsRequired;
+                      
+                      const formatBonusValue = (bonusValue: ItemSetBonusValue): React.JSX.Element => {
+                        if (!bonusValue) return <span>No bonus data</span>;
 
                         if ('stat' in bonusValue) {
                           // It's an ItemStat
@@ -249,18 +308,22 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
                           const statName = formatStatName(itemStat.stat);
                           const value = itemStat.value;
                           const isPercentage = itemStat.percentage;
-                          return `+ ${value}${isPercentage ? '%' : ''} ${statName}`;
+                          return <span>+ {value}{isPercentage ? '%' : ''} {statName}</span>;
                         } else if ('name' in bonusValue || 'description' in bonusValue) {
                           // It's an Ability
                           const ability = bonusValue as Ability;
-                          return ability.name || ability.description || 'Unknown Ability';
+                          return (
+                            <span className="text-xs italic">
+                              + {ability.description || ability.name}
+                            </span>
+                          );
                         } else {
-                          return 'Unknown bonus type';
+                          return <span>Unknown bonus type</span>;
                         }
                       };
 
                       return (
-                        <div key={idx} className="text-green-400">
+                        <div key={idx} className={isActive ? "text-green-400" : "text-gray-500"}>
                           ({bonus.itemsRequired} piece bonus:) {formatBonusValue(bonus.bonus)}
                         </div>
                       );
@@ -276,13 +339,13 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           {/* 7. Item Requirements (levelReq, renownReq, careerReq, raceReq) */}
           <div>
             <div className="text-xs text-gray-200 space-y-1">
-              {item.levelRequirement > 0 && <div>Minimum Rank: {item.levelRequirement}</div>}
-              {item.renownRankRequirement > 0 && <div>Requires {item.renownRankRequirement} Renown</div>}
-              {item.careerRestriction && item.careerRestriction.length > 0 && (
-                <div>Career: {item.careerRestriction.map(career => formatCareerName(career)).join(', ')}</div>
+              {displayItem.levelRequirement > 0 && <div>Minimum Rank: {displayItem.levelRequirement}</div>}
+              {displayItem.renownRankRequirement > 0 && <div>Requires {displayItem.renownRankRequirement} Renown</div>}
+              {displayItem.careerRestriction && displayItem.careerRestriction.length > 0 && (
+                <div>Career: {displayItem.careerRestriction.map(career => formatCareerName(career)).join(', ')}</div>
               )}
-              {item.raceRestriction && item.raceRestriction.length > 0 && (
-                <div>Race: {item.raceRestriction.map(race => formatToTitleCase(race)).join(', ')}</div>
+              {displayItem.raceRestriction && displayItem.raceRestriction.length > 0 && (
+                <div>Race: {displayItem.raceRestriction.map(race => formatRaceName(race)).join(', ')}</div>
               )}
             </div>
           </div>
