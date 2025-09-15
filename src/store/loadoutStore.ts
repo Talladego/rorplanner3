@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { create } from 'zustand';
 import { Loadout, LoadoutItem, EquipSlot, Career, Item, StatsSummary } from '../types';
 

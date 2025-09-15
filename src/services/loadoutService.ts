@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useLoadoutStore } from '../store/loadoutStore';
+import { loadoutStoreAdapter } from '../store/loadoutStoreAdapter';
 import client from '../lib/apollo-client';
 import { gql } from '@apollo/client';
 import { EquipSlot, Item, Career, LoadoutItem, Stat } from '../types';
@@ -59,6 +59,20 @@ const GET_CHARACTER = gql`
           itemSet {
             id
             name
+            bonuses {
+              itemsRequired
+              bonus {
+                ... on ItemStat {
+                  stat
+                  value
+                  percentage
+                }
+                ... on Ability {
+                  name
+                  description
+                }
+              }
+            }
           }
         }
         talismans {
@@ -87,6 +101,20 @@ const GET_CHARACTER = gql`
           itemSet {
             id
             name
+            bonuses {
+              itemsRequired
+              bonus {
+                ... on ItemStat {
+                  stat
+                  value
+                  percentage
+                }
+                ... on Ability {
+                  name
+                  description
+                }
+              }
+            }
           }
         }
       }
@@ -141,6 +169,20 @@ const GET_ITEMS_WITH_CAREER_WITH_STATS = gql`
           itemSet {
             id
             name
+            bonuses {
+              itemsRequired
+              bonus {
+                ... on ItemStat {
+                  stat
+                  value
+                  percentage
+                }
+                ... on Ability {
+                  name
+                  description
+                }
+              }
+            }
           }
         }
       }
@@ -225,6 +267,20 @@ const GET_ITEMS_WITH_CAREER = gql`
           itemSet {
             id
             name
+            bonuses {
+              itemsRequired
+              bonus {
+                ... on ItemStat {
+                  stat
+                  value
+                  percentage
+                }
+                ... on Ability {
+                  name
+                  description
+                }
+              }
+            }
           }
       }
       totalCount
@@ -285,6 +341,20 @@ const GET_ITEMS_WITHOUT_CAREER_WITH_STATS = gql`
           itemSet {
             id
             name
+            bonuses {
+              itemsRequired
+              bonus {
+                ... on ItemStat {
+                  stat
+                  value
+                  percentage
+                }
+                ... on Ability {
+                  name
+                  description
+                }
+              }
+            }
           }
         }
       }
@@ -314,6 +384,20 @@ const GET_ITEMS_WITHOUT_CAREER_WITH_STATS = gql`
         itemSet {
           id
           name
+          bonuses {
+            itemsRequired
+            bonus {
+              ... on ItemStat {
+                stat
+                value
+                percentage
+              }
+              ... on Ability {
+                name
+                description
+              }
+            }
+          }
         }
       }
       totalCount
@@ -373,6 +457,20 @@ const GET_ITEMS_WITHOUT_CAREER = gql`
           itemSet {
             id
             name
+            bonuses {
+              itemsRequired
+              bonus {
+                ... on ItemStat {
+                  stat
+                  value
+                  percentage
+                }
+                ... on Ability {
+                  name
+                  description
+                }
+              }
+            }
           }
         }
       }
@@ -402,6 +500,20 @@ const GET_ITEMS_WITHOUT_CAREER = gql`
           itemSet {
             id
             name
+            bonuses {
+              itemsRequired
+              bonus {
+                ... on ItemStat {
+                  stat
+                  value
+                  percentage
+                }
+                ... on Ability {
+                  name
+                  description
+                }
+              }
+            }
           }
       }
       totalCount
@@ -460,6 +572,20 @@ const GET_TALISMANS = gql`
           itemSet {
             id
             name
+            bonuses {
+              itemsRequired
+              bonus {
+                ... on ItemStat {
+                  stat
+                  value
+                  percentage
+                }
+                ... on Ability {
+                  name
+                  description
+                }
+              }
+            }
           }
         }
       }
@@ -489,6 +615,20 @@ const GET_TALISMANS = gql`
           itemSet {
             id
             name
+            bonuses {
+              itemsRequired
+              bonus {
+                ... on ItemStat {
+                  stat
+                  value
+                  percentage
+                }
+                ... on Ability {
+                  name
+                  description
+                }
+              }
+            }
           }
       }
       totalCount
@@ -507,7 +647,7 @@ export const loadoutService = {
       const characters = (data as any).characters.edges.map((e: any) => e.node);
       if (characters.length === 0) throw new Error('Character not found');
       const character = characters[0]; // Take the first match
-      await useLoadoutStore.getState().importFromCharacter(character.id);
+      await loadoutStoreAdapter.importFromCharacter(character.id);
       return character.id;
     } catch (error) {
       console.error('Failed to load from named character:', error);
@@ -517,7 +657,7 @@ export const loadoutService = {
 
   // 2. Add/update specific item/talisman slots
   updateItem(slot: EquipSlot, item: Item | null) {
-    useLoadoutStore.getState().setItem(slot, item);
+    loadoutStoreAdapter.setItem(slot, item);
     loadoutEventEmitter.emit({
       type: 'ITEM_UPDATED',
       payload: { slot, item },
@@ -528,7 +668,7 @@ export const loadoutService = {
   },
 
   updateTalisman(slot: EquipSlot, index: number, talisman: Item | null) {
-    useLoadoutStore.getState().setTalisman(slot, index, talisman);
+    loadoutStoreAdapter.setTalisman(slot, index, talisman);
     loadoutEventEmitter.emit({
       type: 'TALISMAN_UPDATED',
       payload: { slot, index, talisman },
@@ -608,8 +748,8 @@ export const loadoutService = {
 
   // 3. Retrieve stats summary
   getStatsSummary() {
-    useLoadoutStore.getState().calculateStats();
-    const stats = useLoadoutStore.getState().statsSummary;
+    loadoutStoreAdapter.calculateStats();
+    const stats = loadoutStoreAdapter.getStatsSummary();
     loadoutEventEmitter.emit({
       type: 'STATS_UPDATED',
       payload: { stats },
@@ -620,15 +760,15 @@ export const loadoutService = {
 
   // Additional utilities
   getCurrentLoadout() {
-    return useLoadoutStore.getState().getCurrentLoadout();
+    return loadoutStoreAdapter.getCurrentLoadout();
   },
 
   getAllLoadouts() {
-    return useLoadoutStore.getState().loadouts;
+    return loadoutStoreAdapter.getLoadouts();
   },
 
   getCurrentLoadoutId() {
-    return useLoadoutStore.getState().currentLoadoutId;
+    return loadoutStoreAdapter.getCurrentLoadoutId();
   },
 
   // Event subscription methods
@@ -668,7 +808,7 @@ export const loadoutService = {
   },
 
   setCareer(career: Career) {
-    useLoadoutStore.getState().setCareer(career);
+    loadoutStoreAdapter.setCareer(career);
     loadoutEventEmitter.emit({
       type: 'CAREER_CHANGED',
       payload: { career },
@@ -677,7 +817,7 @@ export const loadoutService = {
   },
 
   setLevel(level: number) {
-    useLoadoutStore.getState().setLevel(level);
+    loadoutStoreAdapter.setLevel(level);
     loadoutEventEmitter.emit({
       type: 'LEVEL_CHANGED',
       payload: { level },
@@ -686,7 +826,7 @@ export const loadoutService = {
   },
 
   setRenownRank(renownRank: number) {
-    useLoadoutStore.getState().setRenownRank(renownRank);
+    loadoutStoreAdapter.setRenownRank(renownRank);
     loadoutEventEmitter.emit({
       type: 'RENOWN_RANK_CHANGED',
       payload: { renownRank },
@@ -695,7 +835,7 @@ export const loadoutService = {
   },
 
   createLoadout(name: string) {
-    const loadoutId = useLoadoutStore.getState().createLoadout(name);
+    const loadoutId = loadoutStoreAdapter.createLoadout(name);
     loadoutEventEmitter.emit({
       type: 'LOADOUT_CREATED',
       payload: { loadoutId, name },
@@ -707,7 +847,7 @@ export const loadoutService = {
   },
 
   switchLoadout(id: string) {
-    useLoadoutStore.getState().switchLoadout(id);
+    loadoutStoreAdapter.switchLoadout(id);
     loadoutEventEmitter.emit({
       type: 'LOADOUT_SWITCHED',
       payload: { loadoutId: id },
@@ -718,8 +858,8 @@ export const loadoutService = {
   },
 
   resetCurrentLoadout() {
-    const currentLoadout = useLoadoutStore.getState().getCurrentLoadout();
-    useLoadoutStore.getState().resetCurrentLoadout();
+    const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
+    loadoutStoreAdapter.resetCurrentLoadout();
     if (currentLoadout) {
       loadoutEventEmitter.emit({
         type: 'LOADOUT_RESET',

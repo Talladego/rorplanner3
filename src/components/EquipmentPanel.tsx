@@ -85,7 +85,7 @@ export default function EquipmentPanel() {
             <div key={slot} className="relative">
               <div className="equipment-slot">
                 <div className="flex items-start gap-2">
-                  <Tooltip item={slotData.item}>
+                  <Tooltip item={slotData.item ? { ...slotData.item, talismans: slotData.talismans } : null}>
                     <div
                       className="equipment-icon cursor-pointer"
                       onClick={() => handleSlotClick(slot)}
@@ -108,7 +108,7 @@ export default function EquipmentPanel() {
                         {Array.from({ length: slotData.item.talismanSlots }, (_, i) => (
                           <div key={i} className="talisman-slot">
                             {slotData.talismans[i] ? (
-                              <Tooltip item={slotData.talismans[i]}>
+                              <Tooltip item={slotData.talismans[i]} isTalismanTooltip={true}>
                                 <img
                                   src={slotData.talismans[i]!.iconUrl}
                                   alt={slotData.talismans[i]!.name}

@@ -46,7 +46,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   const [currentPage, setCurrentPage] = useState(1);
   const [pageHistory, setPageHistory] = useState<string[]>([]); // Track cursors for back navigation
   const [nameFilter, setNameFilter] = useState('');
-  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [statsFilter, setStatsFilter] = useState<Stat[]>([]);
 
   // Handle click outside to close
@@ -259,7 +259,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
         {/* Items List */}
         <div className="space-y-0.5">
           {pageData.items.map((item: any) => (
-            <Tooltip key={item.id} item={item as Item}>
+            <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode}>
               <div
                 className="border border-gray-300 dark:border-gray-600 p-1.5 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 bg-white dark:bg-gray-800 transition-colors h-12 flex items-center"
                 onClick={() => handleItemSelect(item as Item)}

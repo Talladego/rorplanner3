@@ -110,10 +110,84 @@ export enum ItemType {
   JEWELRY = 'JEWELRY',
 }
 
+export interface ItemSetBonus {
+  itemsRequired: number;
+  bonus: ItemSetBonusValue;
+}
+
+export interface ItemStat {
+  stat: Stat;
+  value: number;
+  percentage: boolean;
+}
+
+export interface AbilityInfo {
+  id: string;
+  name: string;
+  iconUrl: string;
+  description: string;
+  abilityType: string;
+  specialization: number;
+  actionPointCost: number;
+  moraleLevel: number;
+  moraleCost: number;
+  castTime: number;
+  range: number;
+  minRange: number;
+  minLevel: number;
+  cooldown: number;
+  labels: string[];
+}
+
+export interface Ability {
+  id: string;
+  name: string;
+  iconUrl: string;
+  description: string;
+  info: AbilityInfo;
+  abilityType: string;
+  specialization: number;
+  actionPointCost: number;
+  moraleLevel: number;
+  moraleCost: number;
+  castTime: number;
+  range: number;
+  minRange: number;
+  minLevel: number;
+  cooldown: number;
+  labels: string[];
+}
+
+export type ItemSetBonusValue = Ability | ItemStat;
+
+export interface ILoadoutStore {
+  // State getters
+  getLoadouts(): Loadout[];
+  getCurrentLoadoutId(): string | null;
+  getCurrentLoadout(): Loadout | null;
+  getStatsSummary(): StatsSummary;
+
+  // State setters
+  setCareer(career: Career): void;
+  setLevel(level: number): void;
+  setRenownRank(renownRank: number): void;
+  setItem(slot: EquipSlot, item: Item | null): void;
+  setTalisman(slot: EquipSlot, index: number, talisman: Item | null): void;
+  resetCurrentLoadout(): void;
+  calculateStats(): void;
+
+  // Loadout management
+  createLoadout(name: string): string;
+  deleteLoadout(id: string): void;
+  switchLoadout(id: string): void;
+  importFromCharacter(characterId: string): Promise<void>;
+}
+
 export interface ItemSet {
   id: string;
   name: string;
   level: number;
+  bonuses?: ItemSetBonus[];
 }
 
 export enum Stat {
@@ -188,12 +262,6 @@ export enum Stat {
   MAGIC_CRIT_RATE = 'MAGIC_CRIT_RATE',
 }
 
-export interface ItemStat {
-  stat: Stat;
-  value: number;
-  percentage: boolean;
-}
-
 export interface Item {
   id: string;
   name: string;
@@ -214,7 +282,9 @@ export interface Item {
   iconUrl: string;
   talismanSlots: number;
   itemSet: ItemSet | null;
-  // buffs, abilities can be added if needed
+  talismans?: (Item | null)[]; // Array of talisman items
+  abilities?: string[]; // Array of ability descriptions
+  buffs?: string[]; // Array of buff descriptions
 }
 
 export interface LoadoutItem {
