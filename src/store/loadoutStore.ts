@@ -14,19 +14,19 @@ interface LoadoutState {
   resetCurrentLoadout: () => void;
   calculateStats: () => void;
   // Actions for multiple loadouts
-  createLoadout: (name: string) => string;
+  createLoadout: (name: string, level?: number, renownRank?: number) => string;
   deleteLoadout: (id: string) => void;
   switchLoadout: (id: string) => void;
   importFromCharacter: (characterId: string) => Promise<string>; // Will use GraphQL
   getCurrentLoadout: () => Loadout | null;
 }
 
-const createInitialLoadout = (id: string, name: string): Loadout => ({
+const createInitialLoadout = (id: string, name: string, level: number = 50, renownRank: number = 80): Loadout => ({
   id,
   name,
   career: null,
-  level: 40,
-  renownRank: 80,
+  level,
+  renownRank,
   items: Object.values(EquipSlot).reduce((acc, slot) => {
     acc[slot] = { item: null, talismans: [] };
     return acc;
@@ -207,10 +207,10 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     return { statsSummary: stats };
   }),
 
-  createLoadout: (name) => {
+  createLoadout: (name, level = 50, renownRank = 80) => {
     const id = `loadout-${Date.now()}`;
     set((state) => ({
-      loadouts: [...state.loadouts, createInitialLoadout(id, name)],
+      loadouts: [...state.loadouts, createInitialLoadout(id, name, level, renownRank)],
       currentLoadoutId: state.currentLoadoutId || id,
     }));
     return id;

@@ -4,11 +4,25 @@ import { loadoutService } from '../services/loadoutService';
 import { CareerChangedEvent, LevelChangedEvent, RenownRankChangedEvent } from '../types/events';
 import { formatCareerName } from '../utils/formatters';
 
-export default function Toolbar() {
-  const [selectedCareer, setSelectedCareer] = useState<Career | ''>('');
-  const [level, setLevel] = useState(40);
+interface ToolbarProps {
+  selectedCareer: Career | '';
+  setSelectedCareer: (career: Career | '') => void;
+}
+
+export default function Toolbar({ selectedCareer, setSelectedCareer }: ToolbarProps) {
+  const [level, setLevel] = useState(50);
   const [renownRank, setRenownRank] = useState(80);
   const [characterName, setCharacterName] = useState('');
+
+  // Initialize state from current loadout on mount
+  useEffect(() => {
+    const currentLoadout = loadoutService.getCurrentLoadout();
+    if (currentLoadout) {
+      setSelectedCareer(currentLoadout.career || '');
+      setLevel(currentLoadout.level);
+      setRenownRank(currentLoadout.renownRank);
+    }
+  }, [setSelectedCareer]);
 
   // Listen to events to update local state when loadout changes externally
   useEffect(() => {
@@ -29,23 +43,29 @@ export default function Toolbar() {
           setRenownRank(renownEvent.payload.renownRank);
           break;
         }
-        case 'LOADOUT_RESET':
-          // Clear all form fields when loadout is reset
-          setSelectedCareer('');
-          setLevel(40);
-          setRenownRank(80);
-          setCharacterName('');
+        case 'LOADOUT_SWITCHED': {
+          // Update UI state to match the new current loadout
+          const currentLoadout = loadoutService.getCurrentLoadout();
+          if (currentLoadout) {
+            // Update career from the global career
+            if (currentLoadout.career) {
+              setSelectedCareer(currentLoadout.career);
+            }
+            setLevel(currentLoadout.level);
+            setRenownRank(currentLoadout.renownRank);
+          }
           break;
+        }
       }
     });
 
     return unsubscribe;
-  }, []);
+  }, [setSelectedCareer]);
 
   const handleCareerChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const career = e.target.value as Career;
     setSelectedCareer(career);
-    if (career) loadoutService.setCareer(career);
+    if (career) loadoutService.getOrCreateLoadoutForCareer(career);
   };
 
   const handleLevelChange = (e: ChangeEvent<HTMLInputElement>) => {

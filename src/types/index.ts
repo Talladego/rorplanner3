@@ -215,7 +215,7 @@ export interface ILoadoutStore {
   calculateStats(): void;
 
   // Loadout management
-  createLoadout(name: string): string;
+  createLoadout(name: string, level?: number, renownRank?: number): string;
   deleteLoadout(id: string): void;
   switchLoadout(id: string): void;
   importFromCharacter(characterId: string): Promise<void>;

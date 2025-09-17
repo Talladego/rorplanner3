@@ -129,19 +129,24 @@ const GET_CHARACTER = gql`
 `;
 
 
-const GET_ITEMS_WITH_CAREER = gql`
-  query GetItemsWithCareer($slot: EquipSlot, $usableByCareer: Career, $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!]) {
-    items(where: { 
-      slot: { eq: $slot },
-      type: { neq: NONE },
-      levelRequirement: { lte: $levelRequirement },
-      renownRankRequirement: { lte: $renownRankRequirement },
-      name: { contains: $nameFilter }
-    }, usableByCareer: $usableByCareer, hasStats: $hasStats, first: $first, after: $after, order: [
-      { rarity: DESC },
-      { itemLevel: DESC },
-      { name: ASC }
-    ]) {
+const GET_ITEMS_WITHOUT_CAREER = gql`
+  query GetItemsWithoutCareer($slot: EquipSlot, $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!]) {
+    items(
+      where: { 
+        slot: { eq: $slot },
+        levelRequirement: { lte: $levelRequirement },
+        renownRankRequirement: { lte: $renownRankRequirement },
+        name: { contains: $nameFilter }
+      }, 
+      hasStats: $hasStats,
+      first: $first, 
+      after: $after,
+      order: [
+        { rarity: DESC },
+        { itemLevel: DESC },
+        { name: ASC }
+      ]
+    ) {
       pageInfo {
         hasNextPage
         hasPreviousPage
@@ -210,8 +215,8 @@ const GET_ITEMS_WITH_CAREER = gql`
   }
 `;
 
-const GET_ITEMS_WITHOUT_CAREER = gql`
-  query GetItemsWithoutCareer($slot: EquipSlot, $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!]) {
+const GET_ITEMS_WITH_CAREER = gql`
+  query GetItemsWithCareer($slot: EquipSlot, $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!], $usableByCareer: Career) {
     items(
       where: { 
         slot: { eq: $slot },
@@ -220,6 +225,7 @@ const GET_ITEMS_WITHOUT_CAREER = gql`
         name: { contains: $nameFilter }
       }, 
       hasStats: $hasStats,
+      usableByCareer: $usableByCareer,
       first: $first, 
       after: $after,
       order: [
@@ -831,8 +837,8 @@ export const loadoutService = {
     });
   },
 
-  createLoadout(name: string) {
-    const loadoutId = loadoutStoreAdapter.createLoadout(name);
+  createLoadout(name: string, level?: number, renownRank?: number) {
+    const loadoutId = loadoutStoreAdapter.createLoadout(name, level, renownRank);
     loadoutEventEmitter.emit({
       type: 'LOADOUT_CREATED',
       payload: { loadoutId, name },
@@ -866,6 +872,34 @@ export const loadoutService = {
     }
     // Recalculate stats after reset
     this.getStatsSummary();
+  },
+
+  getOrCreateLoadoutForCareer(career: Career) {
+    const loadouts = loadoutStoreAdapter.getLoadouts();
+    const careerLoadout = loadouts.find(l => l.career === career);
+    
+    if (careerLoadout) {
+      // Switch to existing loadout for this career
+      this.switchLoadout(careerLoadout.id);
+      return careerLoadout.id;
+    } else {
+      // Get current level/renown to copy to new loadout
+      const currentLoadout = this.getCurrentLoadout();
+      const currentLevel = currentLoadout?.level ?? 40;
+      const currentRenown = currentLoadout?.renownRank ?? 80;
+      
+      // Create new loadout for this career
+      const loadoutName = `${career} Loadout`;
+      const loadoutId = this.createLoadout(loadoutName, currentLevel, currentRenown);
+      
+      // Switch to the new loadout first
+      this.switchLoadout(loadoutId);
+      
+      // Now set the career for the current loadout (which is now the new loadout)
+      loadoutStoreAdapter.setCareer(career);
+      
+      return loadoutId;
+    }
   },
 
   // 4. Import character data and create loadout
@@ -941,11 +975,10 @@ export const loadoutService = {
       }
 
       // Create the loadout using the service (this emits LOADOUT_CREATED event)
-      const loadoutId = loadoutService.createLoadout(`Imported from ${character.name}`);
+      const loadoutId = loadoutService.createLoadout(`Imported from ${character.name}`, character.level, character.renownRank);
       loadoutService.switchLoadout(loadoutId);
       loadoutService.setCareer(character.career);
-      loadoutService.setLevel(character.level);
-      loadoutService.setRenownRank(character.renownRank);
+      // Level and renown already set in createLoadout
 
       // Set all the items
       Object.entries(items).forEach(([slot, loadoutItem]) => {

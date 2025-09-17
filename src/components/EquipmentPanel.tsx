@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { EquipSlot, Item } from '../types';
+import { EquipSlot, Item, Stat, Career } from '../types';
 import { loadoutService } from '../services/loadoutService';
 import { useLoadoutData } from '../hooks/useLoadoutData';
 import EquipmentSelector from './EquipmentSelector';
@@ -7,12 +7,20 @@ import { DEFAULT_SLOT_ICONS } from '../constants/slotIcons';
 import Tooltip from './Tooltip';
 import { getItemColor } from '../utils/rarityColors';
 
-export default function EquipmentPanel() {
+interface EquipmentPanelProps {
+  selectedCareer: Career | '';
+}
+
+export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) {
   const { currentLoadout } = useLoadoutData();
   const [selectedSlot, setSelectedSlot] = useState<EquipSlot | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [talismanSlot, setTalismanSlot] = useState<{ slot: EquipSlot; index: number } | null>(null);
+
+  // Persistent filter state shared across all equipment selections
+  const [nameFilter, setNameFilter] = useState('');
+  const [statsFilter, setStatsFilter] = useState<Stat[]>([]);
 
   const handleSlotClick = (slot: EquipSlot) => {
     setSelectedSlot(slot);
@@ -137,21 +145,25 @@ export default function EquipmentPanel() {
           );
         })}
       </div>
-      {(selectedSlot || talismanSlot) && (
-        <EquipmentSelector
-          slot={selectedSlot || talismanSlot!.slot}
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false);
-            setSelectedSlot(null);
-            setTalismanSlot(null);
-          }}
-          onSelect={talismanSlot ? handleTalismanSelect : handleItemSelect}
-          isTalismanMode={!!talismanSlot}
-          holdingItemLevelReq={talismanSlot ? currentLoadout?.items[talismanSlot.slot].item?.levelRequirement : undefined}
-          talismanSlotIndex={talismanSlot?.index}
-        />
-      )}
+      
+      <EquipmentSelector
+        slot={selectedSlot || talismanSlot?.slot || EquipSlot.HELM}
+        isOpen={isModalOpen && !!(selectedSlot || talismanSlot)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedSlot(null);
+          setTalismanSlot(null);
+        }}
+        onSelect={talismanSlot ? handleTalismanSelect : handleItemSelect}
+        isTalismanMode={!!talismanSlot}
+        holdingItemLevelReq={talismanSlot ? currentLoadout?.items[talismanSlot.slot].item?.levelRequirement : undefined}
+        talismanSlotIndex={talismanSlot?.index}
+        nameFilter={nameFilter}
+        statsFilter={statsFilter}
+        onNameFilterChange={setNameFilter}
+        onStatsFilterChange={setStatsFilter}
+        selectedCareer={selectedCareer}
+      />
     </div>
   );
 }

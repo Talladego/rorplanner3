@@ -16,6 +16,11 @@ interface EquipmentSelectorProps {
   isTalismanMode?: boolean;
   holdingItemLevelReq?: number;
   talismanSlotIndex?: number; // Index of the talisman slot being filled
+  nameFilter: string;
+  statsFilter: Stat[];
+  onNameFilterChange: (value: string) => void;
+  onStatsFilterChange: (value: Stat[]) => void;
+  selectedCareer: Career | '';
 }
 
 // Helper function to format talisman stats display
@@ -48,9 +53,9 @@ interface PageData {
   totalCount: number;
 }
 
-export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isTalismanMode = false, holdingItemLevelReq, talismanSlotIndex }: EquipmentSelectorProps) {
+export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isTalismanMode = false, holdingItemLevelReq, talismanSlotIndex, nameFilter, statsFilter, onNameFilterChange, onStatsFilterChange, selectedCareer }: EquipmentSelectorProps) {
   const { currentLoadout } = useLoadoutData();
-  const career = currentLoadout?.career;
+  const career = selectedCareer;
   const modalRef = useRef<HTMLDivElement>(null);
   
   // Store previous context to detect changes
@@ -71,9 +76,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageHistory, setPageHistory] = useState<string[]>([]); // Track cursors for back navigation
-  const [nameFilter, setNameFilter] = useState('');
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
-  const [statsFilter, setStatsFilter] = useState<Stat[]>([]);
 
   // Handle click outside to close
   useEffect(() => {
@@ -127,10 +130,15 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
         );
       }
 
-      // Apply client-side level/renown and race filtering for career queries
-      // since the usableByCareer filter may not handle all restrictions properly
-      // Skip this filtering for pocket items as they should be available regardless of level/renown/race
+      // Apply client-side level/renown filtering
+      // Skip this filtering for pocket items as they should be available regardless of level/renown
       let filteredNodes = connection.nodes || [];
+      
+      // Filter out items with type NONE for all slots except POCKET1 and POCKET2
+      if (slot !== EquipSlot.POCKET1 && slot !== EquipSlot.POCKET2) {
+        filteredNodes = filteredNodes.filter((item: any) => item.type !== 'NONE');
+      }
+      
       if (career && !isTalismanMode && currentLoadout && slot !== EquipSlot.POCKET1 && slot !== EquipSlot.POCKET2) {
         const allowedRaces = CAREER_RACE_MAPPING[career] || [];
         
@@ -143,7 +151,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
           // Allow items that are usable by the character's race
           // Items with empty raceRestriction are available to all races
           const raceOk = !item.raceRestriction || item.raceRestriction.length === 0 || 
-                        item.raceRestriction.some((race: any) => allowedRaces.includes(race));
+                        item.raceRestriction.some((race: any) => allowedRaces.some((allowed: string) => allowed.toLowerCase() === race.toLowerCase()));
           
           return levelOk && renownOk && raceOk;
         });
@@ -186,19 +194,32 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
       setCurrentPage(1);
       setPageHistory([]);
       
+      // Reset pageData when modal opens
+      setPageData({
+        items: [],
+        hasNextPage: false,
+        hasPreviousPage: false,
+        startCursor: null,
+        endCursor: null,
+        totalCount: 0,
+      });
+      
       // Reset filters only if context changed
       if (contextChanged) {
-        setNameFilter('');
-        setStatsFilter([]);
+        onNameFilterChange('');
+        onStatsFilterChange([]);
         prevContextRef.current = currentContext;
       }
       
-      fetchItems(undefined, nameFilter, statsFilter);
+      // Only fetch if we have a career (for equipment) or it's talisman mode
+      if (career || isTalismanMode) {
+        fetchItems(undefined, nameFilter, statsFilter);
+      }
     }
-  }, [isOpen, isTalismanMode, career, nameFilter, statsFilter, fetchItems]);
+  }, [isOpen, isTalismanMode, career, currentLoadout, nameFilter, statsFilter, fetchItems, onNameFilterChange, onStatsFilterChange]);
 
   const handleNameFilterChange = (value: string) => {
-    setNameFilter(value);
+    onNameFilterChange(value);
     
     // Debounce the filter to avoid too many API calls
     if (debounceTimer) {
@@ -289,7 +310,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
               onChange={(e) => {
                 const selectedStat = e.target.value as Stat;
                 const newStatsFilter = selectedStat ? [selectedStat] : [];
-                setStatsFilter(newStatsFilter);
+                onStatsFilterChange(newStatsFilter);
                 setCurrentPage(1);
                 setPageHistory([]);
                 fetchItems(undefined, nameFilter, newStatsFilter);

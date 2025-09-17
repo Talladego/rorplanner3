@@ -1,9 +1,10 @@
-import { useEffect, Component, ReactNode, ErrorInfo } from 'react';
+import { useEffect, useState, Component, ReactNode, ErrorInfo } from 'react';
 import { loadoutService } from './services/loadoutService';
 import Toolbar from './components/Toolbar';
 import EquipmentPanel from './components/EquipmentPanel';
 import StatsPanel from './components/StatsPanel';
 import ApolloProviderWrapper from './components/ApolloProviderWrapper';
+import { Career } from './types';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error?: Error }> {
   constructor(props: { children: ReactNode }) {
@@ -42,6 +43,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 }
 
 function App() {
+  const [selectedCareer, setSelectedCareer] = useState<Career | ''>('');
+
   useEffect(() => {
     console.log('App useEffect running');
     // Create a default loadout if none exists
@@ -68,10 +71,10 @@ function App() {
             <h1 className="text-4xl font-bold text-primary">RorPlanner</h1>
           </header>
           <div className="max-w-6xl mx-auto">
-            <Toolbar />
+            <Toolbar selectedCareer={selectedCareer} setSelectedCareer={setSelectedCareer} />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2">
-                <EquipmentPanel />
+                <EquipmentPanel selectedCareer={selectedCareer} />
               </div>
               <div className="lg:col-span-1">
                 <StatsPanel />

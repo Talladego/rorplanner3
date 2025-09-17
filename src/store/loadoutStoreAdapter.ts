@@ -46,8 +46,8 @@ class LoadoutStoreAdapter implements ILoadoutStore {
     useLoadoutStore.getState().calculateStats();
   }
 
-  createLoadout(name: string): string {
-    return useLoadoutStore.getState().createLoadout(name);
+  createLoadout(name: string, level?: number, renownRank?: number): string {
+    return useLoadoutStore.getState().createLoadout(name, level, renownRank);
   }
 
   deleteLoadout(id: string): void {
