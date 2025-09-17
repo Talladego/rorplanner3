@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { EquipSlot, Item, Stat, CAREER_RACE_MAPPING } from '../types';
 import { useLoadoutData } from '../hooks/useLoadoutData';
 import { loadoutService } from '../services/loadoutService';
-import { formatSlotName, formatStatName } from '../utils/formatters';
+import { formatSlotName, formatStatName, formatItemTypeName } from '../utils/formatters';
 import Tooltip from './Tooltip';
 import { getItemColor } from '../utils/rarityColors';
 
@@ -16,6 +16,25 @@ interface EquipmentSelectorProps {
   isTalismanMode?: boolean;
   holdingItemLevelReq?: number;
   talismanSlotIndex?: number; // Index of the talisman slot being filled
+}
+
+// Helper function to format talisman stats display
+function formatTalismanStats(item: any): string {
+  if (!item.stats || item.stats.length === 0) return '';
+  
+  // Talismans typically have one primary stat
+  const primaryStat = item.stats[0];
+  const value = primaryStat.percentage ? `${primaryStat.value}%` : `+${primaryStat.value}`;
+  const statName = formatStatName(primaryStat.stat);
+  
+  return `${value} ${statName}`;
+}
+
+// Helper function to format item info display
+function formatItemInfo(item: any): string {
+  const typeName = formatItemTypeName(item.type);
+  const slotName = formatSlotName(item.slot);
+  return `${typeName}, ${slotName}, Item Level: ${item.itemLevel}`;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -311,7 +330,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                           {isAlreadyEquipped ? 'Already equipped (Unique)' : 
                            isRaceRestricted ? 'Not usable by this race' :
                            isTalismanAlreadySlotted ? 'Already slotted in this item' :
-                           `Lv.${item.levelRequirement} Rn.${item.renownRankRequirement}`}
+                           isTalismanMode ? formatTalismanStats(item) : formatItemInfo(item)}
                         </p>
                       </div>
                     </div>
