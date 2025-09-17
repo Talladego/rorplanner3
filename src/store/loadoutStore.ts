@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Loadout, LoadoutItem, EquipSlot, Career, Item, StatsSummary } from '../types';
+import { Loadout, LoadoutItem, EquipSlot, Career, Item, StatsSummary, ItemSetBonus } from '../types';
 
 interface LoadoutState {
   loadouts: Loadout[];
@@ -21,7 +21,7 @@ interface LoadoutState {
   getCurrentLoadout: () => Loadout | null;
 }
 
-const createInitialLoadout = (id: string, name: string, level: number = 50, renownRank: number = 80): Loadout => ({
+const createInitialLoadout = (id: string, name: string, level: number = 40, renownRank: number = 80): Loadout => ({
   id,
   name,
   career: null,
@@ -145,6 +145,14 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     if (!current) return { statsSummary: initialStats };
     const stats = { ...initialStats };
 
+    // Helper function to check if an item is eligible based on level/renown requirements
+    const isItemEligible = (item: any): boolean => {
+      if (!item) return true;
+      const levelEligible = !item.levelRequirement || item.levelRequirement <= current.level;
+      const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= current.renownRank;
+      return levelEligible && renownEligible;
+    };
+
     // Helper function to map stat names to StatsSummary keys
     const mapStatToKey = (stat: string): keyof StatsSummary | null => {
       const statMap: Record<string, keyof StatsSummary> = {
@@ -181,33 +189,69 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
       return statMap[stat] || null;
     };
 
+    // Collect set items for bonus calculation
+    const setItems: Record<string, { item: any; set: any }[]> = {};
+
     Object.values(current.items).forEach(({ item, talismans }) => {
-      if (item && item.stats) {
+      // Only include stats from eligible items
+      if (item && isItemEligible(item) && item.stats) {
         item.stats.forEach(({ stat, value }) => {
           const key = mapStatToKey(stat);
           if (key && stats[key] !== undefined) {
             stats[key] += value;
           }
         });
+
+        // Collect for set bonus calculation
+        if (item.itemSet) {
+          const setName = item.itemSet.name;
+          if (!setItems[setName]) {
+            setItems[setName] = [];
+          }
+          setItems[setName].push({ item, set: item.itemSet });
+        }
+
+        // Only include talisman stats if the parent item is eligible
+        if (talismans && Array.isArray(talismans)) {
+          talismans.forEach((talisman) => {
+            // Only include stats from eligible talismans
+            if (talisman && isItemEligible(talisman) && talisman.stats) {
+              talisman.stats.forEach(({ stat, value }) => {
+                const key = mapStatToKey(stat);
+                if (key && stats[key] !== undefined) {
+                  stats[key] += value;
+                }
+              });
+            }
+          });
+        }
       }
-      // Safely iterate over talismans if they exist
-      if (talismans && Array.isArray(talismans)) {
-        talismans.forEach((talisman) => {
-          if (talisman && talisman.stats) {
-            talisman.stats.forEach(({ stat, value }) => {
-              const key = mapStatToKey(stat);
+    });
+
+    // Calculate set bonuses
+    Object.values(setItems).forEach((items) => {
+      if (items.length > 0 && items[0].set.bonuses) {
+        const setBonuses = items[0].set.bonuses;
+        setBonuses.forEach((setBonus: ItemSetBonus) => {
+          if (items.length >= setBonus.itemsRequired) {
+            // Apply the bonus if we have enough eligible items
+            if ('stat' in setBonus.bonus) {
+              // It's an ItemStat
+              const key = mapStatToKey(setBonus.bonus.stat);
               if (key && stats[key] !== undefined) {
-                stats[key] += value;
+                stats[key] += setBonus.bonus.value;
               }
-            });
+            }
+            // Note: Abilities are not handled in stats calculation as they don't affect numeric stats
           }
         });
       }
     });
+
     return { statsSummary: stats };
   }),
 
-  createLoadout: (name, level = 50, renownRank = 80) => {
+  createLoadout: (name, level = 40, renownRank = 80) => {
     const id = `loadout-${Date.now()}`;
     set((state) => ({
       loadouts: [...state.loadouts, createInitialLoadout(id, name, level, renownRank)],

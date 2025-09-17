@@ -136,7 +136,8 @@ const GET_ITEMS_WITHOUT_CAREER = gql`
         slot: { eq: $slot },
         levelRequirement: { lte: $levelRequirement },
         renownRankRequirement: { lte: $renownRankRequirement },
-        name: { contains: $nameFilter }
+        name: { contains: $nameFilter },
+        type: { neq: NONE }
       }, 
       hasStats: $hasStats,
       first: $first, 
@@ -215,18 +216,20 @@ const GET_ITEMS_WITHOUT_CAREER = gql`
   }
 `;
 
+
 const GET_ITEMS_WITH_CAREER = gql`
   query GetItemsWithCareer($slot: EquipSlot, $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!], $usableByCareer: Career) {
     items(
-      where: { 
+      where: {
         slot: { eq: $slot },
         levelRequirement: { lte: $levelRequirement },
         renownRankRequirement: { lte: $renownRankRequirement },
-        name: { contains: $nameFilter }
-      }, 
+        name: { contains: $nameFilter },
+        type: { neq: NONE }
+      },
       hasStats: $hasStats,
       usableByCareer: $usableByCareer,
-      first: $first, 
+      first: $first,
       after: $after,
       order: [
         { rarity: DESC },
@@ -826,6 +829,8 @@ export const loadoutService = {
       payload: { level },
       timestamp: Date.now(),
     });
+    // Emit stats updated event since level changes affect item eligibility
+    this.getStatsSummary();
   },
 
   setRenownRank(renownRank: number) {
@@ -835,6 +840,8 @@ export const loadoutService = {
       payload: { renownRank },
       timestamp: Date.now(),
     });
+    // Emit stats updated event since renown changes affect item eligibility
+    this.getStatsSummary();
   },
 
   createLoadout(name: string, level?: number, renownRank?: number) {
@@ -1016,7 +1023,12 @@ export const loadoutService = {
     let count = 0;
     Object.values(loadout.items).forEach(loadoutItem => {
       if (loadoutItem.item && loadoutItem.item.itemSet && loadoutItem.item.itemSet.name === setName) {
-        count++;
+        // Only count eligible items toward set bonuses
+        const levelEligible = !loadoutItem.item.levelRequirement || loadoutItem.item.levelRequirement <= loadout.level;
+        const renownEligible = !loadoutItem.item.renownRankRequirement || loadoutItem.item.renownRankRequirement <= loadout.renownRank;
+        if (levelEligible && renownEligible) {
+          count++;
+        }
       }
     });
     return count;

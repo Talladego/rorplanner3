@@ -123,8 +123,8 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
           career || undefined,
           ITEMS_PER_PAGE,
           after,
-          999, // High level to show all items
-          999, // High renown to show all items
+          currentLoadout?.level || 40,
+          currentLoadout?.renownRank || 80,
           filter,
           stats
         );
@@ -133,13 +133,9 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
       // Apply client-side filtering
       let filteredNodes = connection.nodes || [];
       
-      // Filter out items with type NONE for all slots except POCKET1 and POCKET2
-      if (slot !== EquipSlot.POCKET1 && slot !== EquipSlot.POCKET2) {
-        filteredNodes = filteredNodes.filter((item: any) => item.type !== 'NONE');
-      }
-      
       // Note: Level/renown filtering is handled server-side
       // Race filtering is handled in the UI for greying out incompatible items
+      // Type filtering (excluding NONE) is now handled server-side
 
       setPageData({
         items: filteredNodes,
@@ -331,11 +327,9 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
               const allowedRaces = career ? CAREER_RACE_MAPPING[career] || [] : [];
               const isRaceRestricted = career && item.raceRestriction && item.raceRestriction.length > 0 && 
                                      !item.raceRestriction.some((race: any) => allowedRaces.includes(race));
-              const isLevelRestricted = currentLoadout && item.levelRequirement && item.levelRequirement > currentLoadout.level;
-              const isRenownRestricted = currentLoadout && item.renownRankRequirement && item.renownRankRequirement > currentLoadout.renownRank;
               const isTalismanAlreadySlotted = isTalismanMode && talismanSlotIndex !== undefined && 
                                              loadoutService.isTalismanAlreadySlottedInItem(item.id, slot, talismanSlotIndex);
-              const isDisabled = isAlreadyEquipped || isRaceRestricted || isLevelRestricted || isRenownRestricted || isTalismanAlreadySlotted;
+              const isDisabled = isAlreadyEquipped || isRaceRestricted || isTalismanAlreadySlotted;
               
               return (
                 <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode}>
@@ -354,8 +348,6 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                         <p className={`text-xs leading-tight ${isDisabled ? 'text-gray-400 dark:text-gray-500' : 'text-muted'}`}>
                           {isAlreadyEquipped ? 'Already equipped (Unique)' : 
                            isRaceRestricted ? 'Not usable by this race' :
-                           isLevelRestricted ? `Requires level ${item.levelRequirement}` :
-                           isRenownRestricted ? `Requires renown rank ${item.renownRankRequirement}` :
                            isTalismanAlreadySlotted ? 'Already slotted in this item' :
                            isTalismanMode ? formatTalismanStats(item) : formatItemInfo(item)}
                         </p>

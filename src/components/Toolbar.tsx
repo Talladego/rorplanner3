@@ -10,7 +10,7 @@ interface ToolbarProps {
 }
 
 export default function Toolbar({ selectedCareer, setSelectedCareer }: ToolbarProps) {
-  const [level, setLevel] = useState(50);
+  const [level, setLevel] = useState(40);
   const [renownRank, setRenownRank] = useState(80);
   const [characterName, setCharacterName] = useState('');
 
@@ -51,6 +51,16 @@ export default function Toolbar({ selectedCareer, setSelectedCareer }: ToolbarPr
             if (currentLoadout.career) {
               setSelectedCareer(currentLoadout.career);
             }
+            setLevel(currentLoadout.level);
+            setRenownRank(currentLoadout.renownRank);
+          }
+          break;
+        }
+        case 'LOADOUT_RESET': {
+          // Update UI state to match the reset loadout
+          const currentLoadout = loadoutService.getCurrentLoadout();
+          if (currentLoadout) {
+            setSelectedCareer(currentLoadout.career || '');
             setLevel(currentLoadout.level);
             setRenownRank(currentLoadout.renownRank);
           }

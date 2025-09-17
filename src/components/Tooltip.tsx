@@ -19,15 +19,6 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
   const tooltipRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
 
-  // Reset detailed item data when item prop changes
-  useEffect(() => {
-    if (item && detailedItem && detailedItem.id !== item.id) {
-      setDetailedItem(null);
-      setIsLoadingDetails(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item?.id]);
-
   const handleMouseEnter = (e: React.MouseEvent) => {
     if (!item) return;
 

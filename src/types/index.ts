@@ -45,7 +45,7 @@ export const CAREER_RACE_MAPPING: Record<Career, Race[]> = {
   [Career.ENGINEER]: [Race.DWARF],
   [Career.BLACK_ORC]: [Race.ORC],
   [Career.CHOPPA]: [Race.ORC], // Choppa is always Orc
-  [Career.SHAMAN]: [Race.ORC],
+  [Career.SHAMAN]: [Race.GOBLIN],
   [Career.SQUIG_HERDER]: [Race.GOBLIN], // Squig Herder is always Goblin
   [Career.WITCH_HUNTER]: [Race.EMPIRE],
   [Career.KNIGHT_OF_THE_BLAZING_SUN]: [Race.EMPIRE],
