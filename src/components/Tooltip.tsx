@@ -19,6 +19,16 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
   const tooltipRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
 
+  // Helper function to check if an item is eligible based on level/renown requirements
+  const isItemEligible = (item: Item | null): boolean => {
+    if (!item) return true;
+    const currentLoadout = loadoutService.getCurrentLoadout();
+    if (!currentLoadout) return true;
+    const levelEligible = !item.levelRequirement || item.levelRequirement <= currentLoadout.level;
+    const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= currentLoadout.renownRank;
+    return levelEligible && renownEligible;
+  };
+
   const handleMouseEnter = (e: React.MouseEvent) => {
     if (!item) return;
 
@@ -196,6 +206,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
   // Use detailed item data if available, otherwise use the provided item
   // Merge detailed item data with original item to preserve talismans
   const displayItem = detailedItem ? { ...item, ...detailedItem } : item;
+  const itemEligible = isItemEligible(displayItem);
 
   return (
     <>
@@ -211,7 +222,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
       {isVisible && (
         <div
           ref={tooltipRef}
-          className="fixed z-50 bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 max-w-xs pointer-events-none"
+          className={`fixed z-50 bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 max-w-xs pointer-events-none ${!itemEligible ? 'opacity-75' : ''}`}
           style={{
             left: position.x,
             top: position.y,
@@ -219,7 +230,12 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
         >
           {/* 1. Item Name */}
           <div className="mb-1">
-            <p className="equipment-item-name" style={{ color: getItemColor(displayItem) }}>{displayItem.name}</p>
+            <p 
+              className={`equipment-item-name ${!itemEligible ? 'text-gray-500' : ''}`}
+              style={{ color: itemEligible ? getItemColor(displayItem) : undefined }}
+            >
+              {displayItem.name}
+            </p>
           </div>
 
           {/* 2. Item Description */}
@@ -241,7 +257,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
 
           {/* 4. Item Stats (armor, dps, speed, stats) */}
           <div className="mb-2">
-            <div className="text-xs text-yellow-400 space-y-0.5">
+            <div className={`text-xs space-y-0.5 ${itemEligible ? 'text-yellow-400' : 'text-gray-500'}`}>
               {displayItem.armor > 0 && <div>{displayItem.armor} Armor</div>}
               {displayItem.dps > 0 && <div>{(displayItem.dps / 10).toFixed(1)} DPS</div>}
               {displayItem.speed > 0 && <div>{(displayItem.speed / 100).toFixed(1)} Speed</div>}
@@ -256,15 +272,15 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           {/* 4.5. Item Abilities and Buffs */}
           {(displayItem.abilities && displayItem.abilities.length > 0) || (displayItem.buffs && displayItem.buffs.length > 0) ? (
             <div className="mb-2">
-              <div className="text-xs text-green-400 space-y-0.5">
+              <div className={`text-xs space-y-0.5 ${itemEligible ? 'text-green-400' : 'text-gray-500'}`}>
                 {displayItem.abilities && displayItem.abilities.length > 0 && displayItem.abilities.map((ability, idx: number) => (
                   <div key={`ability-${idx}`}>
-                    <div className="text-green-400 text-xs italic">+ {ability.description || ability.name}</div>
+                    <div className={`text-xs italic ${itemEligible ? 'text-green-400' : 'text-gray-500'}`}>+ {ability.description || ability.name}</div>
                   </div>
                 ))}
                 {displayItem.buffs && displayItem.buffs.length > 0 && displayItem.buffs.map((buff, idx: number) => (
                   <div key={`buff-${idx}`}>
-                    <div className="text-green-400 text-xs italic">+ {buff.description || buff.name}</div>
+                    <div className={`text-xs italic ${itemEligible ? 'text-green-400' : 'text-gray-500'}`}>+ {buff.description || buff.name}</div>
                   </div>
                 ))}
               </div>
