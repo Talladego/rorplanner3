@@ -15,6 +15,7 @@ interface EquipmentSelectorProps {
   onSelect: (item: Item) => void;
   isTalismanMode?: boolean;
   holdingItemLevelReq?: number;
+  talismanSlotIndex?: number; // Index of the talisman slot being filled
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -28,7 +29,7 @@ interface PageData {
   totalCount: number;
 }
 
-export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isTalismanMode = false, holdingItemLevelReq }: EquipmentSelectorProps) {
+export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isTalismanMode = false, holdingItemLevelReq, talismanSlotIndex }: EquipmentSelectorProps) {
   const { currentLoadout } = useLoadoutData();
   const career = currentLoadout?.career;
   const modalRef = useRef<HTMLDivElement>(null);
@@ -288,7 +289,9 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
               const allowedRaces = career ? CAREER_RACE_MAPPING[career] || [] : [];
               const isRaceRestricted = career && item.raceRestriction && item.raceRestriction.length > 0 && 
                                      !item.raceRestriction.some((race: any) => allowedRaces.includes(race));
-              const isDisabled = isAlreadyEquipped || isRaceRestricted;
+              const isTalismanAlreadySlotted = isTalismanMode && talismanSlotIndex !== undefined && 
+                                             loadoutService.isTalismanAlreadySlottedInItem(item.id, slot, talismanSlotIndex);
+              const isDisabled = isAlreadyEquipped || isRaceRestricted || isTalismanAlreadySlotted;
               
               return (
                 <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode}>
@@ -306,7 +309,8 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                         <p className={`font-medium text-xs leading-tight break-words overflow-wrap-anywhere ${isDisabled ? 'text-gray-500 dark:text-gray-400' : ''}`} style={{ color: isDisabled ? undefined : getItemColor(item) }}>{item.name}</p>
                         <p className={`text-xs leading-tight ${isDisabled ? 'text-gray-400 dark:text-gray-500' : 'text-muted'}`}>
                           {isAlreadyEquipped ? 'Already equipped (Unique)' : 
-                           isRaceRestricted ? 'Not usable by this race' : 
+                           isRaceRestricted ? 'Not usable by this race' :
+                           isTalismanAlreadySlotted ? 'Already slotted in this item' :
                            `Lv.${item.levelRequirement} Rn.${item.renownRankRequirement}`}
                         </p>
                       </div>

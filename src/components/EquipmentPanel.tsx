@@ -149,6 +149,7 @@ export default function EquipmentPanel() {
           onSelect={talismanSlot ? handleTalismanSelect : handleItemSelect}
           isTalismanMode={!!talismanSlot}
           holdingItemLevelReq={talismanSlot ? currentLoadout?.items[talismanSlot.slot].item?.levelRequirement : undefined}
+          talismanSlotIndex={talismanSlot?.index}
         />
       )}
     </div>

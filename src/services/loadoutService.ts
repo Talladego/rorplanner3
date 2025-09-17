@@ -996,6 +996,17 @@ export const loadoutService = {
       throw error;
     }
   },
+
+  // Check if a talisman is already slotted in a specific item (same slot, different index)
+  isTalismanAlreadySlottedInItem(talismanId: string, slot: EquipSlot, excludeIndex?: number): boolean {
+    const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
+    if (!currentLoadout) return false;
+
+    const itemTalismans = currentLoadout.items[slot].talismans;
+    return itemTalismans.some((talisman, index) => 
+      talisman && talisman.id === talismanId && index !== excludeIndex
+    );
+  },
 };
 
 // Initialize stats on service load
