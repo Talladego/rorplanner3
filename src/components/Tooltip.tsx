@@ -163,20 +163,22 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
     const slots = [];
     for (let i = 0; i < displayItem.talismanSlots; i++) {
       const talisman = displayItem.talismans?.[i];
+      const talismanEligible = talisman ? isItemEligible(talisman) : true;
+      
       slots.push(
         <div key={i} className="flex items-center gap-2 mb-0.5">
           <div className="flex items-center gap-1">
             <img
               src={talisman?.iconUrl || 'https://armory.returnofreckoning.com/icon/1'}
               alt={talisman?.name || 'Empty Talisman Slot'}
-              className="w-4 h-4 object-contain rounded"
+              className={`w-4 h-4 object-contain rounded ${talisman && !talismanEligible ? 'grayscale opacity-50' : ''}`}
             />
-            <span className="text-xs">
+            <span className={`text-xs ${talisman && !talismanEligible ? 'text-gray-500' : ''}`}>
               {talisman ? (
                 <>
-                  <span style={{ color: getItemColor(talisman) }}>{talisman.name}</span>
+                  <span style={{ color: talismanEligible ? getItemColor(talisman) : undefined }}>{talisman.name}</span>
                   {talisman.stats && talisman.stats.length > 0 && (
-                    <span className="text-gray-400">
+                    <span className={`text-gray-400 ${!talismanEligible ? 'text-gray-600' : ''}`}>
                       {' ('}
                       {talisman.stats.map((stat: ItemStat, idx: number) => (
                         <span key={idx}>
@@ -247,7 +249,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
 
           {/* 3. Item Info (slot, type, iLvl) */}
           <div className="mb-2">
-            <div className="text-xs text-gray-200 space-y-0.5">
+            <div className={`text-xs space-y-0.5 ${itemEligible ? 'text-gray-200' : 'text-gray-500'}`}>
               <div>Slot: {formatSlotName(displayItem.slot)}</div>
               <div>Type: {formatItemTypeName(displayItem.type)}</div>
               {displayItem.itemLevel > 0 && <div>Item Level: {displayItem.itemLevel}</div>}
@@ -290,7 +292,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           {/* 5. Item Talismans */}
           {!isTalismanTooltip && displayItem.talismanSlots > 0 && (
             <div className="mb-2">
-              <div className="text-xs text-gray-200">
+              <div className={`text-xs ${itemEligible ? 'text-gray-200' : 'text-gray-500'}`}>
                 {renderTalismanSlots()}
               </div>
             </div>
@@ -299,8 +301,8 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           {/* 6. Item Set and Set Bonuses */}
           {displayItem.itemSet && (
             <div className="mb-2">
-              <div className="text-xs text-gray-200">
-                <div className="font-medium text-green-400 mb-1">{displayItem.itemSet.name}</div>
+              <div className={`text-xs ${itemEligible ? 'text-gray-200' : 'text-gray-500'}`}>
+                <div className={`font-medium mb-1 ${itemEligible ? 'text-green-400' : 'text-gray-500'}`}>{displayItem.itemSet.name}</div>
                 {/* Render set bonuses with piece counts */}
                 {displayItem.itemSet.bonuses && displayItem.itemSet.bonuses.length > 0 ? (
                   <div className="space-y-0.5">
@@ -332,7 +334,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
                       };
 
                       return (
-                        <div key={idx} className={isActive ? "text-green-400" : "text-gray-500"}>
+                        <div key={idx} className={isActive && itemEligible ? "text-green-400" : "text-gray-500"}>
                           ({bonus.itemsRequired} piece bonus:) {formatBonusValue(bonus.bonus)}
                         </div>
                       );
@@ -347,7 +349,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
 
           {/* 7. Item Requirements (levelReq, renownReq, careerReq, raceReq) */}
           <div>
-            <div className="text-xs text-gray-200 space-y-1">
+            <div className={`text-xs space-y-1 ${itemEligible ? 'text-gray-200' : 'text-gray-500'}`}>
               {displayItem.levelRequirement > 0 && <div>Minimum Rank: {displayItem.levelRequirement}</div>}
               {displayItem.renownRankRequirement > 0 && <div>Requires {displayItem.renownRankRequirement} Renown</div>}
               {displayItem.careerRestriction && displayItem.careerRestriction.length > 0 && (
