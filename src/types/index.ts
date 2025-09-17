@@ -1,5 +1,15 @@
 // Types based on schema.graphql for RorPlanner data layer
 
+export enum Race {
+  DWARF = 'DWARF',
+  ORC = 'ORC',
+  GOBLIN = 'GOBLIN',
+  HIGH_ELF = 'HIGH_ELF',
+  DARK_ELF = 'DARK_ELF',
+  EMPIRE = 'EMPIRE',
+  CHAOS = 'CHAOS',
+}
+
 export enum Career {
   IRON_BREAKER = 'IRON_BREAKER',
   SLAYER = 'SLAYER',
@@ -26,6 +36,34 @@ export enum Career {
   DISCIPLE_OF_KHAINE = 'DISCIPLE_OF_KHAINE',
   SORCERER = 'SORCERER',
 }
+
+// Career to Race mapping based on Warhammer Online lore
+export const CAREER_RACE_MAPPING: Record<Career, Race[]> = {
+  [Career.IRON_BREAKER]: [Race.DWARF],
+  [Career.SLAYER]: [Race.DWARF],
+  [Career.RUNE_PRIEST]: [Race.DWARF],
+  [Career.ENGINEER]: [Race.DWARF],
+  [Career.BLACK_ORC]: [Race.ORC],
+  [Career.CHOPPA]: [Race.ORC], // Choppa is always Orc
+  [Career.SHAMAN]: [Race.ORC],
+  [Career.SQUIG_HERDER]: [Race.GOBLIN], // Squig Herder is always Goblin
+  [Career.WITCH_HUNTER]: [Race.EMPIRE],
+  [Career.KNIGHT_OF_THE_BLAZING_SUN]: [Race.EMPIRE],
+  [Career.BRIGHT_WIZARD]: [Race.EMPIRE],
+  [Career.WARRIOR_PRIEST]: [Race.EMPIRE],
+  [Career.CHOSEN]: [Race.CHAOS],
+  [Career.MARAUDER]: [Race.CHAOS],
+  [Career.ZEALOT]: [Race.CHAOS],
+  [Career.MAGUS]: [Race.CHAOS],
+  [Career.SWORD_MASTER]: [Race.HIGH_ELF],
+  [Career.SHADOW_WARRIOR]: [Race.HIGH_ELF],
+  [Career.WHITE_LION]: [Race.HIGH_ELF],
+  [Career.ARCHMAGE]: [Race.HIGH_ELF],
+  [Career.BLACK_GUARD]: [Race.DARK_ELF], // Black Guard is a Dark Elf career
+  [Career.WITCH_ELF]: [Race.DARK_ELF],
+  [Career.DISCIPLE_OF_KHAINE]: [Race.DARK_ELF],
+  [Career.SORCERER]: [Race.DARK_ELF],
+};
 
 export enum EquipSlot {
   NONE = 'NONE',
@@ -278,7 +316,7 @@ export interface Item {
   uniqueEquipped: boolean;
   stats: ItemStat[];
   careerRestriction: Career[];
-  raceRestriction: string[]; // Assuming Race enum
+  raceRestriction: Race[]; // Array of allowed races
   iconUrl: string;
   talismanSlots: number;
   itemSet: ItemSet | null;

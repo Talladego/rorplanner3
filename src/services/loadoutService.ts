@@ -382,88 +382,6 @@ const GET_POCKET_ITEMS = gql`
   }
 `;
 
-`;
-      where: { 
-        slot: { in: $slots },
-        type: { neq: NONE },
-        name: { contains: $nameFilter }
-      }, 
-      hasStats: $hasStats,
-      first: $first, 
-      after: $after,
-      order: [
-        { rarity: DESC },
-        { itemLevel: DESC },
-        { name: ASC }
-      ]
-    ) {
-      pageInfo {
-        hasNextPage
-        hasPreviousPage
-        startCursor
-        endCursor
-      }
-      edges {
-        cursor
-        node {
-          id
-          name
-          type
-          slot
-          rarity
-          armor
-          dps
-          speed
-          levelRequirement
-          renownRankRequirement
-          itemLevel
-          uniqueEquipped
-          stats {
-            stat
-            value
-            percentage
-          }
-          careerRestriction
-          raceRestriction
-          iconUrl
-          talismanSlots
-          itemSet {
-            id
-            name
-          }
-        }
-      }
-      nodes {
-        id
-        name
-        type
-        slot
-        rarity
-        armor
-        dps
-        speed
-        levelRequirement
-        renownRankRequirement
-        itemLevel
-        uniqueEquipped
-        stats {
-          stat
-          value
-          percentage
-        }
-        careerRestriction
-        raceRestriction
-        iconUrl
-        talismanSlots
-        itemSet {
-          id
-          name
-        }
-      }
-      totalCount
-    }
-`;
-
 const GET_TALISMANS = gql`
   query GetTalismans($itemLevel: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!]) {
     items(
@@ -569,7 +487,45 @@ export const loadoutService = {
   },
 
   // 2. Add/update specific item/talisman slots
+  // Check if a unique-equipped item is already equipped in the current loadout
+  isUniqueItemAlreadyEquipped(itemId: string): boolean {
+    const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
+    if (!currentLoadout) return false;
+
+    // Check all equipped items for this unique item
+    for (const slot of Object.values(EquipSlot)) {
+      const equippedItem = currentLoadout.items[slot]?.item;
+      if (equippedItem && equippedItem.id === itemId && equippedItem.uniqueEquipped) {
+        return true;
+      }
+    }
+
+    return false;
+  },
+
+  // Check if equipping this item would violate unique-equipped rules
+  canEquipUniqueItem(item: Item): { canEquip: boolean; reason?: string } {
+    if (!item.uniqueEquipped) {
+      return { canEquip: true };
+    }
+
+    // Check if this exact item is already equipped elsewhere
+    if (this.isUniqueItemAlreadyEquipped(item.id)) {
+      return { canEquip: false, reason: 'This unique item is already equipped' };
+    }
+
+    return { canEquip: true };
+  },
+
   updateItem(slot: EquipSlot, item: Item | null) {
+    // Validate unique-equipped constraints
+    if (item) {
+      const validation = this.canEquipUniqueItem(item);
+      if (!validation.canEquip) {
+        throw new Error(validation.reason || 'Cannot equip this unique item');
+      }
+    }
+
     loadoutStoreAdapter.setItem(slot, item);
     loadoutEventEmitter.emit({
       type: 'ITEM_UPDATED',

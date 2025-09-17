@@ -281,7 +281,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           ) : null}
 
           {/* 5. Item Talismans */}
-          {!isTalismanTooltip && displayItem.talismanSlots > 0 && displayItem.talismans && displayItem.talismans.length > 0 && (
+          {!isTalismanTooltip && displayItem.talismanSlots > 0 && (
             <div className="mb-2">
               <div className="text-xs text-gray-200">
                 {renderTalismanSlots()}

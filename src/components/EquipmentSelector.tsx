@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { EquipSlot, Item, Stat } from '../types';
+import { EquipSlot, Item, Stat, CAREER_RACE_MAPPING } from '../types';
 import { useLoadoutData } from '../hooks/useLoadoutData';
 import { loadoutService } from '../services/loadoutService';
 import { formatSlotName, formatStatName } from '../utils/formatters';
@@ -101,17 +101,25 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
         );
       }
 
-      // Apply client-side level/renown filtering for career queries
-      // since the usableByCareer filter doesn't handle level/renown requirements
-      // Skip this filtering for pocket items as they should be available regardless of level/renown
+      // Apply client-side level/renown and race filtering for career queries
+      // since the usableByCareer filter may not handle all restrictions properly
+      // Skip this filtering for pocket items as they should be available regardless of level/renown/race
       let filteredNodes = connection.nodes || [];
       if (career && !isTalismanMode && currentLoadout && slot !== EquipSlot.POCKET1 && slot !== EquipSlot.POCKET2) {
+        const allowedRaces = CAREER_RACE_MAPPING[career] || [];
+        
         filteredNodes = filteredNodes.filter((item: any) => {
           // Allow items that meet the character's current level/renown requirements
           // or items with no requirements
           const levelOk = !item.levelRequirement || item.levelRequirement <= currentLoadout!.level;
           const renownOk = !item.renownRankRequirement || item.renownRankRequirement <= currentLoadout!.renownRank;
-          return levelOk && renownOk;
+          
+          // Allow items that are usable by the character's race
+          // Items with empty raceRestriction are available to all races
+          const raceOk = !item.raceRestriction || item.raceRestriction.length === 0 || 
+                        item.raceRestriction.some((race: any) => allowedRaces.includes(race));
+          
+          return levelOk && renownOk && raceOk;
         });
       }
 
@@ -275,22 +283,38 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
             (pageData.items.length > ITEMS_PER_PAGE 
               ? pageData.items.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
               : pageData.items
-            ).map((item: any) => (
-              <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode}>
-                <div
-                  className="border border-gray-300 dark:border-gray-600 p-1.5 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 bg-white dark:bg-gray-800 transition-colors h-12 flex items-center"
-                  onClick={() => handleItemSelect(item as Item)}
-                >
-                  <div className="flex items-center space-x-2 w-full">
-                    <img src={item.iconUrl} alt={item.name} className="w-6 h-6 flex-shrink-0 object-contain rounded" />
-                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                      <p className="font-medium text-xs leading-tight break-words overflow-wrap-anywhere" style={{ color: getItemColor(item) }}>{item.name}</p>
-                      <p className="text-xs text-muted leading-tight">Lv.{item.levelRequirement} Rn.{item.renownRankRequirement}</p>
+            ).map((item: any) => {
+              const isAlreadyEquipped = item.uniqueEquipped && loadoutService.isUniqueItemAlreadyEquipped(item.id);
+              const allowedRaces = career ? CAREER_RACE_MAPPING[career] || [] : [];
+              const isRaceRestricted = career && item.raceRestriction && item.raceRestriction.length > 0 && 
+                                     !item.raceRestriction.some((race: any) => allowedRaces.includes(race));
+              const isDisabled = isAlreadyEquipped || isRaceRestricted;
+              
+              return (
+                <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode}>
+                  <div
+                    className={`border p-1.5 rounded h-12 flex items-center ${
+                      isDisabled
+                        ? 'border-gray-400 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 cursor-not-allowed opacity-60'
+                        : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700'
+                    } transition-colors`}
+                    onClick={() => !isDisabled && handleItemSelect(item as Item)}
+                  >
+                    <div className="flex items-center space-x-2 w-full">
+                      <img src={item.iconUrl} alt={item.name} className="w-6 h-6 flex-shrink-0 object-contain rounded" />
+                      <div className="flex-1 min-w-0 flex flex-col justify-center">
+                        <p className={`font-medium text-xs leading-tight break-words overflow-wrap-anywhere ${isDisabled ? 'text-gray-500 dark:text-gray-400' : ''}`} style={{ color: isDisabled ? undefined : getItemColor(item) }}>{item.name}</p>
+                        <p className={`text-xs leading-tight ${isDisabled ? 'text-gray-400 dark:text-gray-500' : 'text-muted'}`}>
+                          {isAlreadyEquipped ? 'Already equipped (Unique)' : 
+                           isRaceRestricted ? 'Not usable by this race' : 
+                           `Lv.${item.levelRequirement} Rn.${item.renownRankRequirement}`}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Tooltip>
-            ))
+                </Tooltip>
+              );
+            })
           )}
         </div>
 

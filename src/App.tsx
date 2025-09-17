@@ -1,4 +1,4 @@
-import { useEffect, Component, ReactNode } from 'react';
+import { useEffect, Component, ReactNode, ErrorInfo } from 'react';
 import { loadoutService } from './services/loadoutService';
 import Toolbar from './components/Toolbar';
 import EquipmentPanel from './components/EquipmentPanel';
@@ -15,7 +15,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: any) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
   }
 
