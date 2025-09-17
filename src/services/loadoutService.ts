@@ -553,6 +553,9 @@ export const loadoutService = {
       // Check if we need compatibility slots
       const needsCompatibility = (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4);
 
+      // Check if we need to include EITHER_HAND items for hand slots
+      const needsEitherHand = (slot === EquipSlot.MAIN_HAND || slot === EquipSlot.OFF_HAND);
+
       if (needsCompatibility) {
         // For compatibility slots, use a higher limit since pagination is disabled
         const compatibilityLimit = Math.max(limit * 5, 50); // At least 50 items or 5x the requested limit
@@ -567,6 +570,46 @@ export const loadoutService = {
         const allResults = [];
         for (const slotToQuery of compatibleSlots) {
           const result = await this.getItemsForSingleSlot(slotToQuery, career, compatibilityLimit, after, levelRequirement, renownRankRequirement, nameFilter, hasStats);
+          if (result.edges) {
+            allResults.push(...result.edges);
+          }
+        }
+
+        // Remove duplicates based on item id
+        const seenIds = new Set();
+        let uniqueEdges = allResults.filter(edge => {
+          if (seenIds.has(edge.node.id)) {
+            return false;
+          }
+          seenIds.add(edge.node.id);
+          return true;
+        });
+
+        // Apply client-side stat filtering if hasStats is provided
+        if (hasStats && hasStats.length > 0) {
+          uniqueEdges = uniqueEdges.filter((edge: any) => {
+            const item = edge.node;
+            return item.stats && item.stats.some((stat: any) => hasStats.includes(stat.stat));
+          });
+        }
+
+        return {
+          edges: uniqueEdges,
+          nodes: uniqueEdges.map(edge => edge.node),
+          pageInfo: { hasNextPage: false, hasPreviousPage: false }, // Simplified for compatibility
+          totalCount: uniqueEdges.length
+        };
+      } else if (needsEitherHand) {
+        // For hand slots, include both specific slot and EITHER_HAND items
+        const handLimit = Math.max(limit * 2, 50); // At least 50 items or 2x the requested limit
+
+        // Make separate queries for the specific slot and EITHER_HAND, then combine results
+        const handSlots: EquipSlot[] = [slot, EquipSlot.EITHER_HAND];
+
+        // Query each slot separately and combine results
+        const allResults = [];
+        for (const slotToQuery of handSlots) {
+          const result = await this.getItemsForSingleSlot(slotToQuery, career, handLimit, after, levelRequirement, renownRankRequirement, nameFilter, hasStats);
           if (result.edges) {
             allResults.push(...result.edges);
           }
