@@ -633,6 +633,24 @@ export const loadoutService = {
           });
         }
 
+        // Apply global sorting to match GraphQL query order: rarity DESC, itemLevel DESC, name ASC
+        const rarityOrder: Record<string, number> = { MYTHIC: 6, VERY_RARE: 5, RARE: 4, UNCOMMON: 3, COMMON: 2, UTILITY: 1 };
+        uniqueEdges.sort((a: any, b: any) => {
+          const itemA = a.node;
+          const itemB = b.node;
+          
+          // First sort by rarity DESC
+          const rarityDiff = (rarityOrder[itemB.rarity] || 0) - (rarityOrder[itemA.rarity] || 0);
+          if (rarityDiff !== 0) return rarityDiff;
+          
+          // Then sort by itemLevel DESC
+          const levelDiff = itemB.itemLevel - itemA.itemLevel;
+          if (levelDiff !== 0) return levelDiff;
+          
+          // Finally sort by name ASC
+          return itemA.name.localeCompare(itemB.name);
+        });
+
         return {
           edges: uniqueEdges,
           nodes: uniqueEdges.map(edge => edge.node),
