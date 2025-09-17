@@ -103,8 +103,9 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
 
       // Apply client-side level/renown filtering for career queries
       // since the usableByCareer filter doesn't handle level/renown requirements
+      // Skip this filtering for pocket items as they should be available regardless of level/renown
       let filteredNodes = connection.nodes || [];
-      if (career && !isTalismanMode && currentLoadout) {
+      if (career && !isTalismanMode && currentLoadout && slot !== EquipSlot.POCKET1 && slot !== EquipSlot.POCKET2) {
         filteredNodes = filteredNodes.filter((item: any) => {
           // Allow items that meet the character's current level/renown requirements
           // or items with no requirements
@@ -168,23 +169,28 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   if (!isOpen) return null;
 
   const handleNextPage = () => {
+    const maxPage = Math.ceil(pageData.items.length / ITEMS_PER_PAGE);
     if (pageData.hasNextPage && pageData.endCursor) {
+      // Server-side pagination for regular slots
       setPageHistory(prev => [...prev, pageData.startCursor || '']);
       setCurrentPage(prev => prev + 1);
       fetchItems(pageData.endCursor, nameFilter, statsFilter);
+    } else if (currentPage < maxPage) {
+      // Client-side pagination for compatibility slots (all data already loaded)
+      setCurrentPage(prev => prev + 1);
     }
   };
 
   const handlePreviousPage = () => {
     if (pageHistory.length > 0) {
+      // Server-side pagination - go back to previous server page
       const previousCursor = pageHistory[pageHistory.length - 1];
       setPageHistory(prev => prev.slice(0, -1));
       setCurrentPage(prev => prev - 1);
       fetchItems(previousCursor || undefined, nameFilter, statsFilter);
-    } else {
-      // Go to first page - don't pass any cursor
-      setCurrentPage(1);
-      fetchItems(undefined, nameFilter, statsFilter);
+    } else if (currentPage > 1) {
+      // Client-side pagination - just decrement page counter
+      setCurrentPage(prev => prev - 1);
     }
   };
 
@@ -254,26 +260,38 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
           </div>
         </div>
         
-        {error && <p className="text-red-600 dark:text-red-400">Error loading items: {error}</p>}
-        
         {/* Items List */}
         <div className="space-y-0.5">
-          {pageData.items.map((item: any) => (
-            <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode}>
-              <div
-                className="border border-gray-300 dark:border-gray-600 p-1.5 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 bg-white dark:bg-gray-800 transition-colors h-12 flex items-center"
-                onClick={() => handleItemSelect(item as Item)}
-              >
-                <div className="flex items-center space-x-2 w-full">
-                  <img src={item.iconUrl} alt={item.name} className="w-6 h-6 flex-shrink-0 object-contain rounded" />
-                  <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    <p className="font-medium text-xs leading-tight break-words overflow-wrap-anywhere" style={{ color: getItemColor(item) }}>{item.name}</p>
-                    <p className="text-xs text-muted leading-tight">Lv.{item.levelRequirement} Rn.{item.renownRankRequirement}</p>
+          {error ? (
+            <div className="text-center py-8">
+              <p className="text-red-500 dark:text-red-400 text-sm mb-2">Error loading items</p>
+              <p className="text-muted text-xs">{error}</p>
+            </div>
+          ) : pageData.items.length === 0 && !loading ? (
+            <div className="text-center py-8">
+              <p className="text-muted text-sm">No items found</p>
+            </div>
+          ) : (
+            (pageData.items.length > ITEMS_PER_PAGE 
+              ? pageData.items.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+              : pageData.items
+            ).map((item: any) => (
+              <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode}>
+                <div
+                  className="border border-gray-300 dark:border-gray-600 p-1.5 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 bg-white dark:bg-gray-800 transition-colors h-12 flex items-center"
+                  onClick={() => handleItemSelect(item as Item)}
+                >
+                  <div className="flex items-center space-x-2 w-full">
+                    <img src={item.iconUrl} alt={item.name} className="w-6 h-6 flex-shrink-0 object-contain rounded" />
+                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                      <p className="font-medium text-xs leading-tight break-words overflow-wrap-anywhere" style={{ color: getItemColor(item) }}>{item.name}</p>
+                      <p className="text-xs text-muted leading-tight">Lv.{item.levelRequirement} Rn.{item.renownRankRequirement}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Tooltip>
-          ))}
+              </Tooltip>
+            ))
+          )}
         </div>
 
         {/* Loading/Pagination Footer */}
@@ -300,7 +318,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                 
                 <button
                   onClick={handleNextPage}
-                  disabled={!pageData.hasNextPage}
+                  disabled={!pageData.hasNextPage && currentPage >= Math.ceil(pageData.items.length / ITEMS_PER_PAGE)}
                   className="btn btn-primary btn-sm"
                 >
                   Next

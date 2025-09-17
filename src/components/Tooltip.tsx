@@ -25,6 +25,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
       setDetailedItem(null);
       setIsLoadingDetails(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item?.id]);
 
   const handleMouseEnter = (e: React.MouseEvent) => {
@@ -202,7 +203,8 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
   }
 
   // Use detailed item data if available, otherwise use the provided item
-  const displayItem = detailedItem || item;
+  // Merge detailed item data with original item to preserve talismans
+  const displayItem = detailedItem ? { ...item, ...detailedItem } : item;
 
   return (
     <>
