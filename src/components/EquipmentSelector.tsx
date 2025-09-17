@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { EquipSlot, Item, Stat, CAREER_RACE_MAPPING } from '../types';
+import { EquipSlot, Item, Stat, CAREER_RACE_MAPPING, Career } from '../types';
 import { useLoadoutData } from '../hooks/useLoadoutData';
 import { loadoutService } from '../services/loadoutService';
 import { formatSlotName, formatStatName, formatItemTypeName } from '../utils/formatters';
@@ -52,6 +52,12 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   const { currentLoadout } = useLoadoutData();
   const career = currentLoadout?.career;
   const modalRef = useRef<HTMLDivElement>(null);
+  
+  // Store previous context to detect changes
+  const prevContextRef = useRef<{ isTalismanMode: boolean; career: Career | null }>({
+    isTalismanMode,
+    career: career || null
+  });
   
   const [pageData, setPageData] = useState<PageData>({
     items: [],
@@ -166,16 +172,30 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
     }
   }, [isTalismanMode, holdingItemLevelReq, career, currentLoadout, slot]);
 
-  // Reset when modal opens
+  // Reset pagination when modal opens, reset filters only when context changes
   useEffect(() => {
-    if (isOpen && career) {
+    if (isOpen) {
+      const currentContext = { isTalismanMode, career: career || null };
+      const prevContext = prevContextRef.current;
+      
+      // Check if context changed (talisman mode or career)
+      const contextChanged = 
+        currentContext.isTalismanMode !== prevContext.isTalismanMode ||
+        currentContext.career !== prevContext.career;
+      
       setCurrentPage(1);
       setPageHistory([]);
-      setNameFilter('');
-      setStatsFilter([]);
-      fetchItems(undefined, '', []); // Explicitly no cursor for first page
+      
+      // Reset filters only if context changed
+      if (contextChanged) {
+        setNameFilter('');
+        setStatsFilter([]);
+        prevContextRef.current = currentContext;
+      }
+      
+      fetchItems(undefined, nameFilter, statsFilter);
     }
-  }, [isOpen, career, slot, fetchItems]);
+  }, [isOpen, isTalismanMode, career, nameFilter, statsFilter, fetchItems]);
 
   const handleNameFilterChange = (value: string) => {
     setNameFilter(value);
@@ -225,11 +245,9 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   const handleItemSelect = (item: Item) => {
     onSelect(item);
     onClose();
-    // Reset state for next time
+    // Reset pagination state for next time, but keep filters
     setCurrentPage(1);
     setPageHistory([]);
-    setNameFilter('');
-    setStatsFilter([]);
   };
 
   const startItem = ((currentPage - 1) * ITEMS_PER_PAGE) + 1;
