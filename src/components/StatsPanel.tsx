@@ -26,47 +26,48 @@ export default function StatsPanel() {
   const equippedItemsCount = Object.values(currentLoadout.items).filter(slot => slot.item !== null).length;
 
   // Group stats by category
-  const coreStats = [
+  const baseStats = [
     { key: 'strength', value: stats.strength },
-    { key: 'agility', value: stats.agility },
-    { key: 'willpower', value: stats.willpower },
-    { key: 'toughness', value: stats.toughness },
-    { key: 'wounds', value: stats.wounds },
-    { key: 'initiative', value: stats.initiative },
+    { key: 'ballisticSkill', value: stats.ballisticSkill },
     { key: 'intelligence', value: stats.intelligence },
+    { key: 'toughness', value: stats.toughness },
+    { key: 'weaponSkill', value: stats.weaponSkill },
+    { key: 'initiative', value: stats.initiative },
+    { key: 'willpower', value: stats.willpower },
+    { key: 'wounds', value: stats.wounds },
+  ];
+
+  const defenseStats = [
+    { key: 'armor', value: stats.armor },
+    { key: 'spiritResistance', value: stats.spiritResistance },
+    { key: 'corporealResistance', value: stats.corporealResistance },
+    { key: 'elementalResistance', value: stats.elementalResistance },
+    { key: 'block', value: stats.block, isPercentage: true },
+    { key: 'parry', value: stats.parry, isPercentage: true },
+    { key: 'disrupt', value: stats.disrupt, isPercentage: true },
+    { key: 'evade', value: stats.evade, isPercentage: true },
   ];
 
   const combatStats = [
-    { key: 'weaponSkill', value: stats.weaponSkill },
-    { key: 'ballisticSkill', value: stats.ballisticSkill },
-    { key: 'armor', value: stats.armor },
-    { key: 'block', value: stats.block },
-    { key: 'parry', value: stats.parry },
-    { key: 'evade', value: stats.evade },
-    { key: 'disrupt', value: stats.disrupt },
-  ];
-
-  const damageStats = [
     { key: 'outgoingDamage', value: stats.outgoingDamage },
-    { key: 'outgoingDamagePercent', value: stats.outgoingDamagePercent, isPercentage: true },
-    { key: 'incomingDamage', value: stats.incomingDamage },
-    { key: 'incomingDamagePercent', value: stats.incomingDamagePercent, isPercentage: true },
     { key: 'criticalDamage', value: stats.criticalDamage },
+    { key: 'incomingDamage', value: stats.incomingDamage }, // Armor Penetration
   ];
 
-  const resistanceStats = [
-    { key: 'spiritResistance', value: stats.spiritResistance },
-    { key: 'elementalResistance', value: stats.elementalResistance },
-    { key: 'corporealResistance', value: stats.corporealResistance },
+  const magicStats: { key: string; value: number; isPercentage?: boolean }[] = [
+    // Magic stats not currently available in the data
   ];
 
-  const utilityStats = [
+  const otherStats = [
     { key: 'velocity', value: stats.velocity },
     { key: 'actionPointRegen', value: stats.actionPointRegen },
     { key: 'moraleRegen', value: stats.moraleRegen },
     { key: 'cooldown', value: stats.cooldown },
     { key: 'range', value: stats.range },
     { key: 'autoAttackSpeed', value: stats.autoAttackSpeed },
+    { key: 'outgoingDamagePercent', value: stats.outgoingDamagePercent, isPercentage: true },
+    { key: 'incomingDamagePercent', value: stats.incomingDamagePercent, isPercentage: true },
+    { key: 'buildTime', value: stats.buildTime },
   ];
 
   const renderStatGroup = (title: string, statGroup: { key: string; value: number; isPercentage?: boolean }[], showIfEmpty: boolean = false) => {
@@ -105,9 +106,14 @@ export default function StatsPanel() {
         </div>
       </div>
 
-      {/* Core Stats - Always show */}
+      {/* Base Stats - Always show */}
       <div className="stats-section">
-        {renderStatGroup('Core Stats', coreStats, true)}
+        {renderStatGroup('Base Stats', baseStats, true)}
+      </div>
+
+      {/* Defense Stats */}
+      <div className="stats-section">
+        {renderStatGroup('Defense', defenseStats)}
       </div>
 
       {/* Combat Stats */}
@@ -115,19 +121,14 @@ export default function StatsPanel() {
         {renderStatGroup('Combat', combatStats)}
       </div>
 
-      {/* Damage Stats */}
+      {/* Magic Stats */}
       <div className="stats-section">
-        {renderStatGroup('Damage', damageStats)}
+        {renderStatGroup('Magic', magicStats)}
       </div>
 
-      {/* Resistance Stats */}
+      {/* Other Stats */}
       <div className="stats-section">
-        {renderStatGroup('Resistance', resistanceStats)}
-      </div>
-
-      {/* Utility Stats */}
-      <div className="stats-section">
-        {renderStatGroup('Utility', utilityStats)}
+        {renderStatGroup('Other', otherStats)}
       </div>
 
       {/* Show message if no stats */}
