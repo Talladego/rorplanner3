@@ -35,9 +35,11 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
     setIsModalOpen(true);
   };
 
-  const handleItemSelect = (item: Item) => {
+  const handleItemSelect = async (item: Item) => {
     if (selectedSlot) {
-      loadoutService.updateItem(selectedSlot, item);
+      // Fetch complete item details including set bonuses
+      const completeItem = await loadoutService.getItemWithDetails(item.id);
+      loadoutService.updateItem(selectedSlot, completeItem);
       // No need to manually update local state - the hook handles reactivity
     }
   };
@@ -54,9 +56,11 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
     setIsModalOpen(true);
   };
 
-  const handleTalismanSelect = (talisman: Item) => {
+  const handleTalismanSelect = async (talisman: Item) => {
     if (talismanSlot) {
-      loadoutService.updateTalisman(talismanSlot.slot, talismanSlot.index, talisman);
+      // Fetch complete talisman details including set bonuses
+      const completeTalisman = await loadoutService.getItemWithDetails(talisman.id);
+      loadoutService.updateTalisman(talismanSlot.slot, talismanSlot.index, completeTalisman);
     }
   };
 

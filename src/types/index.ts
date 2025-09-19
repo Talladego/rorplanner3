@@ -298,6 +298,28 @@ export enum Stat {
   MELEE_CRIT_RATE = 'MELEE_CRIT_RATE',
   RANGED_CRIT_RATE = 'RANGED_CRIT_RATE',
   MAGIC_CRIT_RATE = 'MAGIC_CRIT_RATE',
+  HEALTH_REGEN = 'HEALTH_REGEN',
+  MELEE_POWER = 'MELEE_POWER',
+  RANGED_POWER = 'RANGED_POWER',
+  MAGIC_POWER = 'MAGIC_POWER',
+  ARMOR_PENETRATION_REDUCTION = 'ARMOR_PENETRATION_REDUCTION',
+  CRITICAL_HIT_RATE_REDUCTION = 'CRITICAL_HIT_RATE_REDUCTION',
+  BLOCK_STRIKETHROUGH = 'BLOCK_STRIKETHROUGH',
+  PARRY_STRIKETHROUGH = 'PARRY_STRIKETHROUGH',
+  EVADE_STRIKETHROUGH = 'EVADE_STRIKETHROUGH',
+  DISRUPT_STRIKETHROUGH = 'DISRUPT_STRIKETHROUGH',
+  HEAL_CRIT_RATE = 'HEAL_CRIT_RATE',
+  MAX_ACTION_POINTS = 'MAX_ACTION_POINTS',
+  MASTERY_1_BONUS = 'MASTERY_1_BONUS',
+  MASTERY_2_BONUS = 'MASTERY_2_BONUS',
+  MASTERY_3_BONUS = 'MASTERY_3_BONUS',
+  HEALING_POWER = 'HEALING_POWER',
+  INTERACT_TIME = 'INTERACT_TIME',
+  FORTITUDE = 'FORTITUDE',
+  OUTGOING_HEAL_PERCENT = 'OUTGOING_HEAL_PERCENT',
+  INCOMING_HEAL_PERCENT = 'INCOMING_HEAL_PERCENT',
+  ARMOR_PENETRATION = 'ARMOR_PENETRATION',
+  LOOT_CHANCE = 'LOOT_CHANCE',
 }
 
 export interface Item {
@@ -369,4 +391,27 @@ export interface StatsSummary {
   criticalDamage: number;
   range: number;
   autoAttackSpeed: number;
+  meleePower: number;
+  rangedPower: number;
+  magicPower: number;
+  meleeCritRate: number;
+  rangedCritRate: number;
+  magicCritRate: number;
+  armorPenetration: number;
+  healingPower: number;
+  healthRegen: number;
+  maxActionPoints: number;
+  fortitude: number;
+  armorPenetrationReduction: number;
+  criticalHitRateReduction: number;
+  blockStrikethrough: number;
+  parryStrikethrough: number;
+  evadeStrikethrough: number;
+  disruptStrikethrough: number;
+  healCritRate: number;
+  mastery1Bonus: number;
+  mastery2Bonus: number;
+  mastery3Bonus: number;
+  outgoingHealPercent: number;
+  incomingHealPercent: number;
 }

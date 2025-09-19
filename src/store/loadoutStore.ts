@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Loadout, LoadoutItem, EquipSlot, Career, Item, StatsSummary, ItemSetBonus } from '../types';
+import { Loadout, LoadoutItem, EquipSlot, Career, Item, StatsSummary, ItemSetBonus, ItemSet } from '../types';
 
 interface LoadoutState {
   loadouts: Loadout[];
@@ -63,6 +63,29 @@ const initialStats: StatsSummary = {
   criticalDamage: 0,
   range: 0,
   autoAttackSpeed: 0,
+  meleePower: 0,
+  rangedPower: 0,
+  magicPower: 0,
+  meleeCritRate: 0,
+  rangedCritRate: 0,
+  magicCritRate: 0,
+  armorPenetration: 0,
+  healingPower: 0,
+  healthRegen: 0,
+  maxActionPoints: 0,
+  fortitude: 0,
+  armorPenetrationReduction: 0,
+  criticalHitRateReduction: 0,
+  blockStrikethrough: 0,
+  parryStrikethrough: 0,
+  evadeStrikethrough: 0,
+  disruptStrikethrough: 0,
+  healCritRate: 0,
+  mastery1Bonus: 0,
+  mastery2Bonus: 0,
+  mastery3Bonus: 0,
+  outgoingHealPercent: 0,
+  incomingHealPercent: 0,
 };
 
 export const useLoadoutStore = create<LoadoutState>((set, get) => ({
@@ -146,7 +169,7 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     const stats = { ...initialStats };
 
     // Helper function to check if an item is eligible based on level/renown requirements
-    const isItemEligible = (item: any): boolean => {
+    const isItemEligible = (item: Item | null): boolean => {
       if (!item) return true;
       const levelEligible = !item.levelRequirement || item.levelRequirement <= current.level;
       const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= current.renownRank;
@@ -185,22 +208,53 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
         'CRITICAL_DAMAGE': 'criticalDamage',
         'RANGE': 'range',
         'AUTO_ATTACK_SPEED': 'autoAttackSpeed',
+        'MELEE_POWER': 'meleePower',
+        'RANGED_POWER': 'rangedPower',
+        'MAGIC_POWER': 'magicPower',
+        'MELEE_CRIT_RATE': 'meleeCritRate',
+        'RANGED_CRIT_RATE': 'rangedCritRate',
+        'MAGIC_CRIT_RATE': 'magicCritRate',
+        'ARMOR_PENETRATION': 'armorPenetration',
+        'HEALING_POWER': 'healingPower',
+        'HEALTH_REGEN': 'healthRegen',
+        'MAX_ACTION_POINTS': 'maxActionPoints',
+        'FORTITUDE': 'fortitude',
+        'ARMOR_PENETRATION_REDUCTION': 'armorPenetrationReduction',
+        'CRITICAL_HIT_RATE_REDUCTION': 'criticalHitRateReduction',
+        'BLOCK_STRIKETHROUGH': 'blockStrikethrough',
+        'PARRY_STRIKETHROUGH': 'parryStrikethrough',
+        'EVADE_STRIKETHROUGH': 'evadeStrikethrough',
+        'DISRUPT_STRIKETHROUGH': 'disruptStrikethrough',
+        'HEAL_CRIT_RATE': 'healCritRate',
+        'MASTERY_1_BONUS': 'mastery1Bonus',
+        'MASTERY_2_BONUS': 'mastery2Bonus',
+        'MASTERY_3_BONUS': 'mastery3Bonus',
+        'OUTGOING_HEAL_PERCENT': 'outgoingHealPercent',
+        'INCOMING_HEAL_PERCENT': 'incomingHealPercent',
       };
       return statMap[stat] || null;
     };
 
     // Collect set items for bonus calculation
-    const setItems: Record<string, { item: any; set: any }[]> = {};
+    const setItems: Record<string, { item: Item; set: ItemSet }[]> = {};
 
     Object.values(current.items).forEach(({ item, talismans }) => {
       // Only include stats from eligible items
-      if (item && isItemEligible(item) && item.stats) {
-        item.stats.forEach(({ stat, value }) => {
-          const key = mapStatToKey(stat);
-          if (key && stats[key] !== undefined) {
-            stats[key] += value;
-          }
-        });
+      if (item && isItemEligible(item)) {
+        // Handle the separate armor property
+        if (item.armor && item.armor > 0) {
+          stats.armor += Number(item.armor);
+        }
+
+        // Handle stats from the stats array
+        if (item.stats) {
+          item.stats.forEach(({ stat, value }) => {
+            const key = mapStatToKey(stat);
+            if (key && stats[key] !== undefined) {
+              stats[key] += Number(value);
+            }
+          });
+        }
 
         // Collect for set bonus calculation
         if (item.itemSet) {
@@ -215,13 +269,21 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
         if (talismans && Array.isArray(talismans)) {
           talismans.forEach((talisman) => {
             // Only include stats from eligible talismans
-            if (talisman && isItemEligible(talisman) && talisman.stats) {
-              talisman.stats.forEach(({ stat, value }) => {
-                const key = mapStatToKey(stat);
-                if (key && stats[key] !== undefined) {
-                  stats[key] += value;
-                }
-              });
+            if (talisman && isItemEligible(talisman)) {
+              // Handle the separate armor property for talismans
+              if (talisman.armor && talisman.armor > 0) {
+                stats.armor += Number(talisman.armor);
+              }
+
+              // Handle stats from the stats array
+              if (talisman.stats) {
+                talisman.stats.forEach(({ stat, value }) => {
+                  const key = mapStatToKey(stat);
+                  if (key && stats[key] !== undefined) {
+                    stats[key] += Number(value);
+                  }
+                });
+              }
             }
           });
         }
@@ -239,8 +301,16 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
               // It's an ItemStat
               const key = mapStatToKey(setBonus.bonus.stat);
               if (key && stats[key] !== undefined) {
-                stats[key] += setBonus.bonus.value;
+                // Handle values that might be strings from GraphQL
+                const bonusValue = Number(setBonus.bonus.value);
+                if (!isNaN(bonusValue)) {
+                  stats[key] += bonusValue;
+                }
+              } else {
+                // Could not map stat or key not found in stats
               }
+            } else {
+              // Set bonus is an ability, not handled in stats calculation
             }
             // Note: Abilities are not handled in stats calculation as they don't affect numeric stats
           }

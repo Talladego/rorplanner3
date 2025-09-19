@@ -28,6 +28,7 @@ export default function StatsPanel() {
   // Group stats by category
   const baseStats = [
     { key: 'strength', value: stats.strength },
+    { key: 'agility', value: stats.agility },
     { key: 'ballisticSkill', value: stats.ballisticSkill },
     { key: 'intelligence', value: stats.intelligence },
     { key: 'toughness', value: stats.toughness },
@@ -46,16 +47,32 @@ export default function StatsPanel() {
     { key: 'parry', value: stats.parry, isPercentage: true },
     { key: 'disrupt', value: stats.disrupt, isPercentage: true },
     { key: 'evade', value: stats.evade, isPercentage: true },
+    { key: 'armorPenetrationReduction', value: stats.armorPenetrationReduction },
+    { key: 'criticalHitRateReduction', value: stats.criticalHitRateReduction },
   ];
 
   const combatStats = [
     { key: 'outgoingDamage', value: stats.outgoingDamage },
     { key: 'criticalDamage', value: stats.criticalDamage },
     { key: 'incomingDamage', value: stats.incomingDamage }, // Armor Penetration
+    { key: 'meleePower', value: stats.meleePower },
+    { key: 'rangedPower', value: stats.rangedPower },
+    { key: 'armorPenetration', value: stats.armorPenetration },
+    { key: 'meleeCritRate', value: stats.meleeCritRate, isPercentage: true },
+    { key: 'rangedCritRate', value: stats.rangedCritRate, isPercentage: true },
+    { key: 'blockStrikethrough', value: stats.blockStrikethrough },
+    { key: 'parryStrikethrough', value: stats.parryStrikethrough },
+    { key: 'evadeStrikethrough', value: stats.evadeStrikethrough },
   ];
 
   const magicStats: { key: string; value: number; isPercentage?: boolean }[] = [
-    // Magic stats not currently available in the data
+    { key: 'magicPower', value: stats.magicPower },
+    { key: 'magicCritRate', value: stats.magicCritRate, isPercentage: true },
+    { key: 'healingPower', value: stats.healingPower },
+    { key: 'healCritRate', value: stats.healCritRate, isPercentage: true },
+    { key: 'outgoingHealPercent', value: stats.outgoingHealPercent, isPercentage: true },
+    { key: 'incomingHealPercent', value: stats.incomingHealPercent, isPercentage: true },
+    { key: 'disruptStrikethrough', value: stats.disruptStrikethrough },
   ];
 
   const otherStats = [
@@ -68,6 +85,12 @@ export default function StatsPanel() {
     { key: 'outgoingDamagePercent', value: stats.outgoingDamagePercent, isPercentage: true },
     { key: 'incomingDamagePercent', value: stats.incomingDamagePercent, isPercentage: true },
     { key: 'buildTime', value: stats.buildTime },
+    { key: 'healthRegen', value: stats.healthRegen },
+    { key: 'maxActionPoints', value: stats.maxActionPoints },
+    { key: 'fortitude', value: stats.fortitude },
+    { key: 'mastery1Bonus', value: stats.mastery1Bonus },
+    { key: 'mastery2Bonus', value: stats.mastery2Bonus },
+    { key: 'mastery3Bonus', value: stats.mastery3Bonus },
   ];
 
   const renderStatGroup = (title: string, statGroup: { key: string; value: number; isPercentage?: boolean }[], showIfEmpty: boolean = false) => {
