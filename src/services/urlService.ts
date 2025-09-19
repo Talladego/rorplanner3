@@ -10,11 +10,25 @@ class UrlService {
     this.navigateCallback = callback;
   }
 
-  // Get URL search parameters
+  // Get URL search parameters (works with HashRouter)
   getSearchParams(): URLSearchParams {
     if (typeof window === 'undefined') {
       return new URLSearchParams();
     }
+    
+    // With HashRouter, parameters are after the #/ in the hash
+    const hash = window.location.hash;
+    const hashPathStart = hash.indexOf('#/');
+    if (hashPathStart !== -1) {
+      const pathAndQuery = hash.substring(hashPathStart + 2); // Remove '#/'
+      const queryStart = pathAndQuery.indexOf('?');
+      if (queryStart !== -1) {
+        const queryString = pathAndQuery.substring(queryStart + 1); // Get everything after '?'
+        return new URLSearchParams(queryString);
+      }
+    }
+    
+    // Fallback to regular search params for backward compatibility
     return new URLSearchParams(window.location.search);
   }
 
@@ -41,9 +55,9 @@ class UrlService {
       }
     });
 
-    // Build new URL
+    // Build new URL (HashRouter format)
     const searchString = currentParams.toString();
-    const newPath = searchString ? `/?${searchString}` : '/';
+    const newPath = searchString ? `/#/?${searchString}` : '/#/';
 
     try {
       this.navigateCallback(newPath, options);
