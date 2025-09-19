@@ -1,4 +1,5 @@
 import { EquipSlot, Item, Career } from '../types';
+import { StatsSummary } from './index';
 
 export type LoadoutEventType =
   | 'ITEM_UPDATED'
@@ -57,8 +58,6 @@ export interface RenownRankChangedEvent extends LoadoutEvent {
     renownRank: number;
   };
 }
-
-import { StatsSummary } from './index';
 
 export interface StatsUpdatedEvent extends LoadoutEvent {
   type: 'STATS_UPDATED';

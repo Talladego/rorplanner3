@@ -1,6 +1,6 @@
 import { useLoadoutStats } from '../hooks/useLoadoutStats';
 import { useLoadoutData } from '../hooks/useLoadoutData';
-import { formatCamelCaseToTitle } from '../utils/formatters';
+import { formatCamelCase } from '../utils/formatters';
 
 function formatStatValue(value: number, isPercentage: boolean = false): string {
   if (isPercentage) {
@@ -104,7 +104,7 @@ export default function StatsPanel() {
           {nonZeroStats.length > 0 ? (
             nonZeroStats.map(stat => (
               <div key={stat.key} className="stats-row">
-                <span className="text-sm">{formatCamelCaseToTitle(stat.key)}:</span>
+                <span className="text-sm">{formatCamelCase(stat.key)}:</span>
                 <span className="stats-label font-medium">
                   {formatStatValue(stat.value, stat.isPercentage)}
                 </span>

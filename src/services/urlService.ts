@@ -225,7 +225,6 @@ class UrlService {
 
       loadoutEventEmitter.emit(event);
 
-      console.log(`Successfully loaded character from URL: ${characterName} (${characterId})`);
     } catch (error) {
       console.error(`Failed to load character from URL "${characterName}":`, error);
       throw error;
@@ -300,7 +299,6 @@ class UrlService {
 
       loadoutEventEmitter.emit(event);
 
-      console.log(`Successfully loaded loadout from URL parameters`);
     } catch (error) {
       console.error(`Failed to load loadout from URL parameters:`, error);
       throw error;

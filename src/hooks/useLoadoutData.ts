@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import { Loadout } from '../types';
 import { loadoutService } from '../services/loadoutService';
 
+/**
+ * Custom hook for managing loadout data state.
+ * Provides access to all loadouts, current loadout ID, and current loadout data.
+ * Automatically updates when loadout events occur.
+ *
+ * @returns Object containing loadouts array, current loadout ID, and current loadout
+ */
 export function useLoadoutData() {
   const [loadouts, setLoadouts] = useState<Loadout[]>([]);
   const [currentLoadoutId, setCurrentLoadoutId] = useState<string | null>(null);

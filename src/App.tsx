@@ -8,7 +8,6 @@ import StatsPanel from './components/StatsPanel';
 import ApolloProviderWrapper from './components/ApolloProviderWrapper';
 import ErrorBoundary from './components/ErrorBoundary';
 import { Career } from './types';
-import { CharacterLoadedFromUrlEvent, CharacterLoadedEvent } from './types/events';
 import { loadoutEventEmitter } from './services/loadoutEventEmitter';
 
 function App() {
@@ -25,15 +24,13 @@ function App() {
 
   // Subscribe to URL-related events
   useEffect(() => {
-    const unsubscribe = loadoutEventEmitter.subscribe('CHARACTER_LOADED_FROM_URL', (event: CharacterLoadedFromUrlEvent) => {
+    const unsubscribe = loadoutEventEmitter.subscribe('CHARACTER_LOADED_FROM_URL', () => {
       // Handle any UI updates needed when character is loaded from URL
-      console.log(`Character loaded from URL: ${event.payload.characterName}`);
       setCharacterLoaded(true);
     });
 
-    const unsubscribe2 = loadoutEventEmitter.subscribe('CHARACTER_LOADED', (event: CharacterLoadedEvent) => {
+    const unsubscribe2 = loadoutEventEmitter.subscribe('CHARACTER_LOADED', () => {
       // Handle any UI updates needed when character is loaded from button
-      console.log(`Character loaded from button: ${event.payload.characterName}`);
       setCharacterLoaded(true);
     });
 
@@ -55,7 +52,6 @@ function App() {
         event.type === 'RENOWN_RANK_CHANGED'
       )) {
         setCharacterLoaded(false);
-        console.log('Switched from character loadout to regular loadout due to modifications');
       }
     });
 

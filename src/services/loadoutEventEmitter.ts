@@ -2,9 +2,19 @@ import { LoadoutEvents, LoadoutEventType } from '../types/events';
 
 type EventCallback = (event: LoadoutEvents) => void;
 
+/**
+ * Event emitter for loadout-related events.
+ * Provides pub/sub functionality for loadout state changes.
+ */
 class LoadoutEventEmitter {
   private listeners: Map<LoadoutEventType, EventCallback[]> = new Map();
 
+  /**
+   * Subscribe to a specific loadout event type.
+   * @param eventType - The type of event to listen for
+   * @param callback - Function to call when the event is emitted
+   * @returns Unsubscribe function to remove the listener
+   */
   subscribe<T extends LoadoutEvents>(
     eventType: T['type'],
     callback: (event: T) => void
@@ -27,6 +37,10 @@ class LoadoutEventEmitter {
     };
   }
 
+  /**
+   * Emit a loadout event to all subscribers.
+   * @param event - The event to emit
+   */
   emit(event: LoadoutEvents): void {
     const callbacks = this.listeners.get(event.type);
     if (callbacks) {
@@ -40,6 +54,10 @@ class LoadoutEventEmitter {
     }
   }
 
+  /**
+   * Remove all listeners for a specific event type, or all listeners if no type specified.
+   * @param eventType - Optional event type to clear listeners for
+   */
   removeAllListeners(eventType?: LoadoutEventType): void {
     if (eventType) {
       this.listeners.delete(eventType);
