@@ -71,8 +71,15 @@
   transition: background-color 0.15s ease-in-out;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background-color: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+  background-color: var(--text-muted);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .btn-danger {
@@ -83,8 +90,15 @@
   transition: background-color 0.15s ease-in-out;
 }
 
-.btn-danger:hover {
+.btn-danger:hover:not(:disabled) {
   background-color: rgb(220 38 38);
+}
+
+.btn-danger:disabled {
+  background-color: var(--text-muted);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .modal-overlay {

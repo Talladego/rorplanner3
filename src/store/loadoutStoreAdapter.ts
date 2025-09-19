@@ -18,7 +18,7 @@ class LoadoutStoreAdapter implements ILoadoutStore {
     return useLoadoutStore.getState().statsSummary;
   }
 
-  setCareer(career: Career): void {
+  setCareer(career: Career | null): void {
     useLoadoutStore.getState().setCareer(career);
   }
 
@@ -46,16 +46,24 @@ class LoadoutStoreAdapter implements ILoadoutStore {
     useLoadoutStore.getState().calculateStats();
   }
 
-  createLoadout(name: string, level?: number, renownRank?: number): string {
-    return useLoadoutStore.getState().createLoadout(name, level, renownRank);
+  createLoadout(name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string): string {
+    return useLoadoutStore.getState().createLoadout(name, level, renownRank, isFromCharacter, characterName);
   }
 
   deleteLoadout(id: string): void {
     useLoadoutStore.getState().deleteLoadout(id);
   }
 
-  switchLoadout(id: string): void {
-    useLoadoutStore.getState().switchLoadout(id);
+  async switchLoadout(id: string): Promise<void> {
+    await useLoadoutStore.getState().switchLoadout(id);
+  }
+
+  markLoadoutAsModified(id: string): void {
+    useLoadoutStore.getState().markLoadoutAsModified(id);
+  }
+
+  updateLoadoutCharacterStatus(id: string, isFromCharacter: boolean, characterName?: string): void {
+    useLoadoutStore.getState().updateLoadoutCharacterStatus(id, isFromCharacter, characterName);
   }
 
   async importFromCharacter(characterId: string): Promise<void> {

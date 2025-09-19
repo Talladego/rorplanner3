@@ -305,6 +305,21 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
               ))}
             </select>
           </div>
+
+          {/* Reset Button */}
+          <button
+            onClick={() => {
+              onNameFilterChange('');
+              onStatsFilterChange([]);
+              setCurrentPage(1);
+              setPageHistory([]);
+              fetchItems(undefined, '', []);
+            }}
+            className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            title="Reset filters"
+          >
+            Reset
+          </button>
         </div>
         
         {/* Items List */}

@@ -1,15 +1,17 @@
 import { useState, ChangeEvent, useEffect } from 'react';
 import { Career } from '../types';
 import { loadoutService } from '../services/loadoutService';
-import { CareerChangedEvent, LevelChangedEvent, RenownRankChangedEvent } from '../types/events';
+import { LevelChangedEvent, RenownRankChangedEvent, CharacterLoadedFromUrlEvent } from '../types/events';
 import { formatCareerName } from '../utils/formatters';
 
 interface ToolbarProps {
   selectedCareer: Career | '';
   setSelectedCareer: (career: Career | '') => void;
+  errorMessage: string;
+  setErrorMessage: (message: string) => void;
 }
 
-export default function Toolbar({ selectedCareer, setSelectedCareer }: ToolbarProps) {
+export default function Toolbar({ selectedCareer, setSelectedCareer, errorMessage, setErrorMessage }: ToolbarProps) {
   const [level, setLevel] = useState(40);
   const [renownRank, setRenownRank] = useState(80);
   const [characterName, setCharacterName] = useState('');
@@ -29,8 +31,7 @@ export default function Toolbar({ selectedCareer, setSelectedCareer }: ToolbarPr
     const unsubscribe = loadoutService.subscribeToAllEvents((event) => {
       switch (event.type) {
         case 'CAREER_CHANGED': {
-          const careerEvent = event as CareerChangedEvent;
-          setSelectedCareer(careerEvent.payload.career || '');
+          // Don't update selectedCareer here - it's handled in handleCareerChange
           break;
         }
         case 'LEVEL_CHANGED': {
@@ -47,13 +48,12 @@ export default function Toolbar({ selectedCareer, setSelectedCareer }: ToolbarPr
           // Update UI state to match the new current loadout
           const currentLoadout = loadoutService.getCurrentLoadout();
           if (currentLoadout) {
-            // Update career from the global career
-            if (currentLoadout.career) {
-              setSelectedCareer(currentLoadout.career);
-            }
+            // Career is handled in handleCareerChange, only update level and renown
             setLevel(currentLoadout.level);
             setRenownRank(currentLoadout.renownRank);
           }
+          // Clear character name since we're now on a career-specific loadout
+          setCharacterName('');
           break;
         }
         case 'LOADOUT_RESET': {
@@ -64,6 +64,13 @@ export default function Toolbar({ selectedCareer, setSelectedCareer }: ToolbarPr
             setLevel(currentLoadout.level);
             setRenownRank(currentLoadout.renownRank);
           }
+          // Clear the character name field
+          setCharacterName('');
+          break;
+        }
+        case 'CHARACTER_LOADED_FROM_URL': {
+          const urlEvent = event as CharacterLoadedFromUrlEvent;
+          setCharacterName(urlEvent.payload.characterName);
           break;
         }
       }
@@ -72,10 +79,24 @@ export default function Toolbar({ selectedCareer, setSelectedCareer }: ToolbarPr
     return unsubscribe;
   }, [setSelectedCareer]);
 
-  const handleCareerChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const career = e.target.value as Career;
-    setSelectedCareer(career);
-    if (career) loadoutService.getOrCreateLoadoutForCareer(career);
+  const handleCareerChange = async (e: ChangeEvent<HTMLSelectElement>) => {
+    const careerValue = e.target.value;
+    if (careerValue) {
+      // Switch to or create loadout for this career
+      await loadoutService.getOrCreateLoadoutForCareer(careerValue as Career);
+      // Update UI to reflect the new loadout
+      const currentLoadout = loadoutService.getCurrentLoadout();
+      if (currentLoadout) {
+        setSelectedCareer(currentLoadout.career || '');
+        setLevel(currentLoadout.level);
+        setRenownRank(currentLoadout.renownRank);
+      }
+      setCharacterName(''); // Clear character name since we're on a career loadout
+    } else {
+      // Handle clearing career - just set to null on current loadout
+      loadoutService.setCareer(null);
+      setSelectedCareer(''); // For clearing, we do need to update UI immediately
+    }
   };
 
   const handleLevelChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -94,15 +115,16 @@ export default function Toolbar({ selectedCareer, setSelectedCareer }: ToolbarPr
     if (characterName) {
       try {
         await loadoutService.loadFromNamedCharacter(characterName);
+        setErrorMessage(''); // Clear any previous error
         // Character loaded successfully - form fields will be updated via events
       } catch (error) {
-        alert('Failed to load character: ' + (error as Error).message);
+        setErrorMessage((error as Error).message);
       }
     }
   };
 
-  const handleReset = () => {
-    loadoutService.resetCurrentLoadout();
+  const handleReset = async () => {
+    await loadoutService.resetCurrentLoadout();
     // Form fields will be cleared via the LOADOUT_RESET event
   };
 
@@ -189,6 +211,13 @@ export default function Toolbar({ selectedCareer, setSelectedCareer }: ToolbarPr
           </button>
         </div>
       </div>
+
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          <strong>Error:</strong> {errorMessage}
+        </div>
+      )}
     </div>
   );
 }

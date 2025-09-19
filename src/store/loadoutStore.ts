@@ -6,7 +6,7 @@ interface LoadoutState {
   currentLoadoutId: string | null;
   statsSummary: StatsSummary;
   // Actions for current loadout
-  setCareer: (career: Career) => void;
+  setCareer: (career: Career | null) => void;
   setLevel: (level: number) => void;
   setRenownRank: (renownRank: number) => void;
   setItem: (slot: EquipSlot, item: Item | null) => void;
@@ -14,14 +14,16 @@ interface LoadoutState {
   resetCurrentLoadout: () => void;
   calculateStats: () => void;
   // Actions for multiple loadouts
-  createLoadout: (name: string, level?: number, renownRank?: number) => string;
+  createLoadout: (name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string) => string;
   deleteLoadout: (id: string) => void;
-  switchLoadout: (id: string) => void;
+  switchLoadout: (id: string) => Promise<void>;
+  markLoadoutAsModified: (id: string) => void; // Mark loadout as no longer from character
+  updateLoadoutCharacterStatus: (id: string, isFromCharacter: boolean, characterName?: string) => void; // Update character status
   importFromCharacter: (characterId: string) => Promise<string>; // Will use GraphQL
   getCurrentLoadout: () => Loadout | null;
 }
 
-const createInitialLoadout = (id: string, name: string, level: number = 40, renownRank: number = 80): Loadout => ({
+const createInitialLoadout = (id: string, name: string, level: number = 40, renownRank: number = 80, isFromCharacter: boolean = false, characterName?: string): Loadout => ({
   id,
   name,
   career: null,
@@ -31,6 +33,8 @@ const createInitialLoadout = (id: string, name: string, level: number = 40, reno
     acc[slot] = { item: null, talismans: [] };
     return acc;
   }, {} as Record<EquipSlot, LoadoutItem>),
+  isFromCharacter,
+  characterName,
 });
 
 const initialStats: StatsSummary = {
@@ -98,7 +102,7 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     return loadouts.find(l => l.id === currentLoadoutId) || null;
   },
 
-  setCareer: (career) => set((state) => {
+  setCareer: (career: Career | null) => set((state) => {
     const current = state.getCurrentLoadout();
     if (!current) return state;
     const updated = { ...current, career };
@@ -321,10 +325,10 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     return { statsSummary: stats };
   }),
 
-  createLoadout: (name, level = 40, renownRank = 80) => {
+  createLoadout: (name, level = 40, renownRank = 80, isFromCharacter = false, characterName) => {
     const id = `loadout-${Date.now()}`;
     set((state) => ({
-      loadouts: [...state.loadouts, createInitialLoadout(id, name, level, renownRank)],
+      loadouts: [...state.loadouts, createInitialLoadout(id, name, level, renownRank, isFromCharacter, characterName)],
       currentLoadoutId: state.currentLoadoutId || id,
     }));
     return id;
@@ -342,8 +346,20 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     };
   }),
 
-  switchLoadout: (id) => set(() => ({
+  switchLoadout: (id) => Promise.resolve(set(() => ({
     currentLoadoutId: id,
+  }))),
+
+  markLoadoutAsModified: (id) => set((state) => ({
+    loadouts: state.loadouts.map(l => 
+      l.id === id ? { ...l, isFromCharacter: false, characterName: undefined } : l
+    ),
+  })),
+
+  updateLoadoutCharacterStatus: (id, isFromCharacter, characterName) => set((state) => ({
+    loadouts: state.loadouts.map(l => 
+      l.id === id ? { ...l, isFromCharacter, characterName } : l
+    ),
   })),
 
   importFromCharacter: async (characterId) => {

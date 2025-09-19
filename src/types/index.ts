@@ -206,7 +206,7 @@ export interface ILoadoutStore {
   getStatsSummary(): StatsSummary;
 
   // State setters
-  setCareer(career: Career): void;
+  setCareer(career: Career | null): void;
   setLevel(level: number): void;
   setRenownRank(renownRank: number): void;
   setItem(slot: EquipSlot, item: Item | null): void;
@@ -215,9 +215,11 @@ export interface ILoadoutStore {
   calculateStats(): void;
 
   // Loadout management
-  createLoadout(name: string, level?: number, renownRank?: number): string;
+  createLoadout(name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string): string;
   deleteLoadout(id: string): void;
-  switchLoadout(id: string): void;
+  switchLoadout(id: string): Promise<void>;
+  markLoadoutAsModified(id: string): void;
+  updateLoadoutCharacterStatus(id: string, isFromCharacter: boolean, characterName?: string): void;
   importFromCharacter(characterId: string): Promise<void>;
 }
 
@@ -359,6 +361,8 @@ export interface Loadout {
   level: number;
   renownRank: number;
   items: Record<EquipSlot, LoadoutItem>;
+  isFromCharacter?: boolean; // Whether this loadout was loaded from a character
+  characterName?: string; // The character name if loaded from character
 }
 
 export interface StatsSummary {

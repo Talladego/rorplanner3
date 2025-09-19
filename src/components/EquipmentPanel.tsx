@@ -39,15 +39,15 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
     if (selectedSlot) {
       // Fetch complete item details including set bonuses
       const completeItem = await loadoutService.getItemWithDetails(item.id);
-      loadoutService.updateItem(selectedSlot, completeItem);
+      await loadoutService.updateItem(selectedSlot, completeItem);
       // No need to manually update local state - the hook handles reactivity
     }
   };
 
-  const handleSlotRightClick = (e: React.MouseEvent, slot: EquipSlot) => {
+  const handleSlotRightClick = async (e: React.MouseEvent, slot: EquipSlot) => {
     e.preventDefault(); // Prevent default context menu
     if (currentLoadout && currentLoadout.items[slot].item) {
-      loadoutService.updateItem(slot, null);
+      await loadoutService.updateItem(slot, null);
     }
   };
 
@@ -60,14 +60,14 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
     if (talismanSlot) {
       // Fetch complete talisman details including set bonuses
       const completeTalisman = await loadoutService.getItemWithDetails(talisman.id);
-      loadoutService.updateTalisman(talismanSlot.slot, talismanSlot.index, completeTalisman);
+      await loadoutService.updateTalisman(talismanSlot.slot, talismanSlot.index, completeTalisman);
     }
   };
 
-  const handleTalismanRightClick = (e: React.MouseEvent, slot: EquipSlot, index: number) => {
+  const handleTalismanRightClick = async (e: React.MouseEvent, slot: EquipSlot, index: number) => {
     e.preventDefault(); // Prevent default context menu
     if (currentLoadout && currentLoadout.items[slot].talismans[index]) {
-      loadoutService.updateTalisman(slot, index, null);
+      await loadoutService.updateTalisman(slot, index, null);
     }
   };
 

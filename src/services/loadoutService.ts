@@ -485,9 +485,20 @@ export const loadoutService = {
         variables: { name: characterName },
       });
       const characters = (data as any).characters.edges.map((e: any) => e.node);
-      if (characters.length === 0) throw new Error('Character not found');
+      if (characters.length === 0) throw new Error(`Character "${characterName}" not found. Please check the spelling and try again.`);
       const character = characters[0]; // Take the first match
       await loadoutStoreAdapter.importFromCharacter(character.id);
+
+      // Emit event that character was loaded
+      loadoutEventEmitter.emit({
+        type: 'CHARACTER_LOADED',
+        payload: {
+          characterName,
+          characterId: character.id,
+        },
+        timestamp: Date.now(),
+      });
+
       return character.id;
     } catch (error) {
       console.error('Failed to load from named character:', error);
@@ -526,7 +537,7 @@ export const loadoutService = {
     return { canEquip: true };
   },
 
-  updateItem(slot: EquipSlot, item: Item | null) {
+  async updateItem(slot: EquipSlot, item: Item | null) {
     // Validate unique-equipped constraints
     if (item) {
       const validation = this.canEquipUniqueItem(item);
@@ -541,19 +552,47 @@ export const loadoutService = {
       payload: { slot, item },
       timestamp: Date.now(),
     });
+
+    // Mark loadout as no longer from character if it was
+    const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
+    if (currentLoadout && currentLoadout.isFromCharacter) {
+      loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
+    }
+
     // Automatically recalculate stats after item update
     this.getStatsSummary();
+
+    // Update URL with current loadout state
+    const { urlService } = await import('./urlService');
+    const currentLoadoutAfter = loadoutStoreAdapter.getCurrentLoadout();
+    if (currentLoadoutAfter) {
+      urlService.updateUrlWithLoadout(currentLoadoutAfter);
+    }
   },
 
-  updateTalisman(slot: EquipSlot, index: number, talisman: Item | null) {
+  async updateTalisman(slot: EquipSlot, index: number, talisman: Item | null) {
     loadoutStoreAdapter.setTalisman(slot, index, talisman);
     loadoutEventEmitter.emit({
       type: 'TALISMAN_UPDATED',
       payload: { slot, index, talisman },
       timestamp: Date.now(),
     });
+
+    // Mark loadout as no longer from character if it was
+    const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
+    if (currentLoadout && currentLoadout.isFromCharacter) {
+      loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
+    }
+
     // Automatically recalculate stats after talisman update
     this.getStatsSummary();
+
+    // Update URL with current loadout state
+    const { urlService } = await import('./urlService');
+    const currentLoadoutAfter = loadoutStoreAdapter.getCurrentLoadout();
+    if (currentLoadoutAfter) {
+      urlService.updateUrlWithLoadout(currentLoadoutAfter);
+    }
   },
 
   // 3. Fetch items for equipment selection
@@ -799,6 +838,9 @@ export const loadoutService = {
       'LOADOUT_CREATED',
       'LOADOUT_SWITCHED',
       'LOADOUT_RESET',
+      'CHARACTER_LOADED_FROM_URL',
+      'LOADOUT_LOADED_FROM_URL',
+      'CHARACTER_LOADED',
     ];
 
     eventTypes.forEach(eventType => {
@@ -813,39 +855,80 @@ export const loadoutService = {
     };
   },
 
-  setCareer(career: Career) {
+  async setCareer(career: Career | null) {
     loadoutStoreAdapter.setCareer(career);
     loadoutEventEmitter.emit({
       type: 'CAREER_CHANGED',
       payload: { career },
       timestamp: Date.now(),
     });
+
+    // Mark loadout as no longer from character if it was
+    const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
+    if (currentLoadout && currentLoadout.isFromCharacter) {
+      loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
+    }
+
+    // Update URL with current loadout state
+    const { urlService } = await import('./urlService');
+    const currentLoadoutAfter = loadoutStoreAdapter.getCurrentLoadout();
+    if (currentLoadoutAfter) {
+      urlService.updateUrlWithLoadout(currentLoadoutAfter);
+    }
   },
 
-  setLevel(level: number) {
+  async setLevel(level: number) {
     loadoutStoreAdapter.setLevel(level);
     loadoutEventEmitter.emit({
       type: 'LEVEL_CHANGED',
       payload: { level },
       timestamp: Date.now(),
     });
+
+    // Mark loadout as no longer from character if it was
+    const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
+    if (currentLoadout && currentLoadout.isFromCharacter) {
+      loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
+    }
+
     // Emit stats updated event since level changes affect item eligibility
     this.getStatsSummary();
+
+    // Update URL with current loadout state
+    const { urlService } = await import('./urlService');
+    const currentLoadoutAfter = loadoutStoreAdapter.getCurrentLoadout();
+    if (currentLoadoutAfter) {
+      urlService.updateUrlWithLoadout(currentLoadoutAfter);
+    }
   },
 
-  setRenownRank(renownRank: number) {
+  async setRenownRank(renownRank: number) {
     loadoutStoreAdapter.setRenownRank(renownRank);
     loadoutEventEmitter.emit({
       type: 'RENOWN_RANK_CHANGED',
       payload: { renownRank },
       timestamp: Date.now(),
     });
+
+    // Mark loadout as no longer from character if it was
+    const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
+    if (currentLoadout && currentLoadout.isFromCharacter) {
+      loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
+    }
+
     // Emit stats updated event since renown changes affect item eligibility
     this.getStatsSummary();
+
+    // Update URL with current loadout state
+    const { urlService } = await import('./urlService');
+    const currentLoadoutAfter = loadoutStoreAdapter.getCurrentLoadout();
+    if (currentLoadoutAfter) {
+      urlService.updateUrlWithLoadout(currentLoadoutAfter);
+    }
   },
 
-  createLoadout(name: string, level?: number, renownRank?: number) {
-    const loadoutId = loadoutStoreAdapter.createLoadout(name, level, renownRank);
+  createLoadout(name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string) {
+    const loadoutId = loadoutStoreAdapter.createLoadout(name, level, renownRank, isFromCharacter, characterName);
     loadoutEventEmitter.emit({
       type: 'LOADOUT_CREATED',
       payload: { loadoutId, name },
@@ -856,8 +939,8 @@ export const loadoutService = {
     return loadoutId;
   },
 
-  switchLoadout(id: string) {
-    loadoutStoreAdapter.switchLoadout(id);
+  async switchLoadout(id: string) {
+    await loadoutStoreAdapter.switchLoadout(id);
     loadoutEventEmitter.emit({
       type: 'LOADOUT_SWITCHED',
       payload: { loadoutId: id },
@@ -865,29 +948,39 @@ export const loadoutService = {
     });
     // Recalculate stats for the new loadout
     this.getStatsSummary();
+
+    // Update URL with the new loadout state
+    const { urlService } = await import('./urlService');
+    const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
+    if (currentLoadout) {
+      urlService.updateUrlWithLoadout(currentLoadout);
+    }
   },
 
-  resetCurrentLoadout() {
-    const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
+  async resetCurrentLoadout() {
+    // Reset the current loadout to default state
     loadoutStoreAdapter.resetCurrentLoadout();
-    if (currentLoadout) {
-      loadoutEventEmitter.emit({
-        type: 'LOADOUT_RESET',
-        payload: { loadoutId: currentLoadout.id },
-        timestamp: Date.now(),
-      });
-    }
+
+    // Clear all loadout parameters from URL
+    const { urlService } = await import('./urlService');
+    urlService.clearLoadoutFromUrl();
+
+    loadoutEventEmitter.emit({
+      type: 'LOADOUT_RESET',
+      payload: { loadoutId: 'reset' },
+      timestamp: Date.now(),
+    });
     // Recalculate stats after reset
     this.getStatsSummary();
   },
 
-  getOrCreateLoadoutForCareer(career: Career) {
+  async getOrCreateLoadoutForCareer(career: Career) {
     const loadouts = loadoutStoreAdapter.getLoadouts();
     const careerLoadout = loadouts.find(l => l.career === career);
     
     if (careerLoadout) {
       // Switch to existing loadout for this career
-      this.switchLoadout(careerLoadout.id);
+      await this.switchLoadout(careerLoadout.id);
       return careerLoadout.id;
     } else {
       // Get current level/renown to copy to new loadout
@@ -900,7 +993,7 @@ export const loadoutService = {
       const loadoutId = this.createLoadout(loadoutName, currentLevel, currentRenown);
       
       // Switch to the new loadout first
-      this.switchLoadout(loadoutId);
+      await this.switchLoadout(loadoutId);
       
       // Now set the career for the current loadout (which is now the new loadout)
       loadoutStoreAdapter.setCareer(career);
@@ -982,7 +1075,7 @@ export const loadoutService = {
       }
 
       // Create the loadout using the service (this emits LOADOUT_CREATED event)
-      const loadoutId = loadoutService.createLoadout(`Imported from ${character.name}`, character.level, character.renownRank);
+      const loadoutId = loadoutService.createLoadout(`Imported from ${character.name}`, character.level, character.renownRank, true, character.name);
       loadoutService.switchLoadout(loadoutId);
       loadoutService.setCareer(character.career);
       // Level and renown already set in createLoadout
@@ -1002,6 +1095,14 @@ export const loadoutService = {
 
       // Stats will be recalculated automatically by the updateItem/updateTalisman methods
       // No need to call getStatsSummary() again since it's called in those methods
+
+      // Reset the loadout to character state and update URL
+      loadoutStoreAdapter.updateLoadoutCharacterStatus(loadoutId, true, character.name);
+      const { urlService } = await import('./urlService');
+      const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
+      if (currentLoadout) {
+        urlService.updateUrlWithLoadout(currentLoadout);
+      }
 
       return loadoutId;
     } catch (error) {

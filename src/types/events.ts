@@ -9,7 +9,10 @@ export type LoadoutEventType =
   | 'STATS_UPDATED'
   | 'LOADOUT_CREATED'
   | 'LOADOUT_SWITCHED'
-  | 'LOADOUT_RESET';
+  | 'LOADOUT_RESET'
+  | 'CHARACTER_LOADED_FROM_URL'
+  | 'LOADOUT_LOADED_FROM_URL'
+  | 'CHARACTER_LOADED';
 
 export interface LoadoutEvent {
   type: LoadoutEventType;
@@ -86,6 +89,29 @@ export interface LoadoutResetEvent extends LoadoutEvent {
   };
 }
 
+export interface CharacterLoadedFromUrlEvent extends LoadoutEvent {
+  type: 'CHARACTER_LOADED_FROM_URL';
+  payload: {
+    characterName: string;
+    characterId: string;
+  };
+}
+
+export interface LoadoutLoadedFromUrlEvent extends LoadoutEvent {
+  type: 'LOADOUT_LOADED_FROM_URL';
+  payload: {
+    loadoutId: string;
+  };
+}
+
+export interface CharacterLoadedEvent extends LoadoutEvent {
+  type: 'CHARACTER_LOADED';
+  payload: {
+    characterName: string;
+    characterId: string;
+  };
+}
+
 export type LoadoutEvents =
   | ItemUpdatedEvent
   | TalismanUpdatedEvent
@@ -95,4 +121,7 @@ export type LoadoutEvents =
   | StatsUpdatedEvent
   | LoadoutCreatedEvent
   | LoadoutSwitchedEvent
-  | LoadoutResetEvent;
+  | LoadoutResetEvent
+  | CharacterLoadedFromUrlEvent
+  | LoadoutLoadedFromUrlEvent
+  | CharacterLoadedEvent;
