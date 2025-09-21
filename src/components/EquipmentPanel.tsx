@@ -37,10 +37,12 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
   };
 
   const handleItemSelect = async (item: Item) => {
-    if (selectedSlot) {
+    // Capture slot before any await to avoid race with onClose() clearing state
+    const slotToUpdate = selectedSlot;
+    if (slotToUpdate) {
       // Fetch complete item details including set bonuses
       const completeItem = await loadoutService.getItemWithDetails(item.id);
-      await loadoutService.updateItem(selectedSlot, completeItem);
+      await loadoutService.updateItem(slotToUpdate, completeItem);
       // No need to manually update local state - the hook handles reactivity
     }
   };
@@ -58,10 +60,12 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
   };
 
   const handleTalismanSelect = async (talisman: Item) => {
-    if (talismanSlot) {
+    // Capture talisman slot before any await to avoid race with onClose() clearing state
+    const slotInfo = talismanSlot;
+    if (slotInfo) {
       // Fetch complete talisman details including set bonuses
       const completeTalisman = await loadoutService.getItemWithDetails(talisman.id);
-      await loadoutService.updateTalisman(talismanSlot.slot, talismanSlot.index, completeTalisman);
+      await loadoutService.updateTalisman(slotInfo.slot, slotInfo.index, completeTalisman);
     }
   };
 
@@ -184,7 +188,8 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
         }}
         onSelect={talismanSlot ? handleTalismanSelect : handleItemSelect}
         isTalismanMode={!!talismanSlot}
-        holdingItemLevelReq={talismanSlot ? currentLoadout?.items[talismanSlot.slot].item?.itemLevel : undefined}
+  // For talismans, use the holding item's levelRequirement to match eligibility rule
+  holdingItemLevelReq={talismanSlot ? currentLoadout?.items[talismanSlot.slot].item?.levelRequirement : undefined}
         talismanSlotIndex={talismanSlot?.index}
         nameFilter={nameFilter}
         statsFilter={statsFilter}

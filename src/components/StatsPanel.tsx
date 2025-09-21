@@ -1,6 +1,8 @@
 import { useLoadoutStats } from '../hooks/useLoadoutStats';
 import { useLoadoutData } from '../hooks/useLoadoutData';
 import { formatCamelCase } from '../utils/formatters';
+import { loadoutService } from '../services/loadoutService';
+import HoverTooltip from './HoverTooltip';
 
 function formatStatValue(value: number, isPercentage: boolean = false): string {
   if (isPercentage) {
@@ -100,16 +102,47 @@ export default function StatsPanel() {
     return (
       <div>
         <h3 className="stats-section-title">{title}</h3>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {nonZeroStats.length > 0 ? (
-            nonZeroStats.map(stat => (
-              <div key={stat.key} className="stats-row">
-                <span className="text-sm">{formatCamelCase(stat.key)}:</span>
-                <span className="stats-label font-medium">
-                  {formatStatValue(stat.value, stat.isPercentage)}
-                </span>
-              </div>
-            ))
+            nonZeroStats.map(stat => {
+              const contributions = loadoutService.getStatContributions(stat.key);
+              const isPercentRow = !!stat.isPercentage || contributions.some(c => c.percentage);
+              return (
+                <HoverTooltip
+                  key={stat.key}
+                  placement="left"
+                  className="cursor-help"
+                  content={
+                    <div className="max-w-[26rem] whitespace-nowrap overflow-x-auto">
+                      <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatCamelCase(stat.key)}</div>
+                      <ul className="space-y-0.5">
+                        {contributions.length === 0 && (
+                          <li className="text-[11px] text-gray-400">No contributors</li>
+                        )}
+                        {contributions.map((c, idx) => (
+                          <li key={idx} className="text-[11px] flex items-center justify-between gap-3">
+                            <span>
+                              <span style={{ color: c.color || undefined }}>{c.name}</span>
+                              {c.count > 1 && (
+                                <span className="ml-1 text-gray-400">(x{c.count})</span>
+                              )}
+                            </span>
+                            <span className="text-gray-200">{formatStatValue(c.totalValue, isPercentRow || c.percentage)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  }
+                >
+                  <div className="stats-row rounded px-1 -mx-1 hover:bg-gray-800/60 hover:ring-1 hover:ring-gray-700 transition-colors">
+                    <span className="text-xs">{formatCamelCase(stat.key)}:</span>
+                    <span className="stats-label font-medium text-xs">
+                      {formatStatValue(stat.value, isPercentRow)}
+                    </span>
+                  </div>
+                </HoverTooltip>
+              );
+            })
           ) : (
             <div className="text-xs text-muted italic">No {title.toLowerCase()} bonuses</div>
           )}
@@ -124,7 +157,7 @@ export default function StatsPanel() {
 
       {/* Loadout Info */}
       <div className="stats-loadout-info">
-        <div className="text-sm text-muted">
+        <div className="text-xs text-muted">
           {equippedItemsCount} item{equippedItemsCount !== 1 ? 's' : ''} equipped
         </div>
       </div>

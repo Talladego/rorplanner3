@@ -14,7 +14,7 @@ interface EquipmentSelectorProps {
   onClose: () => void;
   onSelect: (item: Item) => void;
   isTalismanMode?: boolean;
-  holdingItemLevelReq?: number;
+  holdingItemLevelReq?: number; // This represents holding item's levelRequirement
   talismanSlotIndex?: number; // Index of the talisman slot being filled
   nameFilter: string;
   statsFilter: Stat[];
@@ -165,16 +165,10 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
     }
   }, [isTalismanMode, holdingItemLevelReq, career, currentLoadout, slot]);
 
-  // Reset pagination when modal opens, reset filters only when context changes
+  // Reset pagination when modal opens; preserve filters across openings/context changes
   useEffect(() => {
     if (isOpen) {
-      const currentContext = { isTalismanMode, career: career || null };
-      const prevContext = prevContextRef.current;
-      
-      // Check if context changed (talisman mode or career)
-      const contextChanged = 
-        currentContext.isTalismanMode !== prevContext.isTalismanMode ||
-        currentContext.career !== prevContext.career;
+  const currentContext = { isTalismanMode, career: career || null };
       
       setCurrentPage(1);
       setPageHistory([]);
@@ -188,21 +182,16 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
         endCursor: null,
         totalCount: 0,
       });
-      
-      // Reset filters only if context changed
-      if (contextChanged) {
-        onNameFilterChange('');
-        onStatsFilterChange([]);
-        onRarityFilterChange([]);
-        prevContextRef.current = currentContext;
-      }
+
+      // Update context ref (no filter resets; we keep user selections)
+      prevContextRef.current = currentContext;
       
       // Only fetch if we have a career (for equipment) or it's talisman mode
       if (career || isTalismanMode) {
         fetchItems(undefined, nameFilter, statsFilter, rarityFilter);
       }
     }
-  }, [isOpen, isTalismanMode, career, currentLoadout, nameFilter, statsFilter, rarityFilter, fetchItems, onNameFilterChange, onStatsFilterChange, onRarityFilterChange]);
+  }, [isOpen, isTalismanMode, career, currentLoadout, nameFilter, statsFilter, rarityFilter, fetchItems]);
 
   const handleNameFilterChange = (value: string) => {
     onNameFilterChange(value);
@@ -265,7 +254,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
       <div ref={modalRef} className="modal-container max-w-2xl">
         <div className="modal-header">
           <h2 className="modal-title">
-            {isTalismanMode ? `Select Talisman (Level ${holdingItemLevelReq})` : `Select Item for ${formatSlotName(slot)}`}
+            {isTalismanMode ? `Select Talisman (Item Level Req ≤ ${holdingItemLevelReq})` : `Select Item for ${formatSlotName(slot)}`}
           </h2>
           <button 
             onClick={onClose} 

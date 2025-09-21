@@ -6,6 +6,7 @@ import { gql } from '@apollo/client';
 import { EquipSlot, Item, Career, LoadoutItem, Stat, ItemRarity } from '../types';
 import { loadoutEventEmitter } from './loadoutEventEmitter';
 import { LoadoutEvents, LoadoutEventType } from '../types/events';
+import { getItemColor } from '../utils/rarityColors';
 
 const SEARCH_CHARACTERS = gql`
   query GetCharacters($name: String!) {
@@ -293,6 +294,10 @@ const GET_TALISMANS = gql`
 `;
 
 export const loadoutService = {
+  // LRU cache for item details + in-flight requests to prevent duplicate fetches
+  _itemDetailsCache: new Map<string, Item | null>(),
+  _itemDetailsInflight: new Map<string, Promise<Item | null>>(),
+  _itemDetailsCacheLimit: 200,
   // 1. Load data from named character
   async loadFromNamedCharacter(characterName: string) {
     try {
@@ -587,8 +592,9 @@ export const loadoutService = {
     return (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
   },
 
-  // 3.5. Fetch talismans for item level (rule: talisman.levelReq ≤ holding.itemLevel)
-  async getTalismansForItemLevel(itemLevel: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
+  // 3.5. Fetch talismans for holding item's level requirement
+  // Rule (from in-game testing): talisman.levelRequirement ≤ holdingItem.levelRequirement
+  async getTalismansForItemLevel(holdingLevelRequirement: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
     try {
       const query = GET_TALISMANS;
       const variables: any = {
@@ -606,16 +612,14 @@ export const loadoutService = {
       // Build the where clause dynamically
       const where: any = {
         type: { eq: 'ENHANCEMENT' },
-        itemLevel: { lte: itemLevel },
+        // Apply the correct matching rule against the holding item's level requirement
+        levelRequirement: { lte: holdingLevelRequirement },
         name: { contains: nameFilter || '' }
       };
 
-      // Always provide rarities - use specified ones or default talisman rarities
+      // Apply rarity filtering only when specified by the user; otherwise include all rarities by default
       if (hasRarities && hasRarities.length > 0) {
         where.rarity = { in: hasRarities };
-      } else {
-        // Default talisman rarities when none specified
-        where.rarity = { in: ['UTILITY', 'COMMON', 'UNCOMMON', 'RARE', 'VERY_RARE'] };
       }
 
       variables.where = where;
@@ -632,134 +636,12 @@ export const loadoutService = {
     }
   },
 
-  // 3.7. Get talismans for a specific slot (handles JEWELLERY3 special case)
-  async getTalismansForSlot(slot: EquipSlot, itemLevel: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
-    // Special handling for JEWELLERY3 legendary items that can hold Sentinel/Triumphant/Victorious talismans
-    // These legendary talismans can be slotted into matching JEWELLERY3 items even when their levelReq > holding.itemLevel
-    if (slot === EquipSlot.JEWELLERY3) {
-      return await this.getLegendaryTalismans(limit, after, nameFilter, hasStats);
-    } else {
-      return await this.getTalismansForItemLevel(itemLevel, limit, after, nameFilter, hasStats, hasRarities);
-    }
+  // 3.7. Get talismans for a specific slot (no special cases)
+  async getTalismansForSlot(_slot: EquipSlot, holdingLevelRequirement: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
+    return await this.getTalismansForItemLevel(holdingLevelRequirement, limit, after, nameFilter, hasStats, hasRarities);
   },
 
-  // 3.6. Fetch legendary talismans (special case for JEWELLERY3 legendary items)
-  async getLegendaryTalismans(limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[]): Promise<any> {
-    try {
-      const query = gql`
-        query GetLegendaryTalismans($first: Int, $after: String, $hasStats: [Stat!], $where: ItemFilterInput) {
-          items(
-            where: $where,
-            hasStats: $hasStats,
-            first: $first,
-            after: $after,
-            order: [
-              { rarity: DESC },
-              { itemLevel: DESC },
-              { name: ASC }
-            ]
-          ) {
-            pageInfo {
-              hasNextPage
-              hasPreviousPage
-              startCursor
-              endCursor
-            }
-            edges {
-              cursor
-              node {
-                id
-                name
-                type
-                slot
-                rarity
-                armor
-                dps
-                speed
-                levelRequirement
-                renownRankRequirement
-                itemLevel
-                uniqueEquipped
-                stats {
-                  stat
-                  value
-                  percentage
-                }
-                careerRestriction
-                raceRestriction
-                iconUrl
-                talismanSlots
-                itemSet {
-                  id
-                  name
-                }
-              }
-            }
-            nodes {
-              id
-              name
-              type
-              slot
-              rarity
-              armor
-              dps
-              speed
-              levelRequirement
-              renownRankRequirement
-              itemLevel
-              uniqueEquipped
-              stats {
-                stat
-                value
-                percentage
-              }
-              careerRestriction
-              raceRestriction
-              iconUrl
-              talismanSlots
-              itemSet {
-                id
-                name
-              }
-            }
-            totalCount
-          }
-        }
-      `;
-
-      const variables: any = {
-        first: limit
-      };
-
-      if (after) {
-        variables.after = after;
-      }
-
-      if (hasStats && hasStats.length > 0) {
-        variables.hasStats = hasStats;
-      }
-
-      // Build the where clause for legendary talismans
-      const where: any = {
-        type: { eq: 'ENHANCEMENT' },
-        rarity: { eq: 'MYTHIC' },
-        slot: { eq: 'NONE' },
-        name: { contains: nameFilter || '' }
-      };
-
-      variables.where = where;
-
-      const { data } = await client.query({
-        query,
-        variables,
-      });
-      
-      return (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
-    } catch (error) {
-      console.error('Failed to fetch Sentinel talismans:', error);
-      throw error;
-    }
-  },
+  // Removed legendary talisman special-case as the required info cannot be reliably extracted from the schema
 
   // 3. Retrieve stats summary
   getStatsSummary() {
@@ -1086,6 +968,168 @@ export const loadoutService = {
     this.getStatsSummary();
   },
 
+  // Get detailed contributions for a given StatsSummary key (e.g., 'strength', 'armor', etc.)
+  getStatContributions(statKey: keyof import('../types').StatsSummary | string): Array<{ name: string; count: number; totalValue: number; percentage: boolean; color?: string }> {
+    const loadout = this.getCurrentLoadout();
+    if (!loadout) return [];
+
+    // Map StatsSummary key to Item Stat enum string
+    const keyToEnum: Record<string, string> = {
+      strength: 'STRENGTH',
+      agility: 'AGILITY',
+      willpower: 'WILLPOWER',
+      toughness: 'TOUGHNESS',
+      wounds: 'WOUNDS',
+      initiative: 'INITIATIVE',
+      weaponSkill: 'WEAPON_SKILL',
+      ballisticSkill: 'BALLISTIC_SKILL',
+      intelligence: 'INTELLIGENCE',
+      spiritResistance: 'SPIRIT_RESISTANCE',
+      elementalResistance: 'ELEMENTAL_RESISTANCE',
+      corporealResistance: 'CORPOREAL_RESISTANCE',
+      incomingDamage: 'INCOMING_DAMAGE',
+      incomingDamagePercent: 'INCOMING_DAMAGE_PERCENT',
+      outgoingDamage: 'OUTGOING_DAMAGE',
+      outgoingDamagePercent: 'OUTGOING_DAMAGE_PERCENT',
+      armor: 'ARMOR',
+      velocity: 'VELOCITY',
+      block: 'BLOCK',
+      parry: 'PARRY',
+      evade: 'EVADE',
+      disrupt: 'DISRUPT',
+      actionPointRegen: 'ACTION_POINT_REGEN',
+      moraleRegen: 'MORALE_REGEN',
+      cooldown: 'COOLDOWN',
+      buildTime: 'BUILD_TIME',
+      criticalDamage: 'CRITICAL_DAMAGE',
+      range: 'RANGE',
+      autoAttackSpeed: 'AUTO_ATTACK_SPEED',
+      meleePower: 'MELEE_POWER',
+      rangedPower: 'RANGED_POWER',
+      magicPower: 'MAGIC_POWER',
+      meleeCritRate: 'MELEE_CRIT_RATE',
+      rangedCritRate: 'RANGED_CRIT_RATE',
+      magicCritRate: 'MAGIC_CRIT_RATE',
+      armorPenetration: 'ARMOR_PENETRATION',
+      healingPower: 'HEALING_POWER',
+      healthRegen: 'HEALTH_REGEN',
+      maxActionPoints: 'MAX_ACTION_POINTS',
+      fortitude: 'FORTITUDE',
+      armorPenetrationReduction: 'ARMOR_PENETRATION_REDUCTION',
+      criticalHitRateReduction: 'CRITICAL_HIT_RATE_REDUCTION',
+      blockStrikethrough: 'BLOCK_STRIKETHROUGH',
+      parryStrikethrough: 'PARRY_STRIKETHROUGH',
+      evadeStrikethrough: 'EVADE_STRIKETHROUGH',
+      disruptStrikethrough: 'DISRUPT_STRIKETHROUGH',
+      healCritRate: 'HEAL_CRIT_RATE',
+      mastery1Bonus: 'MASTERY_1_BONUS',
+      mastery2Bonus: 'MASTERY_2_BONUS',
+      mastery3Bonus: 'MASTERY_3_BONUS',
+      outgoingHealPercent: 'OUTGOING_HEAL_PERCENT',
+      incomingHealPercent: 'INCOMING_HEAL_PERCENT',
+    };
+
+    const target = keyToEnum[String(statKey)] || '';
+
+    // Eligibility helper (same as in store)
+    const isItemEligible = (item: import('../types').Item | null): boolean => {
+      if (!item) return false;
+      const levelEligible = !item.levelRequirement || item.levelRequirement <= loadout.level;
+      const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= loadout.renownRank;
+      return levelEligible && renownEligible;
+    };
+
+    // Aggregate by name
+  const byName = new Map<string, { name: string; count: number; totalValue: number; percentage: boolean; color?: string }>();
+
+    // 1) Items and their own stats (including armor property)
+    Object.values(loadout.items).forEach(({ item, talismans }) => {
+      if (item && isItemEligible(item)) {
+        // Armor property
+        if (target === 'ARMOR' && item.armor && item.armor > 0) {
+          const key = item.name + '|armor';
+          const prev = byName.get(key) || { name: item.name, count: 0, totalValue: 0, percentage: false, color: getItemColor(item) };
+          prev.count += 1;
+          prev.totalValue += Number(item.armor);
+          byName.set(key, prev);
+        }
+
+        // Stats array
+        if (item.stats) {
+          item.stats.forEach((s) => {
+            if (s.stat === target) {
+              const key = item.name + '|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
+              const prev = byName.get(key) || { name: item.name, count: 0, totalValue: 0, percentage: !!s.percentage, color: getItemColor(item) };
+              prev.count += 1;
+              prev.totalValue += Number(s.value);
+              prev.percentage = !!s.percentage;
+              byName.set(key, prev);
+            }
+          });
+        }
+
+        // 2) Talismans on the item
+        if (talismans && Array.isArray(talismans)) {
+          talismans.forEach((talisman) => {
+            if (talisman && isItemEligible(talisman) && talisman.stats) {
+              talisman.stats.forEach((s) => {
+                if (s.stat === target) {
+                  const key = talisman.name + '|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
+                  const prev = byName.get(key) || { name: talisman.name, count: 0, totalValue: 0, percentage: !!s.percentage, color: getItemColor(talisman) };
+                  prev.count += 1;
+                  prev.totalValue += Number(s.value);
+                  prev.percentage = !!s.percentage;
+                  byName.set(key, prev);
+                }
+              });
+            }
+          });
+        }
+      }
+    });
+
+    // 3) Set bonuses that are active
+    // Count eligible items per set
+    const setCounts: Record<string, number> = {};
+    Object.values(loadout.items).forEach(({ item }) => {
+      if (item && isItemEligible(item) && item.itemSet) {
+        setCounts[item.itemSet.name] = (setCounts[item.itemSet.name] || 0) + 1;
+      }
+    });
+
+    // Build a unique map of sets present to avoid counting bonuses once per item
+    const setsMap: Record<string, { bonuses: any[] }> = {};
+    Object.values(loadout.items).forEach(({ item }) => {
+      if (item && isItemEligible(item) && item.itemSet && item.itemSet.bonuses) {
+        const setName = item.itemSet.name;
+        if (!setsMap[setName]) {
+          setsMap[setName] = { bonuses: item.itemSet.bonuses };
+        }
+      }
+    });
+
+    // For each unique set, apply active bonuses once
+    Object.entries(setsMap).forEach(([setName, { bonuses }]) => {
+      const pieceCount = setCounts[setName] || 0;
+      bonuses.forEach((bonus) => {
+        if (pieceCount >= bonus.itemsRequired && 'stat' in bonus.bonus) {
+          const b = bonus.bonus as any; // ItemStat
+          if (b.stat === target) {
+            const key = setName + '|set|' + b.stat + '|' + (b.percentage ? 'pct' : 'val');
+            const prev = byName.get(key) || { name: setName, count: 0, totalValue: 0, percentage: !!b.percentage, color: '#4ade80' };
+            prev.count = 1; // set bonus counted once per set
+            prev.totalValue += Number(b.value);
+            prev.percentage = !!b.percentage;
+            byName.set(key, prev);
+          }
+        }
+      });
+    });
+
+    return Array.from(byName.values())
+      .filter(entry => entry.totalValue !== 0)
+      .sort((a, b) => b.totalValue - a.totalValue || a.name.localeCompare(b.name));
+  },
   // Get count of equipped items for a specific set
   getEquippedSetItemsCount(setName: string): number {
     const loadout = this.getCurrentLoadout();
@@ -1108,66 +1152,98 @@ export const loadoutService = {
   // Fetch single item with full details (including descriptions)
   async getItemWithDetails(itemId: string): Promise<Item | null> {
     try {
-      const query = gql`
-        query GetItem($id: ID!) {
-          item(id: $id) {
-            id
-            name
-            description
-            type
-            slot
-            rarity
-            armor
-            dps
-            speed
-            levelRequirement
-            renownRankRequirement
-            itemLevel
-            uniqueEquipped
-            stats {
-              stat
-              value
-              percentage
-            }
-            careerRestriction
-            raceRestriction
-            iconUrl
-            talismanSlots
-            itemSet {
+      // Return from cache if present (and refresh LRU)
+      if (this._itemDetailsCache.has(itemId)) {
+        const cached = this._itemDetailsCache.get(itemId) ?? null;
+        // Refresh LRU by re-inserting
+        this._itemDetailsCache.delete(itemId);
+        this._itemDetailsCache.set(itemId, cached);
+        return cached;
+      }
+
+      // Coalesce concurrent requests
+      const inflight = this._itemDetailsInflight.get(itemId);
+      if (inflight) return inflight;
+
+      const promise = (async () => {
+        const query = gql`
+          query GetItem($id: ID!) {
+            item(id: $id) {
               id
               name
-              bonuses {
-                itemsRequired
-                bonus {
-                  ... on ItemStat {
-                    stat
-                    value
-                    percentage
-                  }
-                  ... on Ability {
-                    name
-                    description
+              description
+              type
+              slot
+              rarity
+              armor
+              dps
+              speed
+              levelRequirement
+              renownRankRequirement
+              itemLevel
+              uniqueEquipped
+              stats {
+                stat
+                value
+                percentage
+              }
+              careerRestriction
+              raceRestriction
+              iconUrl
+              talismanSlots
+              itemSet {
+                id
+                name
+                bonuses {
+                  itemsRequired
+                  bonus {
+                    ... on ItemStat {
+                      stat
+                      value
+                      percentage
+                    }
+                    ... on Ability {
+                      name
+                      description
+                    }
                   }
                 }
               }
-            }
-            abilities {
-              name
-              description
-            }
-            buffs {
-              name
-              description
+              abilities {
+                name
+                description
+              }
+              buffs {
+                name
+                description
+              }
             }
           }
-        }
-      `;
+        `;
 
-      const { data } = await client.query({
-        query,
-        variables: { id: itemId },
-      });
-      return (data as any).item || null;
+        const { data } = await client.query({
+          query,
+          variables: { id: itemId },
+          fetchPolicy: 'cache-first',
+        });
+        const item = (data as any).item || null;
+
+        // Insert into LRU cache
+        this._itemDetailsCache.set(itemId, item);
+        if (this._itemDetailsCache.size > this._itemDetailsCacheLimit) {
+          // Delete the oldest entry (Map preserves insertion order)
+          const firstKey = this._itemDetailsCache.keys().next().value as string | undefined;
+          if (firstKey) this._itemDetailsCache.delete(firstKey);
+        }
+        return item;
+      })();
+
+      this._itemDetailsInflight.set(itemId, promise);
+      try {
+        return await promise;
+      } finally {
+        this._itemDetailsInflight.delete(itemId);
+      }
     } catch (error) {
       console.error('Failed to fetch item details:', error);
       throw error;

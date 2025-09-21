@@ -8,6 +8,12 @@ const client = new ApolloClient({
     },
   }),
   cache: new InMemoryCache(),
+  // Make cache-first behavior explicit for queries
+  defaultOptions: {
+    query: {
+      fetchPolicy: 'cache-first',
+    },
+  },
 });
 
 export default client;

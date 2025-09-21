@@ -15,6 +15,11 @@ export default [
       globals: globals.browser,
       parser: tsparser,
     },
+    settings: {
+      react: {
+        version: 'detect',
+      },
+    },
     plugins: {
       'react': react,
       'react-hooks': reactHooks,
@@ -27,6 +32,19 @@ export default [
       ...react.configs.recommended.rules,
       ...react.configs['jsx-runtime'].rules,
       ...reactHooks.configs.recommended.rules,
+      // Prevent ambiguous ApolloProvider imports; enforce stable subpath
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@apollo/client',
+              importNames: ['ApolloProvider'],
+              message: "Import ApolloProvider from '@apollo/client/react' to avoid ESM resolution issues.",
+            },
+          ],
+        },
+      ],
       'react/jsx-no-target-blank': 'off',
       'react-refresh/only-export-components': [
         'warn',

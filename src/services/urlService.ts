@@ -55,20 +55,24 @@ class UrlService {
       }
     });
 
-    // Build new URL (HashRouter format)
+    // Build new URL
     const searchString = currentParams.toString();
-    const newPath = searchString ? `/#/?${searchString}` : '/#/';
+    // For React Router navigate (HashRouter), pass a clean path WITHOUT the hash
+    // HashRouter will prefix the path with '#/' automatically
+    const routerPath = searchString ? `/?${searchString}` : '/';
+    // For direct history API fallback, construct the full hash path
+    const historyPath = searchString ? `/#/?${searchString}` : '/#/';
 
     try {
-      this.navigateCallback(newPath, options);
+      this.navigateCallback(routerPath, options);
     } catch (error) {
       console.warn('Navigate callback failed, falling back to history API:', error);
       // Fallback to direct history manipulation
       if (typeof window !== 'undefined') {
         if (options.replace) {
-          window.history.replaceState(null, '', newPath);
+          window.history.replaceState(null, '', historyPath);
         } else {
-          window.history.pushState(null, '', newPath);
+          window.history.pushState(null, '', historyPath);
         }
       }
     }
