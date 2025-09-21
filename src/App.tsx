@@ -122,7 +122,7 @@ function App() {
           setErrorMessage(`Failed to load loadout from URL parameters: ${(error as Error).message}`);
         });
     }
-  }, [location.search]); // Re-run when URL search params change
+  }, [location.search, errorMessage]); // Re-run when URL search params change or error state changes
 
   return (
     <ErrorBoundary>

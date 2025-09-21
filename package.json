@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint"
+    "lint": "eslint",
+    "probe:jewellery3-talismans": "npx tsx scripts/probe-jewellery3-talismans.ts"
   },
   "dependencies": {
     "@apollo/client": "^4.0.3",

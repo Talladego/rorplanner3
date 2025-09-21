@@ -1,6 +1,7 @@
 import { useState, ChangeEvent, useEffect } from 'react';
 import { Career } from '../types';
 import { loadoutService } from '../services/loadoutService';
+import { urlService } from '../services/urlService';
 import { LevelChangedEvent, RenownRankChangedEvent, CharacterLoadedFromUrlEvent } from '../types/events';
 import { formatCareerName } from '../utils/formatters';
 
@@ -90,12 +91,19 @@ export default function Toolbar({ selectedCareer, setSelectedCareer, errorMessag
         setSelectedCareer(currentLoadout.career || '');
         setLevel(currentLoadout.level);
         setRenownRank(currentLoadout.renownRank);
+        // Update URL with the new career loadout
+        urlService.updateUrlWithLoadout(currentLoadout);
       }
       setCharacterName(''); // Clear character name since we're on a career loadout
     } else {
       // Handle clearing career - just set to null on current loadout
       loadoutService.setCareer(null);
       setSelectedCareer(''); // For clearing, we do need to update UI immediately
+      // Update URL to remove career parameter
+      const currentLoadout = loadoutService.getCurrentLoadout();
+      if (currentLoadout) {
+        urlService.updateUrlWithLoadout(currentLoadout);
+      }
     }
   };
 
@@ -125,6 +133,13 @@ export default function Toolbar({ selectedCareer, setSelectedCareer, errorMessag
 
   const handleReset = async () => {
     await loadoutService.resetCurrentLoadout();
+    // Clear ALL URL parameters for a complete reset
+    const clearParams: Record<string, null> = {};
+    const currentParams = urlService.getSearchParams();
+    for (const key of currentParams.keys()) {
+      clearParams[key] = null;
+    }
+    urlService.updateUrl(clearParams, { replace: true });
     // Form fields will be cleared via the LOADOUT_RESET event
   };
 

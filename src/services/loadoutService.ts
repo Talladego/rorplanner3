@@ -3,7 +3,7 @@
 import { loadoutStoreAdapter } from '../store/loadoutStoreAdapter';
 import client from '../lib/apollo-client';
 import { gql } from '@apollo/client';
-import { EquipSlot, Item, Career, LoadoutItem, Stat } from '../types';
+import { EquipSlot, Item, Career, LoadoutItem, Stat, ItemRarity } from '../types';
 import { loadoutEventEmitter } from './loadoutEventEmitter';
 import { LoadoutEvents, LoadoutEventType } from '../types/events';
 
@@ -129,104 +129,10 @@ const GET_CHARACTER = gql`
 `;
 
 
-const GET_ITEMS_WITHOUT_CAREER = gql`
-  query GetItemsWithoutCareer($slot: EquipSlot, $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!]) {
+const GET_POCKET_ITEMS = gql`
+  query GetPocketItems($first: Int, $after: String, $hasStats: [Stat!], $usableByCareer: Career, $where: ItemFilterInput) {
     items(
-      where: { 
-        slot: { eq: $slot },
-        levelRequirement: { lte: $levelRequirement },
-        renownRankRequirement: { lte: $renownRankRequirement },
-        name: { contains: $nameFilter },
-        type: { neq: NONE }
-      }, 
-      hasStats: $hasStats,
-      first: $first, 
-      after: $after,
-      order: [
-        { rarity: DESC },
-        { itemLevel: DESC },
-        { name: ASC }
-      ]
-    ) {
-      pageInfo {
-        hasNextPage
-        hasPreviousPage
-        startCursor
-        endCursor
-      }
-      edges {
-        cursor
-        node {
-          id
-          name
-          type
-          slot
-          rarity
-          armor
-          dps
-          speed
-          levelRequirement
-          renownRankRequirement
-          itemLevel
-          uniqueEquipped
-          stats {
-            stat
-            value
-            percentage
-          }
-          careerRestriction
-          raceRestriction
-          iconUrl
-          talismanSlots
-          itemSet {
-            id
-            name
-          }
-        }
-      }
-      nodes {
-        id
-        name
-        type
-        slot
-        rarity
-        armor
-        dps
-        speed
-        levelRequirement
-        renownRankRequirement
-        itemLevel
-        uniqueEquipped
-        stats {
-          stat
-          value
-          percentage
-        }
-        careerRestriction
-        raceRestriction
-        iconUrl
-        talismanSlots
-        itemSet {
-          id
-          name
-        }
-      }
-      totalCount
-    }
-  }
-`;
-
-
-const GET_ITEMS_WITH_CAREER = gql`
-  query GetItemsWithCareer($slot: EquipSlot, $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!], $usableByCareer: Career) {
-    items(
-      where: {
-        slot: { eq: $slot },
-        levelRequirement: { lte: $levelRequirement },
-        renownRankRequirement: { lte: $renownRankRequirement },
-        name: { contains: $nameFilter },
-        type: { neq: NONE }
-      },
+      where: $where,
       hasStats: $hasStats,
       usableByCareer: $usableByCareer,
       first: $first,
@@ -305,100 +211,10 @@ const GET_ITEMS_WITH_CAREER = gql`
   }
 `;
 
-const GET_POCKET_ITEMS = gql`
-  query GetPocketItems($slots: [EquipSlot!], $levelRequirement: Byte, $renownRankRequirement: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!]) {
-    items(
-      where: {
-        slot: { in: $slots },
-        levelRequirement: { lte: $levelRequirement },
-        renownRankRequirement: { lte: $renownRankRequirement },
-        name: { contains: $nameFilter }
-      },
-      hasStats: $hasStats,
-      first: $first,
-      after: $after,
-      order: [
-        { rarity: DESC },
-        { itemLevel: DESC },
-        { name: ASC }
-      ]
-    ) {
-      pageInfo {
-        hasNextPage
-        hasPreviousPage
-        startCursor
-        endCursor
-      }
-      edges {
-        cursor
-        node {
-          id
-          name
-          type
-          slot
-          rarity
-          armor
-          dps
-          speed
-          levelRequirement
-          renownRankRequirement
-          itemLevel
-          uniqueEquipped
-          stats {
-            stat
-            value
-            percentage
-          }
-          careerRestriction
-          raceRestriction
-          iconUrl
-          talismanSlots
-          itemSet {
-            id
-            name
-          }
-        }
-      }
-      nodes {
-        id
-        name
-        type
-        slot
-        rarity
-        armor
-        dps
-        speed
-        levelRequirement
-        renownRankRequirement
-        itemLevel
-        uniqueEquipped
-        stats {
-          stat
-          value
-          percentage
-        }
-        careerRestriction
-        raceRestriction
-        iconUrl
-        talismanSlots
-        itemSet {
-          id
-          name
-        }
-      }
-      totalCount
-    }
-  }
-`;
-
 const GET_TALISMANS = gql`
-  query GetTalismans($itemLevel: Byte, $first: Int, $after: String, $nameFilter: String, $hasStats: [Stat!]) {
+  query GetTalismans($first: Int, $after: String, $hasStats: [Stat!], $where: ItemFilterInput) {
     items(
-      where: {
-        type: { eq: ENHANCEMENT },
-        itemLevel: { lte: $itemLevel },
-        name: { contains: $nameFilter }
-      },
+      where: $where,
       hasStats: $hasStats,
       first: $first,
       after: $after,
@@ -596,7 +412,7 @@ export const loadoutService = {
   },
 
   // 3. Fetch items for equipment selection
-  async getItemsForSlot(slot: EquipSlot, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[]): Promise<any> {
+  async getItemsForSlot(slot: EquipSlot, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
     try {
       // Check if we need compatibility slots
       const needsCompatibility = (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4);
@@ -617,7 +433,7 @@ export const loadoutService = {
         // Query each slot separately and combine results
         const allResults = [];
         for (const slotToQuery of compatibleSlots) {
-          const result = await this.getItemsForSingleSlot(slotToQuery, career, compatibilityLimit, after, levelRequirement, renownRankRequirement, nameFilter, hasStats);
+          const result = await this.getItemsForSingleSlot(slotToQuery, career, compatibilityLimit, after, levelRequirement, renownRankRequirement, nameFilter, hasStats, hasRarities);
           if (result.edges) {
             allResults.push(...result.edges);
           }
@@ -707,7 +523,7 @@ export const loadoutService = {
         };
       } else {
         // Use the original single-slot query
-        const result = await this.getItemsForSingleSlot(slot, career, limit, after, levelRequirement, renownRankRequirement, nameFilter, hasStats);
+        const result = await this.getItemsForSingleSlot(slot, career, limit, after, levelRequirement, renownRankRequirement, nameFilter, hasStats, hasRarities);
         
         return result;
       }
@@ -718,12 +534,10 @@ export const loadoutService = {
   },
 
   // Helper method for single slot queries
-  async getItemsForSingleSlot(slot: EquipSlot, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[]): Promise<any> {
+  async getItemsForSingleSlot(slot: EquipSlot, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
     let query;
     let variables: any = { 
-      slot, 
-      first: limit,
-      nameFilter: nameFilter || ''
+      first: limit
     };
 
     if (after) {
@@ -734,23 +548,35 @@ export const loadoutService = {
       variables.hasStats = hasStats;
     }
 
-    if (career && slot !== EquipSlot.POCKET1 && slot !== EquipSlot.POCKET2) {
-      query = GET_ITEMS_WITH_CAREER;
-      variables.usableByCareer = career;
-      variables.levelRequirement = levelRequirement;
-      variables.renownRankRequirement = renownRankRequirement;
+    // Build the where clause dynamically
+    const where: any = {
+      levelRequirement: { lte: levelRequirement },
+      renownRankRequirement: { lte: renownRankRequirement },
+      name: { contains: nameFilter || '' }
+    };
+
+    // Exclude NONE type items for non-pocket slots
+    if (slot !== EquipSlot.POCKET1 && slot !== EquipSlot.POCKET2) {
+      where.type = { neq: 'NONE' };
+    }
+
+    if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
+      // For pocket items, allow both POCKET1 and POCKET2 slots
+      where.slot = { in: [EquipSlot.POCKET1, EquipSlot.POCKET2] };
     } else {
-      // For pocket items, use the pocket-specific query that can handle both POCKET1 and POCKET2
-      if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
-        query = GET_POCKET_ITEMS;
-        variables.slots = [EquipSlot.POCKET1, EquipSlot.POCKET2]; // Allow both pocket slots
-        variables.levelRequirement = levelRequirement;
-        variables.renownRankRequirement = renownRankRequirement;
-      } else {
-        query = GET_ITEMS_WITHOUT_CAREER;
-        variables.levelRequirement = levelRequirement;
-        variables.renownRankRequirement = renownRankRequirement;
-      }
+      where.slot = { eq: slot };
+    }
+
+    if (hasRarities && hasRarities.length > 0) {
+      where.rarity = { in: hasRarities };
+    }
+
+    variables.where = where;
+
+    // Use the general query for all items (now supports career filtering)
+    query = GET_POCKET_ITEMS;
+    if (career) {
+      variables.usableByCareer = career;
     }
 
     const { data } = await client.query({
@@ -761,14 +587,12 @@ export const loadoutService = {
     return (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
   },
 
-  // 3.5. Fetch talismans for item level
-  async getTalismansForItemLevel(itemLevel: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[]): Promise<any> {
+  // 3.5. Fetch talismans for item level (rule: talisman.levelReq ≤ holding.itemLevel)
+  async getTalismansForItemLevel(itemLevel: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
     try {
       const query = GET_TALISMANS;
       const variables: any = {
-        itemLevel,
-        first: limit,
-        nameFilter: nameFilter || ''
+        first: limit
       };
 
       if (after) {
@@ -779,6 +603,23 @@ export const loadoutService = {
         variables.hasStats = hasStats;
       }
 
+      // Build the where clause dynamically
+      const where: any = {
+        type: { eq: 'ENHANCEMENT' },
+        itemLevel: { lte: itemLevel },
+        name: { contains: nameFilter || '' }
+      };
+
+      // Always provide rarities - use specified ones or default talisman rarities
+      if (hasRarities && hasRarities.length > 0) {
+        where.rarity = { in: hasRarities };
+      } else {
+        // Default talisman rarities when none specified
+        where.rarity = { in: ['UTILITY', 'COMMON', 'UNCOMMON', 'RARE', 'VERY_RARE'] };
+      }
+
+      variables.where = where;
+
       const { data } = await client.query({
         query,
         variables,
@@ -786,7 +627,136 @@ export const loadoutService = {
       
       return (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
     } catch (error) {
-      console.error('Failed to fetch talismans for item level:', error);
+      console.error('Failed to fetch talismans for level req:', error);
+      throw error;
+    }
+  },
+
+  // 3.7. Get talismans for a specific slot (handles JEWELLERY3 special case)
+  async getTalismansForSlot(slot: EquipSlot, itemLevel: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
+    // Special handling for JEWELLERY3 legendary items that can hold Sentinel/Triumphant/Victorious talismans
+    // These legendary talismans can be slotted into matching JEWELLERY3 items even when their levelReq > holding.itemLevel
+    if (slot === EquipSlot.JEWELLERY3) {
+      return await this.getLegendaryTalismans(limit, after, nameFilter, hasStats);
+    } else {
+      return await this.getTalismansForItemLevel(itemLevel, limit, after, nameFilter, hasStats, hasRarities);
+    }
+  },
+
+  // 3.6. Fetch legendary talismans (special case for JEWELLERY3 legendary items)
+  async getLegendaryTalismans(limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[]): Promise<any> {
+    try {
+      const query = gql`
+        query GetLegendaryTalismans($first: Int, $after: String, $hasStats: [Stat!], $where: ItemFilterInput) {
+          items(
+            where: $where,
+            hasStats: $hasStats,
+            first: $first,
+            after: $after,
+            order: [
+              { rarity: DESC },
+              { itemLevel: DESC },
+              { name: ASC }
+            ]
+          ) {
+            pageInfo {
+              hasNextPage
+              hasPreviousPage
+              startCursor
+              endCursor
+            }
+            edges {
+              cursor
+              node {
+                id
+                name
+                type
+                slot
+                rarity
+                armor
+                dps
+                speed
+                levelRequirement
+                renownRankRequirement
+                itemLevel
+                uniqueEquipped
+                stats {
+                  stat
+                  value
+                  percentage
+                }
+                careerRestriction
+                raceRestriction
+                iconUrl
+                talismanSlots
+                itemSet {
+                  id
+                  name
+                }
+              }
+            }
+            nodes {
+              id
+              name
+              type
+              slot
+              rarity
+              armor
+              dps
+              speed
+              levelRequirement
+              renownRankRequirement
+              itemLevel
+              uniqueEquipped
+              stats {
+                stat
+                value
+                percentage
+              }
+              careerRestriction
+              raceRestriction
+              iconUrl
+              talismanSlots
+              itemSet {
+                id
+                name
+              }
+            }
+            totalCount
+          }
+        }
+      `;
+
+      const variables: any = {
+        first: limit
+      };
+
+      if (after) {
+        variables.after = after;
+      }
+
+      if (hasStats && hasStats.length > 0) {
+        variables.hasStats = hasStats;
+      }
+
+      // Build the where clause for legendary talismans
+      const where: any = {
+        type: { eq: 'ENHANCEMENT' },
+        rarity: { eq: 'MYTHIC' },
+        slot: { eq: 'NONE' },
+        name: { contains: nameFilter || '' }
+      };
+
+      variables.where = where;
+
+      const { data } = await client.query({
+        query,
+        variables,
+      });
+      
+      return (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
+    } catch (error) {
+      console.error('Failed to fetch Sentinel talismans:', error);
       throw error;
     }
   },

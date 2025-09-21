@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { EquipSlot, Item, Stat, CAREER_RACE_MAPPING, Career } from '../types';
+import { EquipSlot, Item, Stat, CAREER_RACE_MAPPING, Career, ItemRarity } from '../types';
 import { useLoadoutData } from '../hooks/useLoadoutData';
 import { loadoutService } from '../services/loadoutService';
 import { formatSlotName, formatStatName, formatItemTypeName } from '../utils/formatters';
@@ -18,8 +18,10 @@ interface EquipmentSelectorProps {
   talismanSlotIndex?: number; // Index of the talisman slot being filled
   nameFilter: string;
   statsFilter: Stat[];
+  rarityFilter: ItemRarity[];
   onNameFilterChange: (value: string) => void;
   onStatsFilterChange: (value: Stat[]) => void;
+  onRarityFilterChange: (value: ItemRarity[]) => void;
   selectedCareer: Career | '';
 }
 
@@ -53,7 +55,7 @@ interface PageData {
   totalCount: number;
 }
 
-export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isTalismanMode = false, holdingItemLevelReq, talismanSlotIndex, nameFilter, statsFilter, onNameFilterChange, onStatsFilterChange, selectedCareer }: EquipmentSelectorProps) {
+export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isTalismanMode = false, holdingItemLevelReq, talismanSlotIndex, nameFilter, statsFilter, rarityFilter, onNameFilterChange, onStatsFilterChange, onRarityFilterChange, selectedCareer }: EquipmentSelectorProps) {
   const { currentLoadout } = useLoadoutData();
   const career = selectedCareer;
   const modalRef = useRef<HTMLDivElement>(null);
@@ -96,7 +98,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   }, [isOpen, onClose]);
 
   // Fetch items for current page
-  const fetchItems = useCallback(async (after?: string, filter?: string, stats?: Stat[]) => {
+  const fetchItems = useCallback(async (after?: string, filter?: string, stats?: Stat[], rarities?: ItemRarity[]) => {
     if (isTalismanMode) {
       if (!holdingItemLevelReq) return;
     } else {
@@ -110,12 +112,14 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
       let connection;
       
       if (isTalismanMode) {
-        connection = await loadoutService.getTalismansForItemLevel(
+        connection = await loadoutService.getTalismansForSlot(
+          slot,
           holdingItemLevelReq!,
           ITEMS_PER_PAGE,
           after,
           filter,
-          stats
+          stats,
+          rarities
         );
       } else {
         connection = await loadoutService.getItemsForSlot(
@@ -126,7 +130,8 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
           currentLoadout?.level || 40,
           currentLoadout?.renownRank || 80,
           filter,
-          stats
+          stats,
+          rarities
         );
       }
 
@@ -188,15 +193,16 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
       if (contextChanged) {
         onNameFilterChange('');
         onStatsFilterChange([]);
+        onRarityFilterChange([]);
         prevContextRef.current = currentContext;
       }
       
       // Only fetch if we have a career (for equipment) or it's talisman mode
       if (career || isTalismanMode) {
-        fetchItems(undefined, nameFilter, statsFilter);
+        fetchItems(undefined, nameFilter, statsFilter, rarityFilter);
       }
     }
-  }, [isOpen, isTalismanMode, career, currentLoadout, nameFilter, statsFilter, fetchItems, onNameFilterChange, onStatsFilterChange]);
+  }, [isOpen, isTalismanMode, career, currentLoadout, nameFilter, statsFilter, rarityFilter, fetchItems, onNameFilterChange, onStatsFilterChange, onRarityFilterChange]);
 
   const handleNameFilterChange = (value: string) => {
     onNameFilterChange(value);
@@ -209,7 +215,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
     const timer = setTimeout(() => {
       setCurrentPage(1);
       setPageHistory([]);
-      fetchItems(undefined, value, statsFilter);
+      fetchItems(undefined, value, statsFilter, rarityFilter);
     }, 300);
     
     setDebounceTimer(timer);
@@ -223,7 +229,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
       // Server-side pagination for regular slots
       setPageHistory(prev => [...prev, pageData.startCursor || '']);
       setCurrentPage(prev => prev + 1);
-      fetchItems(pageData.endCursor, nameFilter, statsFilter);
+      fetchItems(pageData.endCursor, nameFilter, statsFilter, rarityFilter);
     } else if (currentPage < maxPage) {
       // Client-side pagination for compatibility slots (all data already loaded)
       setCurrentPage(prev => prev + 1);
@@ -236,7 +242,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
       const previousCursor = pageHistory[pageHistory.length - 1];
       setPageHistory(prev => prev.slice(0, -1));
       setCurrentPage(prev => prev - 1);
-      fetchItems(previousCursor || undefined, nameFilter, statsFilter);
+      fetchItems(previousCursor || undefined, nameFilter, statsFilter, rarityFilter);
     } else if (currentPage > 1) {
       // Client-side pagination - just decrement page counter
       setCurrentPage(prev => prev - 1);
@@ -293,7 +299,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                 onStatsFilterChange(newStatsFilter);
                 setCurrentPage(1);
                 setPageHistory([]);
-                fetchItems(undefined, nameFilter, newStatsFilter);
+                fetchItems(undefined, nameFilter, newStatsFilter, rarityFilter);
               }}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
@@ -306,14 +312,38 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
             </select>
           </div>
 
+          {/* Rarity Filter */}
+          <div className="w-48">
+            <select
+              value={rarityFilter.length === 0 ? '' : rarityFilter[0]}
+              onChange={(e) => {
+                const selectedRarity = e.target.value as ItemRarity;
+                const newRarityFilter = selectedRarity ? [selectedRarity] : [];
+                onRarityFilterChange(newRarityFilter);
+                setCurrentPage(1);
+                setPageHistory([]);
+                fetchItems(undefined, nameFilter, statsFilter, newRarityFilter);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">All Rarities</option>
+              {Object.values(ItemRarity).map(rarity => (
+                <option key={rarity} value={rarity}>
+                  {rarity.replace('_', ' ')}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Reset Button */}
           <button
             onClick={() => {
               onNameFilterChange('');
               onStatsFilterChange([]);
+              onRarityFilterChange([]);
               setCurrentPage(1);
               setPageHistory([]);
-              fetchItems(undefined, '', []);
+              fetchItems(undefined, '', [], []);
             }}
             className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
             title="Reset filters"

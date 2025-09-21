@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { EquipSlot, Item, Stat, Career } from '../types';
+import { EquipSlot, Item, Stat, Career, ItemRarity } from '../types';
 import { loadoutService } from '../services/loadoutService';
 import { useLoadoutData } from '../hooks/useLoadoutData';
 import EquipmentSelector from './EquipmentSelector';
@@ -21,6 +21,7 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
   // Persistent filter state shared across all equipment selections
   const [nameFilter, setNameFilter] = useState('');
   const [statsFilter, setStatsFilter] = useState<Stat[]>([]);
+  const [rarityFilter, setRarityFilter] = useState<ItemRarity[]>([]);
 
   // Helper function to check if an item is eligible based on level/renown requirements
   const isItemEligible = (item: Item | null): boolean => {
@@ -183,12 +184,14 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
         }}
         onSelect={talismanSlot ? handleTalismanSelect : handleItemSelect}
         isTalismanMode={!!talismanSlot}
-        holdingItemLevelReq={talismanSlot ? currentLoadout?.items[talismanSlot.slot].item?.levelRequirement : undefined}
+        holdingItemLevelReq={talismanSlot ? currentLoadout?.items[talismanSlot.slot].item?.itemLevel : undefined}
         talismanSlotIndex={talismanSlot?.index}
         nameFilter={nameFilter}
         statsFilter={statsFilter}
+        rarityFilter={rarityFilter}
         onNameFilterChange={setNameFilter}
         onStatsFilterChange={setStatsFilter}
+        onRarityFilterChange={setRarityFilter}
         selectedCareer={selectedCareer}
       />
     </div>
