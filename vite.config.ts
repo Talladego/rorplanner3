@@ -10,5 +10,5 @@ export default defineConfig({
   build: {
     outDir: 'dist',
   },
-  base: '/rorplanner3/',
+  base: '/',
 })

@@ -180,7 +180,6 @@
   border-style: dashed;
   border-color: var(--border);
   padding: 0.5rem;
-  cursor: pointer;
   border-radius: 0.25rem;
   background-color: var(--surface);
   transition: border-color 0.15s ease-in-out;
@@ -233,7 +232,6 @@
   border-width: 1px;
   border-color: var(--border);
   border-radius: 0.25rem;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;

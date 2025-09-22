@@ -87,3 +87,23 @@ src/
 ## License
 
 This project is licensed under the MIT License.
+
+## Deploying to Cloudflare Pages
+
+Cloudflare Pages is a fast, free static hosting platform with a global CDN. This project is preconfigured for it:
+
+- Vite base: `/` (see `vite.config.ts`)
+- Build command: `npm run build`
+- Output directory: `dist`
+- SPA fallback: `public/_redirects` contains `/* /index.html 200`
+
+Setup steps:
+
+1. Push your repository to GitHub.
+2. In Cloudflare Dashboard → Pages → Create a project → Connect to GitHub → select this repo.
+3. Framework preset: None (or Vite)
+4. Build command: `npm run build`
+5. Output directory: `dist`
+6. Save and deploy.
+
+Custom domain: Add your domain in Pages → Custom domains and follow DNS prompts. SSL is automatic.
