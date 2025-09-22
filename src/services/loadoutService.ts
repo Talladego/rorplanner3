@@ -3,8 +3,9 @@
 import { loadoutStoreAdapter } from '../store/loadoutStoreAdapter';
 import client from '../lib/apollo-client';
 import { gql } from '@apollo/client';
-import { EquipSlot, Item, Career, LoadoutItem, Stat, ItemRarity, LoadoutMode, LoadoutSide } from '../types';
+import { EquipSlot, Item, Career, LoadoutItem, Stat, ItemRarity, LoadoutSide } from '../types';
 import { loadoutEventEmitter } from './loadoutEventEmitter';
+import { urlService } from './urlService';
 import { LoadoutEvents, LoadoutEventType } from '../types/events';
 import { getItemColor } from '../utils/rarityColors';
 
@@ -294,26 +295,6 @@ const GET_TALISMANS = gql`
 `;
 
 export const loadoutService = {
-  // Mode management
-  getMode(): LoadoutMode {
-    return loadoutStoreAdapter.getMode();
-  },
-  setMode(mode: LoadoutMode) {
-    loadoutStoreAdapter.setMode(mode);
-    // If entering compare (dual) mode, ensure both sides have loadouts assigned
-    if (mode === 'dual') {
-      try {
-        this.ensureSideLoadout('A');
-        this.ensureSideLoadout('B');
-      } catch (e) {
-        // non-fatal
-        console.warn('Failed to ensure side loadouts when entering dual mode:', e);
-      }
-    }
-    loadoutEventEmitter.emit({ type: 'MODE_CHANGED', payload: { mode }, timestamp: Date.now() });
-    // Reflect mode in URL
-    import('./urlService').then(({ urlService }) => urlService.updateUrlForCurrentLoadout());
-  },
   getActiveSide(): LoadoutSide {
     return loadoutStoreAdapter.getActiveSide();
   },
@@ -321,11 +302,11 @@ export const loadoutService = {
     loadoutStoreAdapter.setActiveSide(side);
     loadoutEventEmitter.emit({ type: 'ACTIVE_SIDE_CHANGED', payload: { side }, timestamp: Date.now() });
     // Update URL with new active side
-    import('./urlService').then(({ urlService }) => urlService.updateUrlForCurrentLoadout());
+  urlService.updateUrlForCurrentLoadout();
   },
   assignSideLoadout(side: LoadoutSide, loadoutId: string | null) {
-    // In dual mode, ensure A and B don't point to the same loadout id
-    if (this.getMode() === 'dual' && loadoutId) {
+    // Dual-only: ensure A and B don't point to the same loadout id
+    if (loadoutId) {
       const otherSide: LoadoutSide = side === 'A' ? 'B' : 'A';
       const otherId = loadoutStoreAdapter.getSideLoadoutId(otherSide);
       if (otherId && otherId === loadoutId) {
@@ -344,7 +325,7 @@ export const loadoutService = {
     }
     loadoutEventEmitter.emit({ type: 'SIDE_LOADOUT_ASSIGNED', payload: { side, loadoutId }, timestamp: Date.now() });
     // Update URL to include the newly assigned side
-    import('./urlService').then(({ urlService }) => urlService.updateUrlForCurrentLoadout());
+  urlService.updateUrlForCurrentLoadout();
   },
   getSideLoadoutId(side: LoadoutSide): string | null {
     return loadoutStoreAdapter.getSideLoadoutId(side);
@@ -357,8 +338,7 @@ export const loadoutService = {
   ensureSideLoadout(side: LoadoutSide): string {
     const assigned = loadoutStoreAdapter.getSideLoadoutId(side);
     if (assigned) {
-      // If both sides point to the same id in dual mode, clone to keep them independent
-      if (this.getMode() === 'dual') {
+      // If both sides point to the same id, clone to keep them independent
         const otherSide: LoadoutSide = side === 'A' ? 'B' : 'A';
         const otherId = loadoutStoreAdapter.getSideLoadoutId(otherSide);
         if (otherId && otherId === assigned) {
@@ -371,7 +351,6 @@ export const loadoutService = {
           }
           return clonedId;
         }
-      }
       return assigned;
     }
     const current = loadoutStoreAdapter.getCurrentLoadout();
@@ -386,7 +365,7 @@ export const loadoutService = {
     return newId;
   },
 
-  // Single-mode helper: pick a side to edit, ensure it exists, and switch to it
+  // Helper: pick a side to edit, ensure it exists, and switch to it (dual-only app)
   async selectSideForEdit(side: LoadoutSide): Promise<string> {
     this.setActiveSide(side);
     const id = this.ensureSideLoadout(side);
@@ -486,8 +465,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-    const { urlService } = await import('./urlService');
-    urlService.updateUrlForCurrentLoadout();
+  urlService.updateUrlForCurrentLoadout();
   },
 
   async updateItemForLoadout(loadoutId: string, slot: EquipSlot, item: Item | null) {
@@ -502,8 +480,7 @@ export const loadoutService = {
     loadoutStoreAdapter.setItemForLoadout(loadoutId, slot, item);
     loadoutEventEmitter.emit({ type: 'ITEM_UPDATED', payload: { slot, item }, timestamp: Date.now() });
     this.getStatsSummary();
-    const { urlService } = await import('./urlService');
-    urlService.updateUrlForCurrentLoadout();
+  urlService.updateUrlForCurrentLoadout();
   },
 
   async updateTalisman(slot: EquipSlot, index: number, talisman: Item | null) {
@@ -524,16 +501,14 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-    const { urlService } = await import('./urlService');
-    urlService.updateUrlForCurrentLoadout();
+  urlService.updateUrlForCurrentLoadout();
   },
 
   async updateTalismanForLoadout(loadoutId: string, slot: EquipSlot, index: number, talisman: Item | null) {
     loadoutStoreAdapter.setTalismanForLoadout(loadoutId, slot, index, talisman);
     loadoutEventEmitter.emit({ type: 'TALISMAN_UPDATED', payload: { slot, index, talisman }, timestamp: Date.now() });
     this.getStatsSummary();
-    const { urlService } = await import('./urlService');
-    urlService.updateUrlForCurrentLoadout();
+  urlService.updateUrlForCurrentLoadout();
   },
 
   // 3. Fetch items for equipment selection
@@ -829,7 +804,6 @@ export const loadoutService = {
       'CHARACTER_LOADED_FROM_URL',
       'LOADOUT_LOADED_FROM_URL',
       'CHARACTER_LOADED',
-      'MODE_CHANGED',
       'ACTIVE_SIDE_CHANGED',
       'SIDE_LOADOUT_ASSIGNED',
     ];
@@ -868,8 +842,7 @@ export const loadoutService = {
     }
 
     // Update URL with current loadout state
-    const { urlService } = await import('./urlService');
-    urlService.updateUrlForCurrentLoadout();
+  urlService.updateUrlForCurrentLoadout();
   },
 
   async setLevel(level: number) {
@@ -891,8 +864,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-    const { urlService } = await import('./urlService');
-    urlService.updateUrlForCurrentLoadout();
+  urlService.updateUrlForCurrentLoadout();
   },
 
   async setRenownRank(renownRank: number) {
@@ -914,8 +886,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-    const { urlService } = await import('./urlService');
-    urlService.updateUrlForCurrentLoadout();
+  urlService.updateUrlForCurrentLoadout();
   },
 
   createLoadout(name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string) {
@@ -937,16 +908,15 @@ export const loadoutService = {
       payload: { loadoutId: id },
       timestamp: Date.now(),
     });
-    // If in dual mode and the active side isn't assigned, assign it implicitly to the active side
-    if (this.getMode() === 'dual' && this.getSideLoadoutId(this.getActiveSide()) == null) {
+    // Dual-only: if the active side isn't assigned, assign it implicitly to the active side
+    if (this.getSideLoadoutId(this.getActiveSide()) == null) {
       this.assignSideLoadout(this.getActiveSide(), id);
     }
     // Recalculate stats for the new loadout
     this.getStatsSummary();
 
     // Update URL with the new loadout state
-    const { urlService } = await import('./urlService');
-    urlService.updateUrlForCurrentLoadout();
+  urlService.updateUrlForCurrentLoadout();
   },
 
   async resetCurrentLoadout() {
@@ -967,7 +937,7 @@ export const loadoutService = {
     }
 
     // Clear all loadout parameters from URL
-  const { urlService } = await import('./urlService');
+  // urlService is statically imported at top
   urlService.clearLoadoutFromUrl();
 
     loadoutEventEmitter.emit({
@@ -988,7 +958,7 @@ export const loadoutService = {
     if (mappedId) {
       // If other side is using the same mappedId in dual mode, clone to keep them separate
       const otherMapped = loadoutStoreAdapter.getSideCareerLoadoutId(otherSide, career);
-      if (this.getMode() === 'dual' && otherMapped && otherMapped === mappedId) {
+      if (otherMapped && otherMapped === mappedId) {
         const clonedId = this.cloneLoadout(mappedId, `${career} Loadout (${activeSide})`);
         loadoutStoreAdapter.setSideCareerLoadoutId(activeSide, career, clonedId);
         this.assignSideLoadout(activeSide, clonedId);
@@ -1134,8 +1104,7 @@ export const loadoutService = {
 
       // Reset the loadout to character state and update URL
     loadoutStoreAdapter.updateLoadoutCharacterStatus(loadoutId, true, character.name);
-    const { urlService } = await import('./urlService');
-    urlService.updateUrlForCurrentLoadout();
+  urlService.updateUrlForCurrentLoadout();
 
       // Ensure side+career mapping aligns with the captured side
       loadoutStoreAdapter.setSideCareerLoadoutId(targetSide, character.career, loadoutId);

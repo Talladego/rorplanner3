@@ -59,9 +59,9 @@ npm run preview
 ```
 src/
 ├── components/          # React components
-│   ├── Toolbar.tsx     # Character selection and controls
-│   ├── EquipmentPanel.tsx # Equipment slots display
-│   ├── StatsPanel.tsx  # Character stats summary
+│   ├── DualToolbar.tsx     # Per-side selection and controls (A/B)
+│   ├── DualEquipmentLayout.tsx # Dual compare layout (A | Stats | B)
+│   ├── EquipmentPanel.tsx # Equipment slots display per side
 │   └── EquipmentSelector.tsx # Item selection modal
 ├── store/              # Zustand state management
 ├── lib/                # Apollo Client configuration

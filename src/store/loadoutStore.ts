@@ -1,11 +1,11 @@
 import { create } from 'zustand';
-import { Loadout, LoadoutItem, EquipSlot, Career, Item, StatsSummary, ItemSetBonus, ItemSet, LoadoutMode, LoadoutSide } from '../types';
+import { Loadout, LoadoutItem, EquipSlot, Career, Item, StatsSummary, ItemSetBonus, ItemSet, LoadoutSide } from '../types';
+import { loadoutService } from '../services/loadoutService';
 
 interface LoadoutState {
   loadouts: Loadout[];
   currentLoadoutId: string | null;
-  // Compare mode state
-  mode: LoadoutMode; // 'single' | 'dual'
+  // Compare mode state (dual-only)
   activeSide: LoadoutSide; // which side is currently being edited/viewed
   sideLoadoutIds: Record<LoadoutSide, string | null>; // mapping from side to loadout id
   sideCareerLoadoutIds: Record<LoadoutSide, Partial<Record<Career, string>>>; // per-side, per-career mapping
@@ -26,9 +26,7 @@ interface LoadoutState {
   resetCurrentLoadout: () => void;
   calculateStats: () => void;
   // Mode actions
-  getMode: () => LoadoutMode;
   getActiveSide: () => LoadoutSide;
-  setMode: (mode: LoadoutMode) => void;
   setActiveSide: (side: LoadoutSide) => void;
   getSideLoadoutId: (side: LoadoutSide) => string | null;
   getLoadoutForSide: (side: LoadoutSide) => Loadout | null;
@@ -117,7 +115,6 @@ const initialStats: StatsSummary = {
 export const useLoadoutStore = create<LoadoutState>((set, get) => ({
   loadouts: [],
   currentLoadoutId: null,
-  mode: 'dual',
   activeSide: 'A',
   sideLoadoutIds: { A: null, B: null },
   sideCareerLoadoutIds: { A: {}, B: {} },
@@ -128,8 +125,7 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     return loadouts.find(l => l.id === currentLoadoutId) || null;
   },
 
-  // Mode getters
-  getMode: () => get().mode,
+  // Mode getters (dual-only)
   getActiveSide: () => get().activeSide,
   getSideLoadoutId: (side) => get().sideLoadoutIds[side],
   getLoadoutForSide: (side) => {
@@ -155,27 +151,7 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     return { sideCareerLoadoutIds: next };
   }),
 
-  // Mode setters
-  setMode: (mode) => set((state) => {
-    // Preserve activeSide and existing side mappings across mode switches
-    const updates: Partial<LoadoutState> = { mode };
-    const nextMap = { ...state.sideLoadoutIds } as Record<LoadoutSide, string | null>;
-    if (mode === 'dual') {
-      // Seed A with current loadout if A is unassigned
-      const current = state.getCurrentLoadout();
-      if (!nextMap.A && current) {
-        nextMap.A = current.id;
-      }
-      // If both sides end up pointing to the same id, keep mapping for now; service will clone on ensure/assign
-      updates.sideLoadoutIds = nextMap;
-      // Do not override activeSide
-    } else {
-      // Single mode: keep mappings to remember A/B selections for later compare
-      updates.sideLoadoutIds = nextMap;
-      // Do not override activeSide
-    }
-    return updates;
-  }),
+  // Mode setters removed (dual-only)
 
   setActiveSide: (side) => set(() => ({ activeSide: side })),
 
@@ -473,8 +449,8 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     set((state) => ({
       loadouts: [...state.loadouts, createInitialLoadout(id, name, level, renownRank, isFromCharacter, characterName)],
       currentLoadoutId: state.currentLoadoutId || id,
-      // If we're in dual mode and the active side isn't assigned, assign this new loadout to it
-      sideLoadoutIds: state.mode === 'dual' && state.sideLoadoutIds[state.activeSide] == null
+      // Dual-only: if the active side isn't assigned, assign this new loadout to it
+      sideLoadoutIds: state.sideLoadoutIds[state.activeSide] == null
         ? { ...state.sideLoadoutIds, [state.activeSide]: id }
         : state.sideLoadoutIds,
     }));
@@ -529,7 +505,6 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
 
   importFromCharacter: async (characterId) => {
     // Delegate to service layer for proper separation of concerns
-    const { loadoutService } = await import('../services/loadoutService');
     return loadoutService.importFromCharacter(characterId);
   },
 }));

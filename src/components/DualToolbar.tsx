@@ -101,14 +101,14 @@ function SideToolbar({ side }: SideToolbarProps) {
 
   return (
     <div className={`panel-container ${side === 'A' ? 'panel-border-green-600' : 'panel-border-red-600'}`}>
-      <div className="text-xs font-semibold mb-2 flex items-center gap-2">
+      <div className="text-xs font-semibold mb-1 flex items-center gap-1.5">
         <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${side === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{side}</span>
       </div>
-      <div className="grid grid-cols-12 gap-2 items-end">
+      <div className="grid grid-cols-12 gap-1 items-end">
         {/* Career */}
         <div className="col-span-4">
           <label className="form-label text-xs">Career</label>
-          <div className="mt-1">
+          <div className="mt-0.5">
             <CareerSelect
               value={selectedCareer}
               onChange={(career) => onCareerChange(career)}
@@ -127,7 +127,7 @@ function SideToolbar({ side }: SideToolbarProps) {
             max="40"
             value={level}
             onChange={(e) => onLevelChange(parseInt(e.target.value))}
-            className="form-input form-input-text mt-1 block w-full pl-2 pr-2 py-1 text-xs rounded-md"
+            className="form-input form-input-text mt-0.5 block w-full pl-2 pr-2 py-0.5 text-xs rounded-md"
           />
         </div>
 
@@ -140,7 +140,7 @@ function SideToolbar({ side }: SideToolbarProps) {
             max="255"
             value={renownRank}
             onChange={(e) => onRenownChange(parseInt(e.target.value))}
-            className="form-input form-input-text mt-1 block w-full pl-2 pr-2 py-1 text-xs rounded-md"
+            className="form-input form-input-text mt-0.5 block w-full pl-2 pr-2 py-0.5 text-xs rounded-md"
           />
         </div>
 
@@ -153,14 +153,14 @@ function SideToolbar({ side }: SideToolbarProps) {
             onChange={(e) => setCharacterName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') onLoadCharacter(); }}
             placeholder="Name"
-            className="form-input form-input-text mt-1 block w-full pl-2 pr-2 py-1 text-xs rounded-md"
+            className="form-input form-input-text mt-0.5 block w-full pl-2 pr-2 py-0.5 text-xs rounded-md"
           />
         </div>
 
         {/* Buttons */}
-        <div className="col-span-1 flex flex-col gap-1">
-          <button onClick={onReset} className="btn btn-primary w-full text-xs py-1">Reset</button>
-          <button onClick={onLoadCharacter} className="btn btn-primary w-full text-xs py-1">Load</button>
+        <div className="col-span-1 flex flex-col gap-0.5">
+          <button onClick={onReset} className="btn btn-primary w-full text-xs py-0.5">Reset</button>
+          <button onClick={onLoadCharacter} className="btn btn-primary w-full text-xs py-0.5">Load</button>
         </div>
       </div>
     </div>
@@ -168,20 +168,8 @@ function SideToolbar({ side }: SideToolbarProps) {
 }
 
 export default function DualToolbar() {
-  const [mode, setMode] = useState<'single' | 'dual'>(loadoutService.getMode());
-
-  useEffect(() => {
-    const unsub = loadoutService.subscribeToAllEvents((ev) => {
-      if (ev.type === 'MODE_CHANGED') setMode(loadoutService.getMode());
-    });
-    return unsub;
-  }, []);
-
-  // Ensure we are in dual mode; if not, render nothing (App shows single Toolbar)
-  if (mode !== 'dual') return null;
-
   return (
-    <div className="grid grid-cols-2 gap-8 mb-6">
+    <div className="grid grid-cols-2 gap-4 mb-4">
       <SideToolbar side="A" />
       <SideToolbar side="B" />
     </div>

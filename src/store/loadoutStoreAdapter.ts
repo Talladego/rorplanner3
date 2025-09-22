@@ -1,5 +1,5 @@
 import { useLoadoutStore } from './loadoutStore';
-import { ILoadoutStore, Loadout, StatsSummary, Career, EquipSlot, Item, LoadoutMode, LoadoutSide } from '../types';
+import { ILoadoutStore, Loadout, StatsSummary, Career, EquipSlot, Item, LoadoutSide } from '../types';
 
 class LoadoutStoreAdapter implements ILoadoutStore {
   getLoadouts(): Loadout[] {
@@ -16,11 +16,6 @@ class LoadoutStoreAdapter implements ILoadoutStore {
 
   getStatsSummary(): StatsSummary {
     return useLoadoutStore.getState().statsSummary;
-  }
-
-  // Mode getters
-  getMode(): LoadoutMode {
-    return useLoadoutStore.getState().getMode();
   }
 
   getActiveSide(): LoadoutSide {
@@ -97,11 +92,6 @@ class LoadoutStoreAdapter implements ILoadoutStore {
 
   calculateStats(): void {
     useLoadoutStore.getState().calculateStats();
-  }
-
-  // Mode setters
-  setMode(mode: LoadoutMode): void {
-    useLoadoutStore.getState().setMode(mode);
   }
 
   setActiveSide(side: LoadoutSide): void {

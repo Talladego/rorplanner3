@@ -33,7 +33,6 @@ export default function StatsComparePanel() {
         'RENOWN_RANK_CHANGED',
         'CAREER_CHANGED',
         'SIDE_LOADOUT_ASSIGNED',
-        'MODE_CHANGED',
         'ACTIVE_SIDE_CHANGED',
       ].includes(ev.type)) {
         pull();

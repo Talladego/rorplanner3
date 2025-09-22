@@ -14,7 +14,6 @@ export type LoadoutEventType =
   | 'CHARACTER_LOADED_FROM_URL'
   | 'LOADOUT_LOADED_FROM_URL'
   | 'CHARACTER_LOADED'
-  | 'MODE_CHANGED'
   | 'ACTIVE_SIDE_CHANGED'
   | 'SIDE_LOADOUT_ASSIGNED';
 
@@ -114,13 +113,6 @@ export interface CharacterLoadedEvent extends LoadoutEvent {
   };
 }
 
-export interface ModeChangedEvent extends LoadoutEvent {
-  type: 'MODE_CHANGED';
-  payload: {
-    mode: import('../types').LoadoutMode;
-  };
-}
-
 export interface ActiveSideChangedEvent extends LoadoutEvent {
   type: 'ACTIVE_SIDE_CHANGED';
   payload: {
@@ -149,6 +141,5 @@ export type LoadoutEvents =
   | CharacterLoadedFromUrlEvent
   | LoadoutLoadedFromUrlEvent
   | CharacterLoadedEvent
-  | ModeChangedEvent
   | ActiveSideChangedEvent
   | SideLoadoutAssignedEvent;

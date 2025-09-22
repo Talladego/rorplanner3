@@ -204,8 +204,7 @@ export interface ILoadoutStore {
   getCurrentLoadoutId(): string | null;
   getCurrentLoadout(): Loadout | null;
   getStatsSummary(): StatsSummary;
-  // Mode getters
-  getMode(): LoadoutMode;
+  // Mode (dual-only)
   getActiveSide(): LoadoutSide;
   getSideLoadoutId(side: LoadoutSide): string | null;
   getLoadoutForSide(side: LoadoutSide): Loadout | null;
@@ -226,8 +225,7 @@ export interface ILoadoutStore {
   setRenownForLoadout(loadoutId: string, renownRank: number): void;
   resetCurrentLoadout(): void;
   calculateStats(): void;
-  // Mode setters
-  setMode(mode: LoadoutMode): void;
+  // Mode setters (dual-only)
   setActiveSide(side: LoadoutSide): void;
   assignSideLoadout(side: LoadoutSide, loadoutId: string | null): void;
 
@@ -240,8 +238,7 @@ export interface ILoadoutStore {
   importFromCharacter(characterId: string, side?: LoadoutSide): Promise<void>;
 }
 
-// Loadout planner modes and sides for compare functionality
-export type LoadoutMode = 'single' | 'dual';
+// Loadout planner sides for compare functionality (dual-only)
 export type LoadoutSide = 'A' | 'B';
 
 export interface ItemSet {

@@ -2,23 +2,17 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { loadoutService } from './services/loadoutService';
 import { urlService } from './services/urlService';
-import Toolbar from './components/Toolbar';
 import DualToolbar from './components/DualToolbar';
-import EquipmentPanel from './components/EquipmentPanel';
-import StatsPanel from './components/StatsPanel';
 import DualEquipmentLayout from './components/DualEquipmentLayout';
 import ApolloProviderWrapper from './components/ApolloProviderWrapper';
 import ErrorBoundary from './components/ErrorBoundary';
-import { Career } from './types';
 import { loadoutEventEmitter } from './services/loadoutEventEmitter';
 
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [selectedCareer, setSelectedCareer] = useState<Career | ''>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [characterLoaded, setCharacterLoaded] = useState<boolean>(false);
-  const [mode, setMode] = useState<'single' | 'dual'>(loadoutService.getMode());
 
   // Set up URL service navigation callback
   useEffect(() => {
@@ -46,9 +40,6 @@ function App() {
   // Listen to loadout changes and handle character loadout switching
   useEffect(() => {
     const unsubscribe = loadoutService.subscribeToAllEvents((event) => {
-      if (event.type === 'MODE_CHANGED') {
-        setMode(loadoutService.getMode());
-      }
       // If a character was loaded and we're now modifying the loadout, switch to regular loadout
       if (characterLoaded && (
         event.type === 'ITEM_UPDATED' ||
@@ -148,29 +139,8 @@ function App() {
             <h1 className="text-4xl font-bold text-primary">RorPlanner</h1>
           </header>
           <div className="max-w-6xl mx-auto">
-            {mode === 'dual' ? (
-              <>
-                <DualToolbar />
-                <DualEquipmentLayout />
-              </>
-            ) : (
-              <>
-                <Toolbar
-                  selectedCareer={selectedCareer}
-                  setSelectedCareer={setSelectedCareer}
-                  errorMessage={errorMessage}
-                  setErrorMessage={setErrorMessage}
-                />
-              <div className="grid grid-cols-[800px_400px] gap-8 justify-center">
-                <div>
-                  <EquipmentPanel selectedCareer={selectedCareer} />
-                </div>
-                <div>
-                  <StatsPanel />
-                </div>
-              </div>
-              </>
-            )}
+            <DualToolbar />
+            <DualEquipmentLayout />
           </div>
         </div>
       </ApolloProviderWrapper>
