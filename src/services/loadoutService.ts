@@ -955,6 +955,13 @@ export const loadoutService = {
     if (current) {
       // Use per-loadout reset to also normalize Side A/B names if assigned
       loadoutStoreAdapter.resetLoadoutById(current.id);
+      // Clear any per-side per-career mapping that points to this loadout for the active side,
+      // so that re-selecting the same career doesn't reuse a reset loadout without a career set.
+      const activeSide = this.getActiveSide();
+      // The adapter doesn't expose a listing; instead, proactively clear the mapping for the current loadout's career if any.
+      if (current.career) {
+        loadoutStoreAdapter.setSideCareerLoadoutId(activeSide, current.career, null);
+      }
     } else {
       loadoutStoreAdapter.resetCurrentLoadout();
     }
@@ -988,7 +995,13 @@ export const loadoutService = {
         await this.switchLoadout(clonedId);
         return clonedId;
       }
-      // Otherwise just switch to it
+      // Otherwise ensure the mapped loadout actually has the requested career (it may have been reset)
+      const existing = loadoutStoreAdapter.getLoadouts().find(l => l.id === mappedId);
+      if (!existing || existing.career !== career) {
+        // Set career directly on the mapped loadout so UI reflects selection and URL picks it up on switch
+        this.setCareerForLoadout(mappedId, career);
+      }
+      // Then switch to it and assign to the side
       this.assignSideLoadout(activeSide, mappedId);
       await this.switchLoadout(mappedId);
       return mappedId;
