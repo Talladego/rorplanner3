@@ -6,6 +6,7 @@ import { useLoadoutById } from '../hooks/useLoadoutById';
 import EquipmentSelector from './EquipmentSelector';
 import { DEFAULT_SLOT_ICONS } from '../constants/slotIcons';
 import Tooltip from './Tooltip';
+import HoverTooltip from './HoverTooltip';
 
 interface EquipmentPanelProps {
   selectedCareer: Career | '';
@@ -23,6 +24,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [talismanSlot, setTalismanSlot] = useState<{ slot: EquipSlot; index: number } | null>(null);
+  const hasCareer = !!selectedCareer;
 
   // Persistent filter state shared across all equipment selections
   const [nameFilter, setNameFilter] = useState('');
@@ -38,6 +40,8 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   };
 
   const handleSlotClick = (slot: EquipSlot) => {
+    // Do not open selector unless a career has been selected
+    if (!hasCareer) return;
     setSelectedSlot(slot);
     setIsModalOpen(true);
   };
@@ -69,6 +73,8 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   };
 
   const handleTalismanClick = (slot: EquipSlot, index: number) => {
+    // Do not open selector unless a career has been selected
+    if (!hasCareer) return;
     setTalismanSlot({ slot, index });
     setIsModalOpen(true);
   };
@@ -132,13 +138,13 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
             <div key={slot} className="relative">
               <div className={`equipment-slot ${compact ? 'p-1' : ''}`}>
                 <div className={iconOnly ? 'flex items-start gap-1' : 'flex items-start gap-2'}>
-                  <Tooltip item={slotData.item ? { ...slotData.item, talismans: slotData.talismans } : null} loadoutId={effectiveLoadout.id}>
-                    <div
-                      className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}`}
-                      onClick={() => handleSlotClick(slot)}
-                      onContextMenu={(e) => handleSlotRightClick(e, slot)}
-                    >
-                      {slotData.item ? (
+                  {slotData.item ? (
+                    <Tooltip item={{ ...slotData.item, talismans: slotData.talismans }} loadoutId={effectiveLoadout.id}>
+                      <div
+                        className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}`}
+                        onClick={() => handleSlotClick(slot)}
+                        onContextMenu={(e) => handleSlotRightClick(e, slot)}
+                      >
                         <div className={`icon-frame ${isItemEligible(slotData.item) ? (slotData.item.itemSet ? 'item-color-set' :
                           slotData.item.rarity === 'MYTHIC' ? 'item-color-mythic' :
                           slotData.item.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
@@ -151,11 +157,19 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                             className={`w-full h-full object-contain rounded ${!isItemEligible(slotData.item) ? 'opacity-50 grayscale' : ''}`} 
                           />
                         </div>
-                      ) : (
+                      </div>
+                    </Tooltip>
+                  ) : (
+                    <HoverTooltip content={hasCareer ? 'Click to select item' : 'Select a career first'}>
+                      <div
+                        className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}`}
+                        onClick={() => handleSlotClick(slot)}
+                        onContextMenu={(e) => handleSlotRightClick(e, slot)}
+                      >
                         <img src={DEFAULT_SLOT_ICONS[slot]} alt={`${slot} slot`} className="w-full h-full object-contain rounded opacity-50" />
-                      )}
-                    </div>
-                  </Tooltip>
+                      </div>
+                    </HoverTooltip>
+                  )}
                   {iconOnly && slotData.item && slotData.item.talismanSlots > 0 && (
                     <div className="flex flex-col justify-start items-start gap-1 ml-1">
                       {Array.from({ length: slotData.item.talismanSlots }, (_, i) => {
@@ -180,13 +194,15 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                                 />
                               </Tooltip>
                             ) : (
-                              <img
-                                src="https://armory.returnofreckoning.com/icon/1"
-                                alt="Empty talisman slot"
-                                className="w-full h-full object-contain rounded cursor-pointer opacity-50"
-                                onClick={() => handleTalismanClick(slot, i)}
-                                onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
-                              />
+                              <HoverTooltip content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
+                                <img
+                                  src="https://armory.returnofreckoning.com/icon/1"
+                                  alt="Empty talisman slot"
+                                  className="w-full h-full object-contain rounded cursor-pointer opacity-50"
+                                  onClick={() => handleTalismanClick(slot, i)}
+                                  onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
+                                />
+                              </HoverTooltip>
                             )}
                           </div>
                         );
@@ -233,13 +249,15 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                                     />
                                   </Tooltip>
                                 ) : (
-                                  <img
-                                    src="https://armory.returnofreckoning.com/icon/1"
-                                    alt="Empty talisman slot"
-                                    className="w-full h-full object-contain rounded cursor-pointer opacity-50"
-                                    onClick={() => handleTalismanClick(slot, i)}
-                                    onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
-                                  />
+                                  <HoverTooltip content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
+                                    <img
+                                      src="https://armory.returnofreckoning.com/icon/1"
+                                      alt="Empty talisman slot"
+                                      className="w-full h-full object-contain rounded cursor-pointer opacity-50"
+                                      onClick={() => handleTalismanClick(slot, i)}
+                                      onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
+                                    />
+                                  </HoverTooltip>
                                 )}
                               </div>
                             );
