@@ -252,6 +252,14 @@
   border-radius: 0.25rem;
 }
 
+/* Frame for empty icons using panel border color */
+.icon-frame-empty {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: 0.25rem;
+}
+
 /* Utility to override an element's border color to current text color */
 .border-current {
   border-color: currentColor !important;

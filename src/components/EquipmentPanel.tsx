@@ -166,7 +166,9 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                         onClick={() => handleSlotClick(slot)}
                         onContextMenu={(e) => handleSlotRightClick(e, slot)}
                       >
-                        <img src={DEFAULT_SLOT_ICONS[slot]} alt={`${slot} slot`} className="w-full h-full object-contain rounded opacity-50" />
+                        <div className="icon-frame-empty w-full h-full rounded">
+                          <img src={DEFAULT_SLOT_ICONS[slot]} alt={`${slot} slot`} className="w-full h-full object-contain rounded opacity-50" />
+                        </div>
                       </div>
                     </HoverTooltip>
                   )}
@@ -182,7 +184,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                             slotData.talismans[i]!.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
                             slotData.talismans[i]!.rarity === 'RARE' ? 'item-color-rare' :
                             slotData.talismans[i]!.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
-                            slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : '') : 'border-none'}`}> 
+                            slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : '') : ''}`}> 
                             {slotData.talismans[i] ? (
                               <Tooltip item={slotData.talismans[i]} isTalismanTooltip={true} loadoutId={effectiveLoadout.id}>
                                 <img
@@ -237,7 +239,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                                 slotData.talismans[i]!.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
                                 slotData.talismans[i]!.rarity === 'RARE' ? 'item-color-rare' :
                                 slotData.talismans[i]!.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
-                                slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : '') : 'border-none'}`}> 
+                                slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : '') : ''}`}> 
                                 {slotData.talismans[i] ? (
                                   <Tooltip item={slotData.talismans[i]} isTalismanTooltip={true} loadoutId={effectiveLoadout.id}>
                                     <img
