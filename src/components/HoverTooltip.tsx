@@ -1,4 +1,5 @@
 import { ReactNode, useRef, useState } from 'react';
+import type { MouseEventHandler } from 'react';
 
 type HoverTooltipProps = {
   content: ReactNode;
@@ -51,7 +52,7 @@ export default function HoverTooltip({ content, children, placement = 'right', c
     setPos({ x, y });
   };
 
-  const handleEnter: React.MouseEventHandler<HTMLDivElement> = (e) => {
+  const handleEnter: MouseEventHandler<HTMLDivElement> = (e) => {
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     computePosition(rect);
     setOpen(true);

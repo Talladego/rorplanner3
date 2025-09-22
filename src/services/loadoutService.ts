@@ -1106,33 +1106,36 @@ export const loadoutService = {
       }
 
       // Create the loadout using the service (this emits LOADOUT_CREATED event)
-  const loadoutId = loadoutService.createLoadout(`Imported from ${character.name}`, character.level, character.renownRank, true, character.name);
-  // Assign it to the captured side mapping (single or dual)
-  this.assignSideLoadout(targetSide, loadoutId);
-    loadoutService.switchLoadout(loadoutId);
-    loadoutService.setCareer(character.career);
+      const loadoutId = loadoutService.createLoadout(`Imported from ${character.name}`, character.level, character.renownRank, true, character.name);
+      // Assign it to the captured side mapping (single or dual)
+      this.assignSideLoadout(targetSide, loadoutId);
+      // Ensure subsequent updates target the correct current loadout
+      await this.switchLoadout(loadoutId);
+      await this.setCareer(character.career);
       // Level and renown already set in createLoadout
 
       // Set all the items
-      Object.entries(items).forEach(([slot, loadoutItem]) => {
-        loadoutService.updateItem(slot as EquipSlot, loadoutItem.item);
-        // Safely iterate over talismans if they exist
+      for (const [slot, loadoutItem] of Object.entries(items)) {
+        // Apply item first
+        await this.updateItem(slot as EquipSlot, loadoutItem.item);
+        // Then talismans for that slot (if any)
         if (loadoutItem.talismans && Array.isArray(loadoutItem.talismans)) {
-          loadoutItem.talismans.forEach((talisman, index) => {
+          for (let index = 0; index < loadoutItem.talismans.length; index++) {
+            const talisman = loadoutItem.talismans[index];
             if (talisman) {
-              loadoutService.updateTalisman(slot as EquipSlot, index, talisman);
+              await this.updateTalisman(slot as EquipSlot, index, talisman);
             }
-          });
+          }
         }
-      });
+      }
 
       // Stats will be recalculated automatically by the updateItem/updateTalisman methods
       // No need to call getStatsSummary() again since it's called in those methods
 
       // Reset the loadout to character state and update URL
-  loadoutStoreAdapter.updateLoadoutCharacterStatus(loadoutId, true, character.name);
-  const { urlService } = await import('./urlService');
-  urlService.updateUrlForCurrentLoadout();
+    loadoutStoreAdapter.updateLoadoutCharacterStatus(loadoutId, true, character.name);
+    const { urlService } = await import('./urlService');
+    urlService.updateUrlForCurrentLoadout();
 
       // Ensure side+career mapping aligns with the captured side
       loadoutStoreAdapter.setSideCareerLoadoutId(targetSide, character.career, loadoutId);

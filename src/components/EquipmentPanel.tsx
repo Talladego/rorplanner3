@@ -7,6 +7,7 @@ import EquipmentSelector from './EquipmentSelector';
 import { DEFAULT_SLOT_ICONS } from '../constants/slotIcons';
 import Tooltip from './Tooltip';
 import HoverTooltip from './HoverTooltip';
+import { formatSlotName } from '../utils/formatters';
 
 interface EquipmentPanelProps {
   selectedCareer: Career | '';
@@ -160,7 +161,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                       </div>
                     </Tooltip>
                   ) : (
-                    <HoverTooltip content={hasCareer ? 'Click to select item' : 'Select a career first'}>
+                    <HoverTooltip content={hasCareer ? `Click to select ${formatSlotName(slot)}` : 'Select a career first'}>
                       <div
                         className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}`}
                         onClick={() => handleSlotClick(slot)}
