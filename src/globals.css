@@ -39,6 +39,21 @@
   border: 1px solid var(--border);
 }
 
+/* Optional helper to lock panel sizes if applied */
+.panel-fixed {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Side-specific panel border overrides for compare mode */
+.panel-border-green-600 {
+  border-color: rgb(22 163 74); /* Tailwind green-600 */
+}
+
+.panel-border-red-600 {
+  border-color: rgb(220 38 38); /* Tailwind red-600 */
+}
+
 .panel-heading {
   font-size: 1.5rem;
   line-height: 2rem;
@@ -229,6 +244,23 @@
   background-color: var(--surface-hover);
 }
 
+/* Thin colored frame for icons using current text color */
+.icon-frame {
+  border-width: 1px;
+  border-style: solid;
+  border-color: currentColor;
+  border-radius: 0.25rem;
+}
+
+/* Utility to override an element's border color to current text color */
+.border-current {
+  border-color: currentColor !important;
+}
+
+.border-none {
+  border-width: 0 !important;
+}
+
 .stats-row {
   display: flex;
   justify-content: space-between;
@@ -301,3 +333,15 @@
 .dark .stats-loadout-info {
   background-color: rgb(31 41 55);
 }
+
+/* Item rarity and set colors (replacing inline style usages) */
+.item-color-set { color: #f0be28; }
+.item-color-mythic { color: #c83c00; }
+.item-color-very-rare { color: #9238d0; }
+.item-color-rare { color: #0064c3; }
+.item-color-uncommon { color: #18f000; }
+.item-color-common { color: #ffffff; }
+.item-color-utility { color: #969696; }
+
+/* Tooltip position helper */
+.tooltip-shift-down { transform: translateY(100%); }

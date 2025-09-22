@@ -25,7 +25,8 @@ export default function StatsPanel() {
   }
 
   // Count equipped items
-  const equippedItemsCount = Object.values(currentLoadout.items).filter(slot => slot.item !== null).length;
+  // Removed loadout info count per request
+  const isAllZero = Object.values(stats).every(value => value === 0);
 
   // Group stats by category
   const baseStats = [
@@ -144,23 +145,28 @@ export default function StatsPanel() {
               );
             })
           ) : (
-            <div className="text-xs text-muted italic">No {title.toLowerCase()} bonuses</div>
+            title === 'Base Stats' ? null : (
+              <div className="text-xs text-muted italic">No {title.toLowerCase()} bonuses</div>
+            )
           )}
         </div>
       </div>
     );
   };
 
+  // If loadout has no bonuses at all, only show the empty state text
+  if (isAllZero) {
+    return (
+      <div className="panel-container">
+        <h2 className="panel-heading">Stats Summary</h2>
+        <div className="stats-empty-message">Equip items to see stat bonuses</div>
+      </div>
+    );
+  }
+
   return (
     <div className="panel-container">
       <h2 className="panel-heading">Stats Summary</h2>
-
-      {/* Loadout Info */}
-      <div className="stats-loadout-info">
-        <div className="text-xs text-muted">
-          {equippedItemsCount} item{equippedItemsCount !== 1 ? 's' : ''} equipped
-        </div>
-      </div>
 
       {/* Base Stats - Always show */}
       <div className="stats-section">
@@ -186,13 +192,6 @@ export default function StatsPanel() {
       <div className="stats-section">
         {renderStatGroup('Other', otherStats)}
       </div>
-
-      {/* Show message if no stats */}
-      {Object.values(stats).every(value => value === 0) && (
-        <div className="stats-empty-message">
-          Equip items to see stat bonuses
-        </div>
-      )}
     </div>
   );
 }

@@ -1,9 +1,14 @@
 import { create } from 'zustand';
-import { Loadout, LoadoutItem, EquipSlot, Career, Item, StatsSummary, ItemSetBonus, ItemSet } from '../types';
+import { Loadout, LoadoutItem, EquipSlot, Career, Item, StatsSummary, ItemSetBonus, ItemSet, LoadoutMode, LoadoutSide } from '../types';
 
 interface LoadoutState {
   loadouts: Loadout[];
   currentLoadoutId: string | null;
+  // Compare mode state
+  mode: LoadoutMode; // 'single' | 'dual'
+  activeSide: LoadoutSide; // which side is currently being edited/viewed
+  sideLoadoutIds: Record<LoadoutSide, string | null>; // mapping from side to loadout id
+  sideCareerLoadoutIds: Record<LoadoutSide, Partial<Record<Career, string>>>; // per-side, per-career mapping
   statsSummary: StatsSummary;
   // Actions for current loadout
   setCareer: (career: Career | null) => void;
@@ -11,8 +16,25 @@ interface LoadoutState {
   setRenownRank: (renownRank: number) => void;
   setItem: (slot: EquipSlot, item: Item | null) => void;
   setTalisman: (slot: EquipSlot, index: number, talisman: Item | null) => void;
+  setItemForLoadout: (loadoutId: string, slot: EquipSlot, item: Item | null) => void;
+  setTalismanForLoadout: (loadoutId: string, slot: EquipSlot, index: number, talisman: Item | null) => void;
+  setCareerForLoadout: (loadoutId: string, career: Career | null) => void;
+  setLevelForLoadout: (loadoutId: string, level: number) => void;
+  setRenownForLoadout: (loadoutId: string, renownRank: number) => void;
+  setLoadoutNameForLoadout: (loadoutId: string, name: string) => void;
+  resetLoadoutById: (loadoutId: string) => void;
   resetCurrentLoadout: () => void;
   calculateStats: () => void;
+  // Mode actions
+  getMode: () => LoadoutMode;
+  getActiveSide: () => LoadoutSide;
+  setMode: (mode: LoadoutMode) => void;
+  setActiveSide: (side: LoadoutSide) => void;
+  getSideLoadoutId: (side: LoadoutSide) => string | null;
+  getLoadoutForSide: (side: LoadoutSide) => Loadout | null;
+  getSideCareerLoadoutId: (side: LoadoutSide, career: Career) => string | null;
+  setSideCareerLoadoutId: (side: LoadoutSide, career: Career, loadoutId: string | null) => void;
+  assignSideLoadout: (side: LoadoutSide, loadoutId: string | null) => void;
   // Actions for multiple loadouts
   createLoadout: (name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string) => string;
   deleteLoadout: (id: string) => void;
@@ -95,12 +117,100 @@ const initialStats: StatsSummary = {
 export const useLoadoutStore = create<LoadoutState>((set, get) => ({
   loadouts: [],
   currentLoadoutId: null,
+  mode: 'dual',
+  activeSide: 'A',
+  sideLoadoutIds: { A: null, B: null },
+  sideCareerLoadoutIds: { A: {}, B: {} },
   statsSummary: initialStats,
 
   getCurrentLoadout: () => {
     const { loadouts, currentLoadoutId } = get();
     return loadouts.find(l => l.id === currentLoadoutId) || null;
   },
+
+  // Mode getters
+  getMode: () => get().mode,
+  getActiveSide: () => get().activeSide,
+  getSideLoadoutId: (side) => get().sideLoadoutIds[side],
+  getLoadoutForSide: (side) => {
+    const id = get().sideLoadoutIds[side];
+    if (!id) return null;
+    return get().loadouts.find(l => l.id === id) || null;
+  },
+
+  getSideCareerLoadoutId: (side, career) => {
+    const map = get().sideCareerLoadoutIds[side];
+    return (map && map[career]) || null;
+  },
+
+  setSideCareerLoadoutId: (side, career, loadoutId) => set((state) => {
+    const next = { ...state.sideCareerLoadoutIds } as Record<LoadoutSide, Partial<Record<Career, string>>>;
+    const inner = { ...(next[side] || {}) } as Partial<Record<Career, string>>;
+    if (loadoutId == null) {
+      delete inner[career];
+    } else {
+      inner[career] = loadoutId;
+    }
+    next[side] = inner;
+    return { sideCareerLoadoutIds: next };
+  }),
+
+  // Mode setters
+  setMode: (mode) => set((state) => {
+    // Preserve activeSide and existing side mappings across mode switches
+    const updates: Partial<LoadoutState> = { mode };
+    const nextMap = { ...state.sideLoadoutIds } as Record<LoadoutSide, string | null>;
+    if (mode === 'dual') {
+      // Seed A with current loadout if A is unassigned
+      const current = state.getCurrentLoadout();
+      if (!nextMap.A && current) {
+        nextMap.A = current.id;
+      }
+      // If both sides end up pointing to the same id, keep mapping for now; service will clone on ensure/assign
+      updates.sideLoadoutIds = nextMap;
+      // Do not override activeSide
+    } else {
+      // Single mode: keep mappings to remember A/B selections for later compare
+      updates.sideLoadoutIds = nextMap;
+      // Do not override activeSide
+    }
+    return updates;
+  }),
+
+  setActiveSide: (side) => set(() => ({ activeSide: side })),
+
+  assignSideLoadout: (side, loadoutId) => set((state) => {
+    const next = { ...state.sideLoadoutIds };
+    next[side] = loadoutId;
+    return { sideLoadoutIds: next };
+  }),
+
+  setCareerForLoadout: (loadoutId, career) => set((state) => {
+    const updated = state.loadouts.map(l => l.id === loadoutId ? { ...l, career } : l);
+    return { loadouts: updated };
+  }),
+
+  setLevelForLoadout: (loadoutId, level) => set((state) => {
+    const updated = state.loadouts.map(l => l.id === loadoutId ? { ...l, level } : l);
+    return { loadouts: updated };
+  }),
+
+  setRenownForLoadout: (loadoutId, renownRank) => set((state) => {
+    const updated = state.loadouts.map(l => l.id === loadoutId ? { ...l, renownRank } : l);
+    return { loadouts: updated };
+  }),
+
+  setLoadoutNameForLoadout: (loadoutId, name) => set((state) => {
+    const updated = state.loadouts.map(l => l.id === loadoutId ? { ...l, name } : l);
+    return { loadouts: updated };
+  }),
+
+  resetLoadoutById: (loadoutId) => set((state) => {
+    const side = Object.entries(state.sideLoadoutIds).find(([, id]) => id === loadoutId)?.[0] as LoadoutSide | undefined;
+    const defaultName = side === 'A' ? 'Side A' : side === 'B' ? 'Side B' : 'Default Loadout';
+    const reset = createInitialLoadout(loadoutId, defaultName);
+    return { loadouts: state.loadouts.map(l => l.id === loadoutId ? reset : l) };
+  }),
 
   setCareer: (career: Career | null) => set((state) => {
     const current = state.getCurrentLoadout();
@@ -158,10 +268,43 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     };
   }),
 
+  setItemForLoadout: (loadoutId, slot, item) => set((state) => {
+    const target = state.loadouts.find(l => l.id === loadoutId);
+    if (!target) return state;
+    const newItems = { ...target.items };
+    newItems[slot] = { ...newItems[slot], item };
+    if (item) {
+      newItems[slot].talismans = new Array(item.talismanSlots).fill(null);
+    } else {
+      newItems[slot].talismans = [];
+    }
+    const updated = { ...target, items: newItems };
+    return {
+      loadouts: state.loadouts.map(l => l.id === loadoutId ? updated : l),
+    };
+  }),
+
+  setTalismanForLoadout: (loadoutId, slot, index, talisman) => set((state) => {
+    const target = state.loadouts.find(l => l.id === loadoutId);
+    if (!target) return state;
+    const newItems = { ...target.items };
+    const talismans = [...newItems[slot].talismans];
+    talismans[index] = talisman;
+    newItems[slot] = { ...newItems[slot], talismans };
+    const updated = { ...target, items: newItems };
+    return {
+      loadouts: state.loadouts.map(l => l.id === loadoutId ? updated : l),
+    };
+  }),
+
   resetCurrentLoadout: () => set((state) => {
     const current = state.getCurrentLoadout();
     if (!current) return state;
-    const reset = createInitialLoadout(current.id, current.name);
+    // Determine side and default name for that side
+    let defaultName = 'Default Loadout';
+    if (state.sideLoadoutIds.A === current.id) defaultName = 'Side A';
+    else if (state.sideLoadoutIds.B === current.id) defaultName = 'Side B';
+    const reset = createInitialLoadout(current.id, defaultName);
     return {
       loadouts: state.loadouts.map(l => l.id === current.id ? reset : l),
     };
@@ -330,6 +473,10 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     set((state) => ({
       loadouts: [...state.loadouts, createInitialLoadout(id, name, level, renownRank, isFromCharacter, characterName)],
       currentLoadoutId: state.currentLoadoutId || id,
+      // If we're in dual mode and the active side isn't assigned, assign this new loadout to it
+      sideLoadoutIds: state.mode === 'dual' && state.sideLoadoutIds[state.activeSide] == null
+        ? { ...state.sideLoadoutIds, [state.activeSide]: id }
+        : state.sideLoadoutIds,
     }));
     return id;
   },
@@ -340,9 +487,23 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
     if (state.currentLoadoutId === id) {
       newCurrent = newLoadouts.length > 0 ? newLoadouts[0].id : null;
     }
+    // Clean side mappings that reference this id
+    const nextSideMap = { ...state.sideLoadoutIds } as Record<LoadoutSide, string | null>;
+    (['A','B'] as LoadoutSide[]).forEach(s => { if (nextSideMap[s] === id) nextSideMap[s] = null; });
+    // Clean per-career mappings referencing this id
+    const nextCareerMap = { ...state.sideCareerLoadoutIds } as Record<LoadoutSide, Partial<Record<Career, string>>>;
+    (['A','B'] as LoadoutSide[]).forEach(s => {
+      const inner = { ...(nextCareerMap[s] || {}) } as Partial<Record<Career, string>>;
+      Object.entries(inner).forEach(([career, lid]) => {
+        if (lid === id) delete inner[career as Career];
+      });
+      nextCareerMap[s] = inner;
+    });
     return {
       loadouts: newLoadouts,
       currentLoadoutId: newCurrent,
+      sideLoadoutIds: nextSideMap,
+      sideCareerLoadoutIds: nextCareerMap,
     };
   }),
 
@@ -351,9 +512,13 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
   }))),
 
   markLoadoutAsModified: (id) => set((state) => ({
-    loadouts: state.loadouts.map(l => 
-      l.id === id ? { ...l, isFromCharacter: false, characterName: undefined } : l
-    ),
+    loadouts: state.loadouts.map(l => {
+      if (l.id !== id) return l;
+      const newName = l.name.startsWith('Imported from ')
+        ? l.name.replace(/^Imported from\s+/, '').trim()
+        : l.name;
+      return { ...l, isFromCharacter: false, characterName: undefined, name: newName };
+    }),
   })),
 
   updateLoadoutCharacterStatus: (id, isFromCharacter, characterName) => set((state) => ({

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Item, ItemSetBonusValue, ItemStat, Ability } from '../types';
-import { getItemColor } from '../utils/rarityColors';
+import { Item, ItemSetBonusValue, ItemStat, Ability, Loadout } from '../types';
 import { formatItemTypeName, formatStatName, formatSlotName, formatCareerName, formatRaceName } from '../utils/formatters';
 import { loadoutService } from '../services/loadoutService';
 
@@ -9,9 +8,10 @@ interface TooltipProps {
   item: Item | null;
   className?: string;
   isTalismanTooltip?: boolean;
+  loadoutId?: string; // ensure tooltip rules are evaluated against this loadout (A/B)
 }
 
-export default function Tooltip({ children, item, className = '', isTalismanTooltip = false }: TooltipProps) {
+export default function Tooltip({ children, item, className = '', isTalismanTooltip = false, loadoutId }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [detailedItem, setDetailedItem] = useState<Item | null>(null);
@@ -19,14 +19,39 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
   const tooltipRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
 
+  // Resolve the loadout we should evaluate against (A/B aware)
+  const getEffectiveLoadout = (): Loadout | null => {
+    if (loadoutId) {
+      const list = loadoutService.getAllLoadouts();
+      const found = list.find((l) => l.id === loadoutId) || null;
+      if (found) return found as Loadout;
+    }
+    return loadoutService.getCurrentLoadout();
+  };
+
   // Helper function to check if an item is eligible based on level/renown requirements
   const isItemEligible = (item: Item | null): boolean => {
     if (!item) return true;
-    const currentLoadout = loadoutService.getCurrentLoadout();
-    if (!currentLoadout) return true;
-    const levelEligible = !item.levelRequirement || item.levelRequirement <= currentLoadout.level;
-    const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= currentLoadout.renownRank;
+    const lo = getEffectiveLoadout();
+    if (!lo) return true;
+    const levelEligible = !item.levelRequirement || item.levelRequirement <= lo.level;
+    const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= lo.renownRank;
     return levelEligible && renownEligible;
+  };
+
+  const getEquippedSetItemsCountForLoadout = (setName: string): number => {
+    const lo = getEffectiveLoadout();
+    if (!lo) return 0;
+    let count = 0;
+    Object.values(lo.items).forEach(loadoutItem => {
+      const i = loadoutItem.item;
+      if (i && i.itemSet && i.itemSet.name === setName) {
+        const levelEligible = !i.levelRequirement || i.levelRequirement <= lo.level;
+        const renownEligible = !i.renownRankRequirement || i.renownRankRequirement <= lo.renownRank;
+        if (levelEligible && renownEligible) count++;
+      }
+    });
+    return count;
   };
 
   const handleMouseEnter = (e: React.MouseEvent) => {
@@ -176,7 +201,12 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
             <span className={`text-xs ${talisman && !talismanEligible ? 'text-gray-500' : ''}`}>
               {talisman ? (
                 <>
-                  <span style={{ color: talismanEligible ? getItemColor(talisman) : undefined }}>{talisman.name}</span>
+                  <span className={`${talismanEligible ? (talisman.itemSet ? 'item-color-set' :
+                    talisman.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                    talisman.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                    talisman.rarity === 'RARE' ? 'item-color-rare' :
+                    talisman.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                    talisman.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : ''}`}>{talisman.name}</span>
                   {talisman.stats && talisman.stats.length > 0 && (
                     <span className={`text-gray-400 ${!talismanEligible ? 'text-gray-600' : ''}`}>
                       {' ('}
@@ -233,8 +263,12 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           {/* 1. Item Name */}
           <div className="mb-1">
             <p 
-              className={`equipment-item-name ${!itemEligible ? 'text-gray-500' : ''}`}
-              style={{ color: itemEligible ? getItemColor(displayItem) : undefined }}
+              className={`equipment-item-name ${!itemEligible ? 'text-gray-500' : ''} ${itemEligible ? (displayItem.itemSet ? 'item-color-set' :
+                displayItem.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                displayItem.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                displayItem.rarity === 'RARE' ? 'item-color-rare' :
+                displayItem.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                displayItem.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : ''}`}
             >
               {displayItem.name}
             </p>
@@ -307,7 +341,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
                 {displayItem.itemSet.bonuses && displayItem.itemSet.bonuses.length > 0 ? (
                   <div className="space-y-0.5">
                     {displayItem.itemSet.bonuses.map((bonus, idx: number) => {
-                      const equippedCount = loadoutService.getEquippedSetItemsCount(displayItem.itemSet!.name);
+                      const equippedCount = getEquippedSetItemsCountForLoadout(displayItem.itemSet!.name);
                       const isActive = equippedCount >= bonus.itemsRequired;
                       
                       const formatBonusValue = (bonusValue: ItemSetBonusValue): React.JSX.Element => {

@@ -2,17 +2,23 @@ import React, { useState } from 'react';
 import { EquipSlot, Item, Stat, Career, ItemRarity } from '../types';
 import { loadoutService } from '../services/loadoutService';
 import { useLoadoutData } from '../hooks/useLoadoutData';
+import { useLoadoutById } from '../hooks/useLoadoutById';
 import EquipmentSelector from './EquipmentSelector';
 import { DEFAULT_SLOT_ICONS } from '../constants/slotIcons';
 import Tooltip from './Tooltip';
-import { getItemColor } from '../utils/rarityColors';
 
 interface EquipmentPanelProps {
   selectedCareer: Career | '';
+  loadoutId?: string | null; // optional loadout to render (for dual mode)
+  compact?: boolean; // compact visuals for dual mode
+  iconOnly?: boolean; // minimal tiles: show only the main item icon
+  hideHeading?: boolean; // optionally hide the internal "Equipment" heading
 }
 
-export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) {
+export default function EquipmentPanel({ selectedCareer, loadoutId, compact = false, iconOnly = false, hideHeading = false }: EquipmentPanelProps) {
   const { currentLoadout } = useLoadoutData();
+  const { loadout } = useLoadoutById(loadoutId ?? null);
+  const effectiveLoadout = loadoutId ? loadout : currentLoadout;
   const [selectedSlot, setSelectedSlot] = useState<EquipSlot | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -25,9 +31,9 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
 
   // Helper function to check if an item is eligible based on level/renown requirements
   const isItemEligible = (item: Item | null): boolean => {
-    if (!item || !currentLoadout) return true;
-    const levelEligible = !item.levelRequirement || item.levelRequirement <= currentLoadout.level;
-    const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= currentLoadout.renownRank;
+    if (!item || !effectiveLoadout) return true;
+    const levelEligible = !item.levelRequirement || item.levelRequirement <= effectiveLoadout.level;
+    const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= effectiveLoadout.renownRank;
     return levelEligible && renownEligible;
   };
 
@@ -42,15 +48,23 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
     if (slotToUpdate) {
       // Fetch complete item details including set bonuses
       const completeItem = await loadoutService.getItemWithDetails(item.id);
-      await loadoutService.updateItem(slotToUpdate, completeItem);
+      if (loadoutId) {
+        await loadoutService.updateItemForLoadout(loadoutId, slotToUpdate, completeItem);
+      } else {
+        await loadoutService.updateItem(slotToUpdate, completeItem);
+      }
       // No need to manually update local state - the hook handles reactivity
     }
   };
 
   const handleSlotRightClick = async (e: React.MouseEvent, slot: EquipSlot) => {
     e.preventDefault(); // Prevent default context menu
-    if (currentLoadout && currentLoadout.items[slot].item) {
-      await loadoutService.updateItem(slot, null);
+    if (effectiveLoadout && effectiveLoadout.items[slot].item) {
+      if (loadoutId) {
+        await loadoutService.updateItemForLoadout(loadoutId, slot, null);
+      } else {
+        await loadoutService.updateItem(slot, null);
+      }
     }
   };
 
@@ -65,18 +79,26 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
     if (slotInfo) {
       // Fetch complete talisman details including set bonuses
       const completeTalisman = await loadoutService.getItemWithDetails(talisman.id);
-      await loadoutService.updateTalisman(slotInfo.slot, slotInfo.index, completeTalisman);
+      if (loadoutId) {
+        await loadoutService.updateTalismanForLoadout(loadoutId, slotInfo.slot, slotInfo.index, completeTalisman);
+      } else {
+        await loadoutService.updateTalisman(slotInfo.slot, slotInfo.index, completeTalisman);
+      }
     }
   };
 
   const handleTalismanRightClick = async (e: React.MouseEvent, slot: EquipSlot, index: number) => {
     e.preventDefault(); // Prevent default context menu
-    if (currentLoadout && currentLoadout.items[slot].talismans[index]) {
-      await loadoutService.updateTalisman(slot, index, null);
+    if (effectiveLoadout && effectiveLoadout.items[slot].talismans[index]) {
+      if (loadoutId) {
+        await loadoutService.updateTalismanForLoadout(loadoutId, slot, index, null);
+      } else {
+        await loadoutService.updateTalisman(slot, index, null);
+      }
     }
   };
 
-  if (!currentLoadout) return <div>Loading...</div>;
+  if (!effectiveLoadout) return <div>Loading...</div>;
 
   // Custom slot order for the desired layout
   const slotOrder = [
@@ -97,80 +119,135 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
   ];
 
   return (
-    <div className="lg:col-span-2 panel-container">
-      <h2 className="panel-heading">Equipment</h2>
-      <div className="grid grid-cols-3 gap-3">
+    <div className="lg:col-span-2 panel-container relative">
+      {!hideHeading && <h2 className="panel-heading">Equipment</h2>}
+  <div className={`grid grid-cols-3 ${compact ? 'gap-2' : 'gap-3'}`}>
         {slotOrder.map((slot, index) => {
           if (slot === null) {
             return <div key={`empty-${index}`} className="invisible"></div>;
           }
 
-          const slotData = currentLoadout.items[slot];
+          const slotData = effectiveLoadout.items[slot];
           return (
             <div key={slot} className="relative">
-              <div className="equipment-slot">
-                <div className="flex items-start gap-2">
-                  <Tooltip item={slotData.item ? { ...slotData.item, talismans: slotData.talismans } : null}>
+              <div className={`equipment-slot ${compact ? 'p-1' : ''}`}>
+                <div className={iconOnly ? 'flex items-start gap-1' : 'flex items-start gap-2'}>
+                  <Tooltip item={slotData.item ? { ...slotData.item, talismans: slotData.talismans } : null} loadoutId={effectiveLoadout.id}>
                     <div
-                      className="equipment-icon cursor-pointer"
+                      className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}`}
                       onClick={() => handleSlotClick(slot)}
                       onContextMenu={(e) => handleSlotRightClick(e, slot)}
                     >
                       {slotData.item ? (
-                        <img 
-                          src={slotData.item.iconUrl} 
-                          alt={slotData.item.name} 
-                          className={`w-full h-full object-contain rounded ${!isItemEligible(slotData.item) ? 'opacity-50 grayscale' : ''}`} 
-                        />
+                        <div className={`icon-frame ${isItemEligible(slotData.item) ? (slotData.item.itemSet ? 'item-color-set' :
+                          slotData.item.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                          slotData.item.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                          slotData.item.rarity === 'RARE' ? 'item-color-rare' :
+                          slotData.item.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                          slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : ''}`}>
+                          <img 
+                            src={slotData.item.iconUrl} 
+                            alt={slotData.item.name} 
+                            className={`w-full h-full object-contain rounded ${!isItemEligible(slotData.item) ? 'opacity-50 grayscale' : ''}`} 
+                          />
+                        </div>
                       ) : (
                         <img src={DEFAULT_SLOT_ICONS[slot]} alt={`${slot} slot`} className="w-full h-full object-contain rounded opacity-50" />
                       )}
                     </div>
                   </Tooltip>
-                  <div className="equipment-text">
-                    {slotData.item && (
-                      <p 
-                        className={`equipment-item-name ${!isItemEligible(slotData.item) ? 'text-gray-500 opacity-60' : ''}`}
-                        style={{ color: isItemEligible(slotData.item) ? getItemColor(slotData.item) : undefined }}
-                      >
-                        {slotData.item.name}
-                      </p>
-                    )}
-                    {/* Talisman slots */}
-                    {slotData.item && slotData.item.talismanSlots > 0 && (
-                      <div className="flex justify-start mt-1 gap-1">
-                        {Array.from({ length: slotData.item.talismanSlots }, (_, i) => {
-                          const isParentItemEligible = isItemEligible(slotData.item);
-                          const isTalismanEligible = slotData.talismans[i] ? isItemEligible(slotData.talismans[i]) : true;
-                          const isSlotGreyedOut = !isParentItemEligible || (slotData.talismans[i] && !isTalismanEligible);
-                          
-                          return (
-                            <div key={i} className={`talisman-slot ${isSlotGreyedOut ? 'opacity-50' : ''}`}>
-                              {slotData.talismans[i] ? (
-                                <Tooltip item={slotData.talismans[i]} isTalismanTooltip={true}>
-                                  <img
-                                    src={slotData.talismans[i]!.iconUrl}
-                                    alt={slotData.talismans[i]!.name}
-                                    className={`w-full h-full object-contain rounded cursor-pointer ${!isTalismanEligible ? 'grayscale' : ''}`}
-                                    onClick={() => handleTalismanClick(slot, i)}
-                                    onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
-                                  />
-                                </Tooltip>
-                              ) : (
+                  {iconOnly && slotData.item && slotData.item.talismanSlots > 0 && (
+                    <div className="flex flex-col justify-start items-start gap-1 ml-1">
+                      {Array.from({ length: slotData.item.talismanSlots }, (_, i) => {
+                        const isParentItemEligible = isItemEligible(slotData.item!);
+                        const isTalismanEligible = slotData.talismans[i] ? isItemEligible(slotData.talismans[i]) : true;
+                        const isSlotGreyedOut = !isParentItemEligible || (slotData.talismans[i] && !isTalismanEligible);
+                        return (
+                          <div key={i} className={`talisman-slot ${compact ? 'w-5 h-5' : ''} ${isSlotGreyedOut ? 'opacity-50' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? (isTalismanEligible ? (slotData.talismans[i]!.itemSet ? 'item-color-set' :
+                            slotData.talismans[i]!.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                            slotData.talismans[i]!.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                            slotData.talismans[i]!.rarity === 'RARE' ? 'item-color-rare' :
+                            slotData.talismans[i]!.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                            slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : '') : 'border-none'}`}> 
+                            {slotData.talismans[i] ? (
+                              <Tooltip item={slotData.talismans[i]} isTalismanTooltip={true} loadoutId={effectiveLoadout.id}>
                                 <img
-                                  src="https://armory.returnofreckoning.com/icon/1"
-                                  alt="Empty talisman slot"
-                                  className="w-full h-full object-contain rounded cursor-pointer opacity-50"
+                                  src={slotData.talismans[i]!.iconUrl}
+                                  alt={slotData.talismans[i]!.name}
+                                  className={`w-full h-full object-contain rounded cursor-pointer ${!isTalismanEligible ? 'grayscale' : ''}`}
                                   onClick={() => handleTalismanClick(slot, i)}
                                   onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
                                 />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                              </Tooltip>
+                            ) : (
+                              <img
+                                src="https://armory.returnofreckoning.com/icon/1"
+                                alt="Empty talisman slot"
+                                className="w-full h-full object-contain rounded cursor-pointer opacity-50"
+                                onClick={() => handleTalismanClick(slot, i)}
+                                onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {!iconOnly && (
+                    <div className="equipment-text">
+                      {!compact && slotData.item && (
+                        <p 
+                          className={`equipment-item-name ${!isItemEligible(slotData.item) ? 'text-gray-500 opacity-60' : ''} ${isItemEligible(slotData.item) ? (slotData.item.itemSet ? 'item-color-set' :
+                            slotData.item.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                            slotData.item.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                            slotData.item.rarity === 'RARE' ? 'item-color-rare' :
+                            slotData.item.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                            slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : ''}`}
+                        >
+                          {slotData.item.name}
+                        </p>
+                      )}
+                      {/* Talisman slots */}
+                      {slotData.item && slotData.item.talismanSlots > 0 && (
+                        <div className="flex justify-start mt-1 gap-1">
+                          {Array.from({ length: slotData.item.talismanSlots }, (_, i) => {
+                            const isParentItemEligible = isItemEligible(slotData.item);
+                            const isTalismanEligible = slotData.talismans[i] ? isItemEligible(slotData.talismans[i]) : true;
+                            const isSlotGreyedOut = !isParentItemEligible || (slotData.talismans[i] && !isTalismanEligible);
+                            
+                            return (
+                              <div key={i} className={`talisman-slot ${compact ? 'w-5 h-5' : ''} ${isSlotGreyedOut ? 'opacity-50' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? (isTalismanEligible ? (slotData.talismans[i]!.itemSet ? 'item-color-set' :
+                                slotData.talismans[i]!.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                                slotData.talismans[i]!.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                                slotData.talismans[i]!.rarity === 'RARE' ? 'item-color-rare' :
+                                slotData.talismans[i]!.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                                slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : '') : 'border-none'}`}> 
+                                {slotData.talismans[i] ? (
+                                  <Tooltip item={slotData.talismans[i]} isTalismanTooltip={true} loadoutId={effectiveLoadout.id}>
+                                    <img
+                                      src={slotData.talismans[i]!.iconUrl}
+                                      alt={slotData.talismans[i]!.name}
+                                      className={`w-full h-full object-contain rounded cursor-pointer ${!isTalismanEligible ? 'grayscale' : ''}`}
+                                      onClick={() => handleTalismanClick(slot, i)}
+                                      onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
+                                    />
+                                  </Tooltip>
+                                ) : (
+                                  <img
+                                    src="https://armory.returnofreckoning.com/icon/1"
+                                    alt="Empty talisman slot"
+                                    className="w-full h-full object-contain rounded cursor-pointer opacity-50"
+                                    onClick={() => handleTalismanClick(slot, i)}
+                                    onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -189,8 +266,9 @@ export default function EquipmentPanel({ selectedCareer }: EquipmentPanelProps) 
         onSelect={talismanSlot ? handleTalismanSelect : handleItemSelect}
         isTalismanMode={!!talismanSlot}
   // For talismans, use the holding item's levelRequirement to match eligibility rule
-  holdingItemLevelReq={talismanSlot ? currentLoadout?.items[talismanSlot.slot].item?.levelRequirement : undefined}
+  holdingItemLevelReq={talismanSlot ? effectiveLoadout?.items[talismanSlot.slot].item?.levelRequirement : undefined}
         talismanSlotIndex={talismanSlot?.index}
+        loadoutId={loadoutId || null}
         nameFilter={nameFilter}
         statsFilter={statsFilter}
         rarityFilter={rarityFilter}

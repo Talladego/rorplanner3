@@ -1,5 +1,5 @@
 import { useLoadoutStore } from './loadoutStore';
-import { ILoadoutStore, Loadout, StatsSummary, Career, EquipSlot, Item } from '../types';
+import { ILoadoutStore, Loadout, StatsSummary, Career, EquipSlot, Item, LoadoutMode, LoadoutSide } from '../types';
 
 class LoadoutStoreAdapter implements ILoadoutStore {
   getLoadouts(): Loadout[] {
@@ -16,6 +16,31 @@ class LoadoutStoreAdapter implements ILoadoutStore {
 
   getStatsSummary(): StatsSummary {
     return useLoadoutStore.getState().statsSummary;
+  }
+
+  // Mode getters
+  getMode(): LoadoutMode {
+    return useLoadoutStore.getState().getMode();
+  }
+
+  getActiveSide(): LoadoutSide {
+    return useLoadoutStore.getState().getActiveSide();
+  }
+
+  getSideLoadoutId(side: LoadoutSide): string | null {
+    return useLoadoutStore.getState().getSideLoadoutId(side);
+  }
+
+  getLoadoutForSide(side: LoadoutSide): Loadout | null {
+    return useLoadoutStore.getState().getLoadoutForSide(side);
+  }
+
+  getSideCareerLoadoutId(side: LoadoutSide, career: Career): string | null {
+    return useLoadoutStore.getState().getSideCareerLoadoutId(side, career);
+  }
+
+  setSideCareerLoadoutId(side: LoadoutSide, career: Career, loadoutId: string | null): void {
+    useLoadoutStore.getState().setSideCareerLoadoutId(side, career, loadoutId);
   }
 
   setCareer(career: Career | null): void {
@@ -38,12 +63,53 @@ class LoadoutStoreAdapter implements ILoadoutStore {
     useLoadoutStore.getState().setTalisman(slot, index, talisman);
   }
 
+  setItemForLoadout(loadoutId: string, slot: EquipSlot, item: Item | null): void {
+    useLoadoutStore.getState().setItemForLoadout(loadoutId, slot, item);
+  }
+
+  setTalismanForLoadout(loadoutId: string, slot: EquipSlot, index: number, talisman: Item | null): void {
+    useLoadoutStore.getState().setTalismanForLoadout(loadoutId, slot, index, talisman);
+  }
+
+  setCareerForLoadout(loadoutId: string, career: Career | null): void {
+    useLoadoutStore.getState().setCareerForLoadout(loadoutId, career);
+  }
+
+  setLevelForLoadout(loadoutId: string, level: number): void {
+    useLoadoutStore.getState().setLevelForLoadout(loadoutId, level);
+  }
+
+  setRenownForLoadout(loadoutId: string, renownRank: number): void {
+    useLoadoutStore.getState().setRenownForLoadout(loadoutId, renownRank);
+  }
+
+  setLoadoutNameForLoadout(loadoutId: string, name: string): void {
+    useLoadoutStore.getState().setLoadoutNameForLoadout(loadoutId, name);
+  }
+
+  resetLoadoutById(loadoutId: string): void {
+    useLoadoutStore.getState().resetLoadoutById(loadoutId);
+  }
+
   resetCurrentLoadout(): void {
     useLoadoutStore.getState().resetCurrentLoadout();
   }
 
   calculateStats(): void {
     useLoadoutStore.getState().calculateStats();
+  }
+
+  // Mode setters
+  setMode(mode: LoadoutMode): void {
+    useLoadoutStore.getState().setMode(mode);
+  }
+
+  setActiveSide(side: LoadoutSide): void {
+    useLoadoutStore.getState().setActiveSide(side);
+  }
+
+  assignSideLoadout(side: LoadoutSide, loadoutId: string | null): void {
+    useLoadoutStore.getState().assignSideLoadout(side, loadoutId);
   }
 
   createLoadout(name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string): string {
@@ -66,7 +132,9 @@ class LoadoutStoreAdapter implements ILoadoutStore {
     useLoadoutStore.getState().updateLoadoutCharacterStatus(id, isFromCharacter, characterName);
   }
 
-  async importFromCharacter(characterId: string): Promise<void> {
+  async importFromCharacter(characterId: string, _side?: LoadoutSide): Promise<void> {
+    // _side is intentionally unused here; API kept for compatibility
+    void _side;
     await useLoadoutStore.getState().importFromCharacter(characterId);
   }
 }

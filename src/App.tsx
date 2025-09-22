@@ -3,8 +3,10 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { loadoutService } from './services/loadoutService';
 import { urlService } from './services/urlService';
 import Toolbar from './components/Toolbar';
+import DualToolbar from './components/DualToolbar';
 import EquipmentPanel from './components/EquipmentPanel';
 import StatsPanel from './components/StatsPanel';
+import DualEquipmentLayout from './components/DualEquipmentLayout';
 import ApolloProviderWrapper from './components/ApolloProviderWrapper';
 import ErrorBoundary from './components/ErrorBoundary';
 import { Career } from './types';
@@ -16,6 +18,7 @@ function App() {
   const [selectedCareer, setSelectedCareer] = useState<Career | ''>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [characterLoaded, setCharacterLoaded] = useState<boolean>(false);
+  const [mode, setMode] = useState<'single' | 'dual'>(loadoutService.getMode());
 
   // Set up URL service navigation callback
   useEffect(() => {
@@ -43,6 +46,9 @@ function App() {
   // Listen to loadout changes and handle character loadout switching
   useEffect(() => {
     const unsubscribe = loadoutService.subscribeToAllEvents((event) => {
+      if (event.type === 'MODE_CHANGED') {
+        setMode(loadoutService.getMode());
+      }
       // If a character was loaded and we're now modifying the loadout, switch to regular loadout
       if (characterLoaded && (
         event.type === 'ITEM_UPDATED' ||
@@ -60,12 +66,19 @@ function App() {
 
   // Handle URL parameters on app initialization
   useEffect(() => {
+    const keys = Array.from(urlService.getSearchParams().keys());
     const loadCharacter = urlService.getParam('loadCharacter');
-    const hasLoadoutParams = urlService.getParam('career') || urlService.getParam('level') || 
-                            Array.from(urlService.getSearchParams().keys()).some(key => 
-                              key.startsWith('item.') || key.startsWith('talisman.'));
+    const hasLoadoutParams = urlService.getParam('career') || urlService.getParam('level') ||
+                             keys.some(key => key.startsWith('item.') || key.startsWith('talisman.'));
+    const hasCompareParams = urlService.getParam('mode') === 'dual' ||
+                             keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
 
-    if (loadCharacter) {
+    if (hasCompareParams) {
+      // Load dual compare state from URL
+      urlService.handleCompareFromUrl()
+        .then(() => setErrorMessage(''))
+        .catch((error) => setErrorMessage(`Failed to load compare from URL: ${(error as Error).message}`));
+    } else if (loadCharacter) {
       // Load character from URL parameter
       urlService.handleCharacterFromUrl(loadCharacter)
         .then(() => {
@@ -84,28 +97,31 @@ function App() {
           setErrorMessage(`Failed to load loadout from URL parameters: ${(error as Error).message}`);
         });
     } else {
-      // Create a default loadout if none exists
+      // Default path: ensure dual compare mode has both sides initialized
       try {
-        // Check if we have a current loadout, if not create one
-        const currentLoadout = loadoutService.getCurrentLoadout();
-        if (!currentLoadout) {
-          loadoutService.createLoadout('Default Loadout');
-        }
+        loadoutService.ensureSideLoadout('A');
+        loadoutService.ensureSideLoadout('B');
       } catch (error) {
-        console.error('Failed to initialize default loadout:', error);
+        console.error('Failed to initialize compare loadouts:', error);
       }
     }
   }, []);
 
   // Handle URL changes (when user navigates back/forward or pastes new URL)
   useEffect(() => {
+    const keys = Array.from(urlService.getSearchParams().keys());
     const loadCharacter = urlService.getParam('loadCharacter');
-    const hasLoadoutParams = urlService.getParam('career') || urlService.getParam('level') || 
-                            Array.from(urlService.getSearchParams().keys()).some(key => 
-                              key.startsWith('item.') || key.startsWith('talisman.'));
+    const hasLoadoutParams = urlService.getParam('career') || urlService.getParam('level') ||
+                             keys.some(key => key.startsWith('item.') || key.startsWith('talisman.'));
+    const hasCompareParams = urlService.getParam('mode') === 'dual' ||
+                             keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
 
     // Only load if there are parameters and we're not in an error state
-    if (loadCharacter && !errorMessage.includes('Failed to load character')) {
+    if (hasCompareParams && !errorMessage.includes('Failed to load compare')) {
+      urlService.handleCompareFromUrl()
+        .then(() => setErrorMessage(''))
+        .catch((error) => setErrorMessage(`Failed to load compare from URL: ${(error as Error).message}`));
+    } else if (loadCharacter && !errorMessage.includes('Failed to load character')) {
       urlService.handleCharacterFromUrl(loadCharacter)
         .then(() => {
           setErrorMessage(''); // Clear any previous error
@@ -132,20 +148,29 @@ function App() {
             <h1 className="text-4xl font-bold text-primary">RorPlanner</h1>
           </header>
           <div className="max-w-6xl mx-auto">
-            <Toolbar
-              selectedCareer={selectedCareer}
-              setSelectedCareer={setSelectedCareer}
-              errorMessage={errorMessage}
-              setErrorMessage={setErrorMessage}
-            />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2">
-                <EquipmentPanel selectedCareer={selectedCareer} />
+            {mode === 'dual' ? (
+              <>
+                <DualToolbar />
+                <DualEquipmentLayout />
+              </>
+            ) : (
+              <>
+                <Toolbar
+                  selectedCareer={selectedCareer}
+                  setSelectedCareer={setSelectedCareer}
+                  errorMessage={errorMessage}
+                  setErrorMessage={setErrorMessage}
+                />
+              <div className="grid grid-cols-[800px_400px] gap-8 justify-center">
+                <div>
+                  <EquipmentPanel selectedCareer={selectedCareer} />
+                </div>
+                <div>
+                  <StatsPanel />
+                </div>
               </div>
-              <div className="lg:col-span-1">
-                <StatsPanel />
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
       </ApolloProviderWrapper>

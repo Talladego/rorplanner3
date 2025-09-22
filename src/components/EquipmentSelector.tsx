@@ -6,7 +6,7 @@ import { useLoadoutData } from '../hooks/useLoadoutData';
 import { loadoutService } from '../services/loadoutService';
 import { formatSlotName, formatStatName, formatItemTypeName } from '../utils/formatters';
 import Tooltip from './Tooltip';
-import { getItemColor } from '../utils/rarityColors';
+import { useLoadoutById } from '../hooks/useLoadoutById';
 
 interface EquipmentSelectorProps {
   slot: EquipSlot;
@@ -16,6 +16,7 @@ interface EquipmentSelectorProps {
   isTalismanMode?: boolean;
   holdingItemLevelReq?: number; // This represents holding item's levelRequirement
   talismanSlotIndex?: number; // Index of the talisman slot being filled
+  loadoutId?: string | null; // optional explicit loadout to operate on (compare mode)
   nameFilter: string;
   statsFilter: Stat[];
   rarityFilter: ItemRarity[];
@@ -55,8 +56,10 @@ interface PageData {
   totalCount: number;
 }
 
-export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isTalismanMode = false, holdingItemLevelReq, talismanSlotIndex, nameFilter, statsFilter, rarityFilter, onNameFilterChange, onStatsFilterChange, onRarityFilterChange, selectedCareer }: EquipmentSelectorProps) {
+export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isTalismanMode = false, holdingItemLevelReq, talismanSlotIndex, loadoutId = null, nameFilter, statsFilter, rarityFilter, onNameFilterChange, onStatsFilterChange, onRarityFilterChange, selectedCareer }: EquipmentSelectorProps) {
   const { currentLoadout } = useLoadoutData();
+  const { loadout: explicitLoadout } = useLoadoutById(loadoutId ?? null);
+  const effectiveLoadout = loadoutId ? explicitLoadout : currentLoadout;
   const career = selectedCareer;
   const modalRef = useRef<HTMLDivElement>(null);
   
@@ -102,7 +105,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
     if (isTalismanMode) {
       if (!holdingItemLevelReq) return;
     } else {
-      if (!career || !currentLoadout) return;
+      if (!career || !effectiveLoadout) return;
     }
 
     setLoading(true);
@@ -127,8 +130,8 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
           career || undefined,
           ITEMS_PER_PAGE,
           after,
-          currentLoadout?.level || 40,
-          currentLoadout?.renownRank || 80,
+          effectiveLoadout?.level || 40,
+          effectiveLoadout?.renownRank || 80,
           filter,
           stats,
           rarities
@@ -163,7 +166,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
     } finally {
       setLoading(false);
     }
-  }, [isTalismanMode, holdingItemLevelReq, career, currentLoadout, slot]);
+  }, [isTalismanMode, holdingItemLevelReq, career, effectiveLoadout, slot]);
 
   // Reset pagination when modal opens; preserve filters across openings/context changes
   useEffect(() => {
@@ -191,7 +194,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
         fetchItems(undefined, nameFilter, statsFilter, rarityFilter);
       }
     }
-  }, [isOpen, isTalismanMode, career, currentLoadout, nameFilter, statsFilter, rarityFilter, fetchItems]);
+  }, [isOpen, isTalismanMode, career, effectiveLoadout, nameFilter, statsFilter, rarityFilter, fetchItems]);
 
   const handleNameFilterChange = (value: string) => {
     onNameFilterChange(value);
@@ -357,16 +360,19 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
               ? pageData.items.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
               : pageData.items
             ).map((item: any) => {
-              const isAlreadyEquipped = item.uniqueEquipped && loadoutService.isUniqueItemAlreadyEquipped(item.id);
+              const isAlreadyEquipped = item.uniqueEquipped && loadoutService.isUniqueItemAlreadyEquippedInLoadout(item.id, loadoutId || undefined);
               const allowedRaces = career ? CAREER_RACE_MAPPING[career] || [] : [];
               const isRaceRestricted = career && item.raceRestriction && item.raceRestriction.length > 0 && 
                                      !item.raceRestriction.some((race: any) => allowedRaces.includes(race));
-              const isTalismanAlreadySlotted = isTalismanMode && talismanSlotIndex !== undefined && 
-                                             loadoutService.isTalismanAlreadySlottedInItem(item.id, slot, talismanSlotIndex);
+              const isTalismanAlreadySlotted = isTalismanMode && talismanSlotIndex !== undefined && (
+                                             loadoutId
+                                               ? loadoutService.isTalismanAlreadySlottedInItemForLoadout(loadoutId, item.id, slot, talismanSlotIndex)
+                                               : loadoutService.isTalismanAlreadySlottedInItem(item.id, slot, talismanSlotIndex)
+                                           );
               const isDisabled = isAlreadyEquipped || isRaceRestricted || isTalismanAlreadySlotted;
               
               return (
-                <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode}>
+                <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode} loadoutId={effectiveLoadout?.id}>
                   <div
                     className={`border p-1.5 rounded h-12 flex items-center ${
                       isDisabled
@@ -378,7 +384,12 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                     <div className="flex items-center space-x-2 w-full">
                       <img src={item.iconUrl} alt={item.name} className="w-6 h-6 flex-shrink-0 object-contain rounded" />
                       <div className="flex-1 min-w-0 flex flex-col justify-center">
-                        <p className={`font-medium text-xs leading-tight break-words overflow-wrap-anywhere ${isDisabled ? 'text-gray-500 dark:text-gray-400' : ''}`} style={{ color: isDisabled ? undefined : getItemColor(item) }}>{item.name}</p>
+                        <p className={`font-medium text-xs leading-tight break-words overflow-wrap-anywhere ${isDisabled ? 'text-gray-500 dark:text-gray-400' : ''} ${!isDisabled ? (item.itemSet ? 'item-color-set' :
+                          item.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                          item.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                          item.rarity === 'RARE' ? 'item-color-rare' :
+                          item.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                          item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : ''}`}>{item.name}</p>
                         <p className={`text-xs leading-tight ${isDisabled ? 'text-gray-400 dark:text-gray-500' : 'text-muted'}`}>
                           {isAlreadyEquipped ? 'Already equipped (Unique)' : 
                            isRaceRestricted ? 'Not usable by this race' :

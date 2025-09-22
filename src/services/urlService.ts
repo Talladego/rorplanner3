@@ -1,35 +1,19 @@
-import { loadoutEventEmitter } from './loadoutEventEmitter';
-import { CharacterLoadedFromUrlEvent, LoadoutLoadedFromUrlEvent } from '../types/events';
-import { Career, EquipSlot, Loadout, LoadoutItem } from '../types';
+import { Career, Loadout, LoadoutItem } from '../types';
 
 class UrlService {
-  private navigateCallback: ((path: string, options?: { replace?: boolean }) => void) | null = null;
+  // URL handling unplugged; navigate callback disabled
+  // Keeping API shape but not storing any callback
 
   // Set the navigation callback (to be called from React components)
-  setNavigateCallback(callback: (path: string, options?: { replace?: boolean }) => void) {
-    this.navigateCallback = callback;
+  setNavigateCallback(_callback: (path: string, options?: { replace?: boolean }) => void) {
+    // No-op while URL handling is unplugged
+    void _callback;
+    return;
   }
 
   // Get URL search parameters (works with HashRouter)
   getSearchParams(): URLSearchParams {
-    if (typeof window === 'undefined') {
-      return new URLSearchParams();
-    }
-    
-    // With HashRouter, parameters are after the #/ in the hash
-    const hash = window.location.hash;
-    const hashPathStart = hash.indexOf('#/');
-    if (hashPathStart !== -1) {
-      const pathAndQuery = hash.substring(hashPathStart + 2); // Remove '#/'
-      const queryStart = pathAndQuery.indexOf('?');
-      if (queryStart !== -1) {
-        const queryString = pathAndQuery.substring(queryStart + 1); // Get everything after '?'
-        return new URLSearchParams(queryString);
-      }
-    }
-    
-    // Fallback to regular search params for backward compatibility
-    return new URLSearchParams(window.location.search);
+    return new URLSearchParams();
   }
 
   // Get a specific URL parameter
@@ -38,44 +22,11 @@ class UrlService {
   }
 
   // Update the URL with new search parameters
-  updateUrl(params: Record<string, string | null>, options: { replace?: boolean } = {}) {
-    if (!this.navigateCallback) {
-      console.warn('Navigate callback not set for UrlService');
-      return;
-    }
-
-    const currentParams = this.getSearchParams();
-
-    // Update parameters
-    Object.entries(params).forEach(([key, value]) => {
-      if (value === null) {
-        currentParams.delete(key);
-      } else {
-        currentParams.set(key, value);
-      }
-    });
-
-    // Build new URL
-    const searchString = currentParams.toString();
-    // For React Router navigate (HashRouter), pass a clean path WITHOUT the hash
-    // HashRouter will prefix the path with '#/' automatically
-    const routerPath = searchString ? `/?${searchString}` : '/';
-    // For direct history API fallback, construct the full hash path
-    const historyPath = searchString ? `/#/?${searchString}` : '/#/';
-
-    try {
-      this.navigateCallback(routerPath, options);
-    } catch (error) {
-      console.warn('Navigate callback failed, falling back to history API:', error);
-      // Fallback to direct history manipulation
-      if (typeof window !== 'undefined') {
-        if (options.replace) {
-          window.history.replaceState(null, '', historyPath);
-        } else {
-          window.history.pushState(null, '', historyPath);
-        }
-      }
-    }
+  updateUrl(_params: Record<string, string | null>, _options: { replace?: boolean } = {}) {
+    // No-op while URL handling is unplugged
+    void _params;
+    void _options;
+    return;
   }
 
   // Encode loadout data into URL parameters
@@ -106,6 +57,16 @@ class UrlService {
     });
 
     return params;
+  }
+
+  // Encode loadout data with a side prefix (e.g., 'a' or 'b')
+  encodeLoadoutToUrlWithPrefix(prefix: 'a' | 'b', loadout: Loadout): Record<string, string> {
+    const base = this.encodeLoadoutToUrl(loadout);
+    const prefixed: Record<string, string> = {};
+    Object.entries(base).forEach(([k, v]) => {
+      prefixed[`${prefix}.${k}`] = v;
+    });
+    return prefixed;
   }
 
   // Decode URL parameters into loadout data
@@ -173,140 +134,87 @@ class UrlService {
     return loadout;
   }
 
-  // Update URL with current loadout data
-  updateUrlWithLoadout(loadout: Loadout): void {
-    // If this loadout is from a character, only keep the loadCharacter parameter
-    if (loadout.isFromCharacter && loadout.characterName) {
-      const params: Record<string, string | null> = {
-        loadCharacter: loadout.characterName,
-        // Clear all other loadout parameters
-        career: null,
-        level: null,
-        renownRank: null,
-      };
-      // Clear item and talisman parameters
-      const currentParams = this.getSearchParams();
-      for (const key of currentParams.keys()) {
-        if (key.startsWith('item.') || key.startsWith('talisman.')) {
-          params[key] = null;
+  // Decode prefixed loadout parameters (for compare sides)
+  decodeLoadoutFromUrlWithPrefix(prefix: 'a' | 'b'): {
+    career: Career | null;
+    level: number;
+    renownRank: number;
+    items: Record<string, {
+      item: { id: string } | null;
+      talismans: ({ id: string } | null)[];
+    }>;
+  } | null {
+    const params = this.getSearchParams();
+    const hasAny = Array.from(params.keys()).some((k) => k.startsWith(`${prefix}.`));
+    if (!hasAny) return null;
+
+    const loadout = {
+      career: null as Career | null,
+      level: 40,
+      renownRank: 80,
+      items: {} as Record<string, { item: { id: string } | null; talismans: ({ id: string } | null)[] }>,
+    };
+
+    const careerParam = params.get(`${prefix}.career`);
+    if (careerParam) loadout.career = careerParam as Career;
+    const levelParam = params.get(`${prefix}.level`);
+    if (levelParam) loadout.level = parseInt(levelParam, 10);
+    const renownParam = params.get(`${prefix}.renownRank`);
+    if (renownParam) loadout.renownRank = parseInt(renownParam, 10);
+
+    for (const [key, value] of params.entries()) {
+      if (key.startsWith(`${prefix}.item.`)) {
+        const slot = key.substring(`${prefix}.item.`.length);
+        if (!loadout.items[slot]) loadout.items[slot] = { item: null, talismans: [] };
+        loadout.items[slot].item = { id: value };
+      } else if (key.startsWith(`${prefix}.talisman.`)) {
+        const rest = key.substring(`${prefix}.talisman.`.length);
+        const parts = rest.split('.');
+        if (parts.length === 2) {
+          const slot = parts[0];
+          const index = parseInt(parts[1], 10);
+          if (!loadout.items[slot]) loadout.items[slot] = { item: null, talismans: [] };
+          loadout.items[slot].talismans[index] = { id: value };
         }
       }
-      this.updateUrl(params, { replace: true });
-    } else {
-      // For non-character loadouts, use parameterized URL
-      const params = this.encodeLoadoutToUrl(loadout);
-      // Clear existing loadout-related parameters first
-      const clearParams: Record<string, null> = {};
-      const currentParams = this.getSearchParams();
-      for (const key of currentParams.keys()) {
-        if (key === 'career' || key === 'level' || key === 'renownRank' ||
-            key.startsWith('item.') || key.startsWith('talisman.') ||
-            key === 'loadCharacter') {
-          clearParams[key] = null;
-        }
-      }
-      this.updateUrl({ ...clearParams, ...params }, { replace: true });
     }
+
+    return loadout;
+  }
+
+  // Update URL with current loadout data
+  updateUrlWithLoadout(_loadout: Loadout): void {
+    // No-op while URL handling is unplugged
+    void _loadout;
+    return;
+  }
+
+  // Update URL with dual-mode compare data for sides A and B
+  updateUrlWithCompare(_aLoadout: Loadout | null, _bLoadout: Loadout | null, _activeSide: 'A' | 'B'): void {
+    // No-op while URL handling is unplugged
+    void _aLoadout;
+    void _bLoadout;
+    void _activeSide;
+    return;
   }
 
   // Handle character loading from URL
-  async handleCharacterFromUrl(characterName: string): Promise<void> {
-    try {
-      // Import loadoutService dynamically to avoid circular dependencies
-      const { loadoutService } = await import('./loadoutService');
-
-      const characterId = await loadoutService.loadFromNamedCharacter(characterName);
-
-      // Emit event that character was loaded from URL
-      const event: CharacterLoadedFromUrlEvent = {
-        type: 'CHARACTER_LOADED_FROM_URL',
-        payload: {
-          characterName,
-          characterId,
-        },
-        timestamp: Date.now(),
-      };
-
-      loadoutEventEmitter.emit(event);
-
-    } catch (error) {
-      console.error(`Failed to load character from URL "${characterName}":`, error);
-      throw error;
-    }
+  async handleCharacterFromUrl(_characterName: string): Promise<void> {
+    // Disabled
+    void _characterName;
+    return;
   }
 
   // Handle loadout loading from URL parameters
   async handleLoadoutFromUrlParams(): Promise<void> {
-    try {
-      // Import loadoutService dynamically to avoid circular dependencies
-      const { loadoutService } = await import('./loadoutService');
+    // Disabled
+    return;
+  }
 
-      const loadoutData = this.decodeLoadoutFromUrl();
-
-      // Reset current loadout to start fresh, or create one if none exists
-      const currentLoadout = loadoutService.getCurrentLoadout();
-      if (currentLoadout) {
-        loadoutService.resetCurrentLoadout();
-      } else {
-        loadoutService.createLoadout('Loaded from URL', loadoutData.level, loadoutData.renownRank);
-      }
-
-      // Apply the loadout data to the current loadout
-      if (loadoutData.career) {
-        loadoutService.setCareer(loadoutData.career);
-      }
-      loadoutService.setLevel(loadoutData.level);
-      loadoutService.setRenownRank(loadoutData.renownRank);
-
-      // Apply items and talismans
-      const itemPromises: Promise<void>[] = [];
-      const talismanPromises: Promise<void>[] = [];
-
-      Object.entries(loadoutData.items).forEach(([slot, slotData]) => {
-        if (slotData?.item?.id) {
-          // Load the complete item details and set it
-          itemPromises.push(
-            loadoutService.getItemWithDetails(slotData.item.id).then(item => {
-              if (item) {
-                return loadoutService.updateItem(slot as EquipSlot, item);
-              }
-            })
-          );
-        }
-
-        if (slotData?.talismans) {
-          slotData.talismans.forEach((talisman: { id: string } | null, index: number) => {
-            if (talisman?.id) {
-              talismanPromises.push(
-                loadoutService.getItemWithDetails(talisman.id).then(completeTalisman => {
-                  if (completeTalisman) {
-                    return loadoutService.updateTalisman(slot as EquipSlot, index, completeTalisman);
-                  }
-                })
-              );
-            }
-          });
-        }
-      });
-
-      // Wait for all items and talismans to be loaded and set
-      await Promise.all([...itemPromises, ...talismanPromises]);
-
-      // Emit event that loadout was loaded from URL
-      const event: LoadoutLoadedFromUrlEvent = {
-        type: 'LOADOUT_LOADED_FROM_URL',
-        payload: {
-          loadoutId: 'url-params', // Placeholder ID for URL-loaded loadouts
-        },
-        timestamp: Date.now(),
-      };
-
-      loadoutEventEmitter.emit(event);
-
-    } catch (error) {
-      console.error(`Failed to load loadout from URL parameters:`, error);
-      throw error;
-    }
+  // Handle dual compare state from URL
+  async handleCompareFromUrl(): Promise<void> {
+    // Disabled
+    return;
   }
 
   // Update URL when character is loaded manually
@@ -316,31 +224,20 @@ class UrlService {
 
   // Update URL when loadout is modified (replaces the old updateUrlForLoadout)
   updateUrlForCurrentLoadout(): void {
-    // Import loadoutService dynamically to avoid circular dependencies
-    import('./loadoutService').then(({ loadoutService }) => {
-      const currentLoadout = loadoutService.getCurrentLoadout();
-      if (currentLoadout) {
-        this.updateUrlWithLoadout(currentLoadout);
-      }
-    });
+    // Disabled
+    return;
   }
 
   // Clear character parameter from URL
   clearCharacterFromUrl(): void {
-    this.updateUrl({ loadCharacter: null }, { replace: true });
+    // Disabled
+    return;
   }
 
   // Clear all loadout parameters from URL
   clearLoadoutFromUrl(): void {
-    const clearParams: Record<string, null> = {};
-    const currentParams = this.getSearchParams();
-    for (const key of currentParams.keys()) {
-      if (key === 'career' || key === 'level' || key === 'renownRank' ||
-          key.startsWith('item.') || key.startsWith('talisman.')) {
-        clearParams[key] = null;
-      }
-    }
-    this.updateUrl(clearParams, { replace: true });
+    // Disabled
+    return;
   }
 }
 

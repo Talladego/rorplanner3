@@ -204,6 +204,14 @@ export interface ILoadoutStore {
   getCurrentLoadoutId(): string | null;
   getCurrentLoadout(): Loadout | null;
   getStatsSummary(): StatsSummary;
+  // Mode getters
+  getMode(): LoadoutMode;
+  getActiveSide(): LoadoutSide;
+  getSideLoadoutId(side: LoadoutSide): string | null;
+  getLoadoutForSide(side: LoadoutSide): Loadout | null;
+  // Per-side, per-career mapping
+  getSideCareerLoadoutId(side: LoadoutSide, career: Career): string | null;
+  setSideCareerLoadoutId(side: LoadoutSide, career: Career, loadoutId: string | null): void;
 
   // State setters
   setCareer(career: Career | null): void;
@@ -211,8 +219,17 @@ export interface ILoadoutStore {
   setRenownRank(renownRank: number): void;
   setItem(slot: EquipSlot, item: Item | null): void;
   setTalisman(slot: EquipSlot, index: number, talisman: Item | null): void;
+  setItemForLoadout(loadoutId: string, slot: EquipSlot, item: Item | null): void;
+  setTalismanForLoadout(loadoutId: string, slot: EquipSlot, index: number, talisman: Item | null): void;
+  setCareerForLoadout(loadoutId: string, career: Career | null): void;
+  setLevelForLoadout(loadoutId: string, level: number): void;
+  setRenownForLoadout(loadoutId: string, renownRank: number): void;
   resetCurrentLoadout(): void;
   calculateStats(): void;
+  // Mode setters
+  setMode(mode: LoadoutMode): void;
+  setActiveSide(side: LoadoutSide): void;
+  assignSideLoadout(side: LoadoutSide, loadoutId: string | null): void;
 
   // Loadout management
   createLoadout(name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string): string;
@@ -220,8 +237,12 @@ export interface ILoadoutStore {
   switchLoadout(id: string): Promise<void>;
   markLoadoutAsModified(id: string): void;
   updateLoadoutCharacterStatus(id: string, isFromCharacter: boolean, characterName?: string): void;
-  importFromCharacter(characterId: string): Promise<void>;
+  importFromCharacter(characterId: string, side?: LoadoutSide): Promise<void>;
 }
+
+// Loadout planner modes and sides for compare functionality
+export type LoadoutMode = 'single' | 'dual';
+export type LoadoutSide = 'A' | 'B';
 
 export interface ItemSet {
   id: string;
