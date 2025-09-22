@@ -198,7 +198,7 @@ export default function StatsComparePanel() {
                   <div className="grid grid-cols-[5rem_5rem] gap-3 justify-end">
                     {/* A side (green) value with contribution tooltip */}
                     <HoverTooltip
-                      placement="left"
+                      placement="right"
                       className="cursor-help w-full text-right"
                       content={
                         <div className="max-w-[26rem] whitespace-nowrap overflow-x-auto">
@@ -231,7 +231,7 @@ export default function StatsComparePanel() {
 
                     {/* B side (red) value with contribution tooltip */}
                     <HoverTooltip
-                      placement="left"
+                      placement="right"
                       className="cursor-help w-full text-right"
                       content={
                         <div className="max-w-[26rem] whitespace-nowrap overflow-x-auto">

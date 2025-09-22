@@ -3,7 +3,7 @@ import { ReactNode, useState } from 'react';
 type HoverTooltipProps = {
   content: ReactNode;
   children: ReactNode;
-  placement?: 'left' | 'bottom';
+  placement?: 'left' | 'right' | 'bottom';
   className?: string;
 };
 
@@ -22,7 +22,11 @@ export default function HoverTooltip({ content, children, placement = 'bottom', 
         <span
           className={
             `absolute z-50 max-w-[28rem] rounded-lg bg-gray-900 dark:bg-gray-800 p-2 text-xs leading-snug text-white shadow-lg border border-gray-700 dark:border-gray-600 pointer-events-none ` +
-            (placement === 'left' ? 'right-full mr-2 top-0' : 'left-0 mt-1 tooltip-shift-down')
+            (placement === 'left'
+              ? 'right-full mr-2 top-0'
+              : placement === 'right'
+                ? 'left-full ml-2 top-0'
+                : 'left-0 mt-1 tooltip-shift-down')
           }
           role="tooltip"
         >
