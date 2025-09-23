@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Item, ItemSetBonusValue, ItemStat, Ability, Loadout } from '../types';
-import { formatItemTypeName, formatStatName, formatSlotName, formatCareerName, formatRaceName } from '../utils/formatters';
+import { formatItemTypeName, formatStatName, formatSlotName, formatCareerName, formatRaceName, formatStatValue, isPercentItemStat } from '../utils/formatters';
 import { loadoutService } from '../services/loadoutService';
 
 interface TooltipProps {
@@ -207,12 +207,12 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
                     talisman.rarity === 'RARE' ? 'item-color-rare' :
                     talisman.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
                     talisman.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : ''}`}>{talisman.name}</span>
-                  {talisman.stats && talisman.stats.length > 0 && (
+                      {talisman.stats && talisman.stats.length > 0 && (
                     <span className={`text-gray-400 ${!talismanEligible ? 'text-gray-600' : ''}`}>
                       {' ('}
                       {talisman.stats.map((stat: ItemStat, idx: number) => (
                         <span key={idx}>
-                          +{stat.value} {formatStatName(stat.stat)}{stat.percentage ? '%' : ''}
+                              {formatStatValue(stat.value, isPercentItemStat(stat.stat, stat.percentage))} {formatStatName(stat.stat)}
                           {idx < talisman.stats.length - 1 && <span className="mx-1">/</span>}
                         </span>
                       ))}
@@ -299,7 +299,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
               {displayItem.speed > 0 && <div>{(displayItem.speed / 100).toFixed(1)} Speed</div>}
               {displayItem.stats && displayItem.stats.length > 0 && displayItem.stats.map((stat: ItemStat, idx: number) => (
                 <div key={idx}>
-                  {stat.value > 0 ? '+' : ''}{stat.value} {formatStatName(stat.stat)}{stat.percentage ? '%' : ''}
+                  {formatStatValue(stat.value, isPercentItemStat(stat.stat, stat.percentage))} {formatStatName(stat.stat)}
                 </div>
               ))}
             </div>
@@ -351,9 +351,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
                           // It's an ItemStat
                           const itemStat = bonusValue as ItemStat;
                           const statName = formatStatName(itemStat.stat);
-                          const value = itemStat.value;
-                          const isPercentage = itemStat.percentage;
-                          return <span>+ {value}{isPercentage ? '%' : ''} {statName}</span>;
+                          return <span>{formatStatValue(itemStat.value, isPercentItemStat(itemStat.stat, itemStat.percentage))} {statName}</span>;
                         } else if ('name' in bonusValue || 'description' in bonusValue) {
                           // It's an Ability
                           const ability = bonusValue as Ability;

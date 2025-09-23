@@ -7,6 +7,15 @@ class UrlService {
   private navigateCb: ((path: string, options?: { replace?: boolean }) => void) | null = null;
   // Suppress URL updates while applying state from URL
   private suppressUpdates = false;
+  // Feature flags
+  private autoUpdateEnabled = false; // when false, never mutate the URL as state changes
+  private navigationHandlingEnabled = false; // when false, ignore URL changes after initial load
+
+  // Controls
+  setAutoUpdateEnabled(val: boolean) { this.autoUpdateEnabled = val; }
+  isAutoUpdateEnabled(): boolean { return this.autoUpdateEnabled; }
+  setNavigationHandlingEnabled(val: boolean) { this.navigationHandlingEnabled = val; }
+  isNavigationHandlingEnabled(): boolean { return this.navigationHandlingEnabled; }
 
   // Set the navigation callback (to be called from React components)
   setNavigateCallback(_callback: (path: string, options?: { replace?: boolean }) => void) {
@@ -34,7 +43,7 @@ class UrlService {
 
   // Update the URL with new search parameters
   updateUrl(_params: Record<string, string | null>, _options: { replace?: boolean } = {}) {
-    if (this.suppressUpdates) return;
+    if (this.suppressUpdates || !this.autoUpdateEnabled) return;
     const params = this.getSearchParams();
     // Merge
     Object.entries(_params).forEach(([k, v]) => {
@@ -57,7 +66,7 @@ class UrlService {
     }
   }
 
-  // Encode loadout data into URL parameters
+  // Encode loadout data into URL parameters (dual-mode only; no single-mode keys)
   encodeLoadoutToUrl(loadout: Loadout): Record<string, string> {
     const params: Record<string, string> = {};
 
@@ -99,71 +108,6 @@ class UrlService {
       prefixed[`${prefix}.${k}`] = v;
     });
     return prefixed;
-  }
-
-  // Decode URL parameters into loadout data
-  decodeLoadoutFromUrl(): {
-    career: Career | null;
-    level: number;
-    renownRank: number;
-    items: Record<string, {
-      item: { id: string } | null;
-      talismans: ({ id: string } | null)[];
-    }>;
-  } {
-    const params = this.getSearchParams();
-    const loadout = {
-      career: null as Career | null,
-      level: 40,
-      renownRank: 80,
-      items: {} as Record<string, {
-        item: { id: string } | null;
-        talismans: ({ id: string } | null)[];
-      }>
-    };
-
-    // Decode basic fields
-    const careerParam = params.get('career');
-    if (careerParam) {
-      loadout.career = careerParam as Career;
-    }
-
-    const levelParam = params.get('level');
-    if (levelParam) {
-      loadout.level = parseInt(levelParam, 10);
-    }
-
-    const renownParam = params.get('renownRank');
-    if (renownParam) {
-      loadout.renownRank = parseInt(renownParam, 10);
-    }
-
-    // Decode items and talismans
-    for (const [key, value] of params.entries()) {
-      if (key.startsWith('item.')) {
-        const slot = key.substring(5); // Remove 'item.' prefix
-        if (!loadout.items[slot]) {
-          loadout.items[slot] = { item: null, talismans: [] };
-        }
-        loadout.items[slot].item = { id: value };
-      } else if (key.startsWith('talisman.')) {
-        const parts = key.split('.');
-        if (parts.length === 3) {
-          const slot = parts[1];
-          const index = parseInt(parts[2], 10);
-          if (!loadout.items[slot]) {
-            loadout.items[slot] = { item: null, talismans: [] };
-          }
-          if (!loadout.items[slot].talismans[index]) {
-            loadout.items[slot].talismans[index] = { id: value };
-          } else {
-            loadout.items[slot].talismans[index] = { id: value };
-          }
-        }
-      }
-    }
-
-    return loadout;
   }
 
   // Decode prefixed loadout parameters (for compare sides)
@@ -214,14 +158,9 @@ class UrlService {
     return loadout;
   }
 
-  // Update URL with current loadout data
-  updateUrlWithLoadout(_loadout: Loadout): void {
-    const params = this.encodeLoadoutToUrl(_loadout);
-    this.updateUrl({ ...params, mode: null, activeSide: null });
-  }
-
   // Update URL with dual-mode compare data for sides A and B
   updateUrlWithCompare(_aLoadout: Loadout | null, _bLoadout: Loadout | null, _activeSide: 'A' | 'B'): void {
+    if (!this.autoUpdateEnabled) return;
     const params: Record<string, string | null> = {};
     const current = this.getSearchParams();
     // Start by clearing all A/B-prefixed params and loadCharacterA/B to avoid leftovers
@@ -230,22 +169,17 @@ class UrlService {
         params[key] = null; // mark for deletion
       }
     }
+    // Back-compat: clear legacy character flags; we won't write them anymore
     params.loadCharacterA = null;
     params.loadCharacterB = null;
 
     if (_aLoadout) {
-      if (_aLoadout.isFromCharacter && _aLoadout.characterName) {
-        params.loadCharacterA = _aLoadout.characterName;
-      } else {
-        Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', _aLoadout));
-      }
+      // Always snapshot A into URL for reliable sharing
+      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', _aLoadout));
     }
     if (_bLoadout) {
-      if (_bLoadout.isFromCharacter && _bLoadout.characterName) {
-        params.loadCharacterB = _bLoadout.characterName;
-      } else {
-        Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', _bLoadout));
-      }
+      // Always snapshot B into URL for reliable sharing
+      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', _bLoadout));
     }
     this.updateUrl(params, { replace: true });
   }
@@ -262,104 +196,29 @@ class UrlService {
     }
   }
 
-  // Handle loadout loading from URL parameters
-  async handleLoadoutFromUrlParams(): Promise<void> {
-    const decoded = this.decodeLoadoutFromUrl();
-    if (!decoded) return;
-    this.suppressUpdates = true;
-    try {
-      // Apply to active side (default 'A')
-      const side: LoadoutSide = 'A';
-      const id = await loadoutService.selectSideForEdit(side);
-      const char = this.getParam('loadCharacter');
-      // Core fields
-      loadoutService.setLevelForLoadout(id, decoded.level);
-      loadoutService.setRenownForLoadout(id, decoded.renownRank);
-      loadoutService.setCareerForLoadout(id, decoded.career);
-      if (char) {
-        loadoutService.setCharacterStatusForLoadout(id, true, char);
-      }
-      // Items and talismans
-      const itemPromises: Promise<void>[] = [];
-      Object.entries(decoded.items).forEach(([slotKey, data]) => {
-        const slot = slotKey as unknown as EquipSlot;
-        if (data.item?.id) {
-          itemPromises.push(
-            (async () => {
-              const item = await loadoutService.getItemWithDetails(data.item!.id);
-              await loadoutService.updateItemForLoadout(id, slot, item);
-            })()
-          );
-        }
-        data.talismans.forEach((t, idx) => {
-          if (t?.id) {
-            itemPromises.push(
-              (async () => {
-                const tal = await loadoutService.getItemWithDetails(t.id);
-                await loadoutService.updateTalismanForLoadout(id, slot, idx, tal);
-              })()
-            );
-          }
-        });
-      });
-      await Promise.all(itemPromises);
-      // Ensure URL reflects single loadout form
-      this.updateUrlWithLoadout(loadoutStoreAdapter.getLoadoutForSide(side)!);
-    } finally {
-      this.suppressUpdates = false;
-    }
-  }
-
   // Handle dual compare state from URL
   async handleCompareFromUrl(): Promise<void> {
     const params = this.getSearchParams();
     const a = this.decodeLoadoutFromUrlWithPrefix('a');
     const b = this.decodeLoadoutFromUrlWithPrefix('b');
-    const keys = Array.from(params.keys());
-    const hasSingle = !!(params.get('career') || params.get('level') || keys.some(k => k.startsWith('item.') || k.startsWith('talisman.')) || params.get('loadCharacter'));
     const charA = params.get('loadCharacterA');
     const charB = params.get('loadCharacterB');
-    if (!a && !b && !hasSingle && !charA && !charB) return;
+    if (!a && !b && !charA && !charB) return;
     // Backward-compat: accept activeSide from older links, default to 'A'
     const active = (params.get('activeSide') === 'b' ? 'B' : 'A') as LoadoutSide;
     this.suppressUpdates = true;
     try {
-      // Fallback: treat legacy single-mode params as side A
-      if (!a && !b && hasSingle) {
-        const s = this.decodeLoadoutFromUrl();
-        const aId = await loadoutService.selectSideForEdit('A');
-        // Ensure mapping to A explicitly before applying
-        loadoutService.assignSideLoadout('A', aId);
-  loadoutService.setLevelForLoadout(aId, s.level);
-        loadoutService.setRenownForLoadout(aId, s.renownRank);
-        loadoutService.setCareerForLoadout(aId, s.career);
-        const char = params.get('loadCharacter');
-        if (char) loadoutService.setCharacterStatusForLoadout(aId, true, char);
-        const tasks: Promise<void>[] = [];
-        Object.entries(s.items).forEach(([slotKey, data]) => {
-          const slot = slotKey as unknown as EquipSlot;
-          if (data.item?.id) {
-            tasks.push((async () => {
-              const item = await loadoutService.getItemWithDetails(data.item!.id);
-              await loadoutService.updateItemForLoadout(aId, slot, item);
-            })());
-          }
-          data.talismans.forEach((t, idx) => {
-            if (t?.id) {
-              tasks.push((async () => {
-                const tal = await loadoutService.getItemWithDetails(t.id);
-                await loadoutService.updateTalismanForLoadout(aId, slot, idx, tal);
-              })());
-            }
-          });
-        });
-        await Promise.all(tasks);
-        // Ensure a B loadout exists for compare mode
+      // Prevent mode flips while we apply URL-driven state
+      loadoutService.beginBulkApply();
+      // If only one side is present in URL, explicitly clear the other side mapping to avoid accidental mirroring
+      const hasA = !!a || !!params.get('loadCharacterA');
+      const hasB = !!b || !!params.get('loadCharacterB');
+      if (hasA && !hasB) {
+        // Ensure side B has a default empty loadout so the panel renders normally
         loadoutService.ensureSideLoadout('B');
-        const aLoadout = loadoutStoreAdapter.getLoadoutForSide('A');
-        const bLoadout = loadoutStoreAdapter.getLoadoutForSide('B');
-        this.updateUrlWithCompare(aLoadout, bLoadout, 'A');
-        return;
+      } else if (hasB && !hasA) {
+        // Ensure side A has a default empty loadout so the panel renders normally
+        loadoutService.ensureSideLoadout('A');
       }
       // Apply A (prefer explicit A params over character flag)
       if (a) {
@@ -370,25 +229,21 @@ class UrlService {
         loadoutService.setCareerForLoadout(aId, a.career);
         const charAFlag = params.get('loadCharacterA');
         if (charAFlag) loadoutService.setCharacterStatusForLoadout(aId, true, charAFlag);
-        const tasks: Promise<void>[] = [];
-        Object.entries(a.items).forEach(([slotKey, data]) => {
+        const perSlotA = Object.entries(a.items).map(([slotKey, data]) => (async () => {
           const slot = slotKey as unknown as EquipSlot;
           if (data.item?.id) {
-            tasks.push((async () => {
-              const item = await loadoutService.getItemWithDetails(data.item!.id);
-              await loadoutService.updateItemForLoadout(aId, slot, item);
-            })());
+            const item = await loadoutService.getItemWithDetails(data.item.id);
+            await loadoutService.updateItemForLoadout(aId, slot, item);
           }
-          data.talismans.forEach((t, idx) => {
+          for (let idx = 0; idx < data.talismans.length; idx++) {
+            const t = data.talismans[idx];
             if (t?.id) {
-              tasks.push((async () => {
-                const tal = await loadoutService.getItemWithDetails(t.id);
-                await loadoutService.updateTalismanForLoadout(aId, slot, idx, tal);
-              })());
+              const tal = await loadoutService.getItemWithDetails(t.id);
+              await loadoutService.updateTalismanForLoadout(aId, slot, idx, tal);
             }
-          });
-        });
-        await Promise.all(tasks);
+          }
+        })());
+        await Promise.all(perSlotA);
       } else if (charA) {
         // State 1: load character to side A
         const aId = await loadoutService.selectSideForEdit('A');
@@ -404,25 +259,21 @@ class UrlService {
         loadoutService.setCareerForLoadout(bId, b.career);
         const charBFlag = params.get('loadCharacterB');
         if (charBFlag) loadoutService.setCharacterStatusForLoadout(bId, true, charBFlag);
-        const tasks: Promise<void>[] = [];
-        Object.entries(b.items).forEach(([slotKey, data]) => {
+        const perSlotB = Object.entries(b.items).map(([slotKey, data]) => (async () => {
           const slot = slotKey as unknown as EquipSlot;
           if (data.item?.id) {
-            tasks.push((async () => {
-              const item = await loadoutService.getItemWithDetails(data.item!.id);
-              await loadoutService.updateItemForLoadout(bId, slot, item);
-            })());
+            const item = await loadoutService.getItemWithDetails(data.item.id);
+            await loadoutService.updateItemForLoadout(bId, slot, item);
           }
-          data.talismans.forEach((t, idx) => {
+          for (let idx = 0; idx < data.talismans.length; idx++) {
+            const t = data.talismans[idx];
             if (t?.id) {
-              tasks.push((async () => {
-                const tal = await loadoutService.getItemWithDetails(t.id);
-                await loadoutService.updateTalismanForLoadout(bId, slot, idx, tal);
-              })());
+              const tal = await loadoutService.getItemWithDetails(t.id);
+              await loadoutService.updateTalismanForLoadout(bId, slot, idx, tal);
             }
-          });
-        });
-        await Promise.all(tasks);
+          }
+        })());
+        await Promise.all(perSlotB);
       } else if (charB) {
         // State 1: load character to side B
         const bId = await loadoutService.selectSideForEdit('B');
@@ -434,15 +285,11 @@ class UrlService {
       // Normalize URL to reflect full compare state
       const aLoadout = loadoutStoreAdapter.getLoadoutForSide('A');
       const bLoadout = loadoutStoreAdapter.getLoadoutForSide('B');
-      this.updateUrlWithCompare(aLoadout, bLoadout, active);
+  if (this.autoUpdateEnabled) this.updateUrlWithCompare(aLoadout, bLoadout, active);
     } finally {
       this.suppressUpdates = false;
+      loadoutService.endBulkApply();
     }
-  }
-
-  // Update URL when character is loaded manually
-  updateUrlForCharacter(characterName: string): void {
-    this.updateUrl({ loadCharacter: characterName }, { replace: true });
   }
 
   // Update URL when loadout is modified (replaces the old updateUrlForLoadout)
@@ -497,18 +344,12 @@ class UrlService {
     } catch {}
     const params: Record<string, string | null> = {};
     if (a) {
-      if (a.isFromCharacter && a.characterName) {
-        params.loadCharacterA = a.characterName;
-      } else {
-        Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', a));
-      }
+      // Always include full snapshot of side A for share stability
+      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', a));
     }
     if (b) {
-      if (b.isFromCharacter && b.characterName) {
-        params.loadCharacterB = b.characterName;
-      } else {
-        Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', b));
-      }
+      // Always include full snapshot of side B for share stability
+      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', b));
     }
     const qs = new URLSearchParams(Object.entries(params).filter(([,v]) => v != null) as [string,string][]).toString();
     return `${base}#/?${qs}`;

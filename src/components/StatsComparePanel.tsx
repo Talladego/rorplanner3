@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadoutService } from '../services/loadoutService';
-import { formatCamelCase } from '../utils/formatters';
+import { formatCamelCase, formatStatValue, isPercentSummaryKey } from '../utils/formatters';
 import HoverTooltip from './HoverTooltip';
 import type { StatsSummary } from '../types';
 import { urlService } from '../services/urlService';
 
-function formatStatValue(value: number, isPercentage: boolean = false): string {
-  if (isPercentage) {
-    return `${value > 0 ? '+' : ''}${value}%`;
-  }
-  return value > 0 ? `+${value}` : value.toString();
-}
+// Per-UI helpers moved to formatters for reuse across components
 
 export default function StatsComparePanel() {
   const [aId, setAId] = useState<string | null>(loadoutService.getSideLoadoutId('A'));
@@ -123,9 +118,9 @@ export default function StatsComparePanel() {
 
   // Removed A/B equipped counts and related helpers per request
 
-  type Row = { key: string; a: number; b: number; isPercentage?: boolean };
-  const makeRows = (defs: Array<{ key: keyof StatsSummary; isPercentage?: boolean }>): Row[] =>
-    defs.map(d => ({ key: d.key as string, a: statsA[d.key], b: statsB[d.key], isPercentage: d.isPercentage }))
+  type Row = { key: string; a: number; b: number };
+  const makeRows = (defs: Array<{ key: keyof StatsSummary }>): Row[] =>
+    defs.map(d => ({ key: d.key as string, a: statsA[d.key], b: statsB[d.key] }))
         .filter(r => r.a !== 0 || r.b !== 0);
 
   const baseDefs = [
@@ -144,10 +139,11 @@ export default function StatsComparePanel() {
     { key: 'spiritResistance' as const },
     { key: 'elementalResistance' as const },
     { key: 'corporealResistance' as const },
-    { key: 'block' as const, isPercentage: true },
-    { key: 'parry' as const, isPercentage: true },
-    { key: 'evade' as const, isPercentage: true },
-    { key: 'disrupt' as const, isPercentage: true },
+    { key: 'block' as const },
+    { key: 'parry' as const },
+    { key: 'evade' as const },
+    { key: 'disrupt' as const },
+    { key: 'incomingDamagePercent' as const },
     { key: 'criticalDamageTakenReduction' as const },
     { key: 'armorPenetrationReduction' as const },
     { key: 'criticalHitRateReduction' as const },
@@ -157,23 +153,24 @@ export default function StatsComparePanel() {
   const combatDefs = [
     { key: 'armorPenetration' as const },
     { key: 'criticalDamage' as const },
-    { key: 'criticalHitRate' as const, isPercentage: true },
+    { key: 'criticalHitRate' as const },
     { key: 'meleePower' as const },
-    { key: 'meleeCritRate' as const, isPercentage: true },
+    { key: 'meleeCritRate' as const },
     { key: 'rangedPower' as const },
-    { key: 'rangedCritRate' as const, isPercentage: true },
+    { key: 'rangedCritRate' as const },
     { key: 'autoAttackSpeed' as const },
     { key: 'autoAttackDamage' as const },
     { key: 'blockStrikethrough' as const },
     { key: 'parryStrikethrough' as const },
     { key: 'evadeStrikethrough' as const },
+    { key: 'outgoingDamagePercent' as const },
   ];
 
   const magicDefs = [
     { key: 'magicPower' as const },
-    { key: 'magicCritRate' as const, isPercentage: true },
+    { key: 'magicCritRate' as const },
     { key: 'healingPower' as const },
-    { key: 'healCritRate' as const, isPercentage: true },
+    { key: 'healCritRate' as const },
     { key: 'disruptStrikethrough' as const },
   ];
 
@@ -181,6 +178,8 @@ export default function StatsComparePanel() {
     { key: 'actionPointRegen' as const },
     { key: 'healthRegen' as const },
     { key: 'moraleRegen' as const },
+    { key: 'outgoingHealPercent' as const },
+    { key: 'incomingHealPercent' as const },
     { key: 'goldLooted' as const },
     { key: 'xpReceived' as const },
     { key: 'renownReceived' as const },
@@ -206,7 +205,12 @@ export default function StatsComparePanel() {
         <h3 className="stats-section-title">{title}</h3>
         <div className="space-y-0.5">
           {rows.length > 0 ? (
-            rows.map(r => (
+            rows.map(r => {
+              // Determine if this row should render in percentage based on known percent stats or if any contribution is percentage
+              const aContrib = aId ? loadoutService.getStatContributionsForLoadout(aId, r.key) : [];
+              const bContrib = bId ? loadoutService.getStatContributionsForLoadout(bId, r.key) : [];
+              const isPercentRow = isPercentSummaryKey(r.key, [...aContrib, ...bContrib]);
+              return (
               <div key={r.key} className="stats-row rounded px-1 -mx-1 hover:bg-gray-800/60 hover:ring-1 hover:ring-gray-700 transition-colors">
                 <span className="text-xs">{formatCamelCase(r.key)}:</span>
                 <span className="stats-label font-medium text-xs">
@@ -220,8 +224,7 @@ export default function StatsComparePanel() {
                           <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatCamelCase(r.key)} — A Contribution</div>
                           <ul className="space-y-0.5">
                             {(() => {
-                              const contributions = aId ? loadoutService.getStatContributionsForLoadout(aId, r.key) : [];
-                              const isPercentRow = !!r.isPercentage || contributions.some(c => c.percentage);
+                              const contributions = aContrib;
                               if (contributions.length === 0) {
                                 return <li className="text-[11px] text-gray-400">No contributors</li>;
                               }
@@ -241,7 +244,7 @@ export default function StatsComparePanel() {
                         </div>
                       }
                     >
-                      <span className={`text-right inline-block w-20 whitespace-nowrap tabular-nums ${r.a > r.b ? 'font-bold text-green-300' : 'text-green-400'}`}>{formatStatValue(r.a, !!r.isPercentage)}</span>
+                      <span className={`text-right inline-block w-20 whitespace-nowrap tabular-nums ${r.a > r.b ? 'font-bold text-green-300' : 'text-green-400'}`}>{formatStatValue(r.a, isPercentRow)}</span>
                     </HoverTooltip>
 
                     {/* B side (red) value with contribution tooltip */}
@@ -253,8 +256,7 @@ export default function StatsComparePanel() {
                           <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatCamelCase(r.key)} — B Contribution</div>
                           <ul className="space-y-0.5">
                             {(() => {
-                              const contributions = bId ? loadoutService.getStatContributionsForLoadout(bId, r.key) : [];
-                              const isPercentRow = !!r.isPercentage || contributions.some(c => c.percentage);
+                              const contributions = bContrib;
                               if (contributions.length === 0) {
                                 return <li className="text-[11px] text-gray-400">No contributors</li>;
                               }
@@ -274,12 +276,13 @@ export default function StatsComparePanel() {
                         </div>
                       }
                     >
-                      <span className={`text-right inline-block w-20 whitespace-nowrap tabular-nums ${r.b > r.a ? 'font-bold text-red-300' : 'text-red-400'}`}>{formatStatValue(r.b, !!r.isPercentage)}</span>
+                      <span className={`text-right inline-block w-20 whitespace-nowrap tabular-nums ${r.b > r.a ? 'font-bold text-red-300' : 'text-red-400'}`}>{formatStatValue(r.b, isPercentRow)}</span>
                     </HoverTooltip>
                   </div>
                 </span>
               </div>
-            ))
+            );
+            })
           ) : (
             title === 'Base Stats' ? null : (
               <div className="text-xs text-muted italic">No {title.toLowerCase()} bonuses</div>

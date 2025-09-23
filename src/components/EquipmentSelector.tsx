@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { EquipSlot, Item, Stat, CAREER_RACE_MAPPING, Career, ItemRarity } from '../types';
 import { useLoadoutData } from '../hooks/useLoadoutData';
 import { loadoutService } from '../services/loadoutService';
-import { formatSlotName, formatStatName, formatItemTypeName } from '../utils/formatters';
+import { formatSlotName, formatStatName, formatItemTypeName, formatStatValue, isPercentItemStat } from '../utils/formatters';
 import Tooltip from './Tooltip';
 import { useLoadoutById } from '../hooks/useLoadoutById';
 
@@ -32,7 +32,7 @@ function formatTalismanStats(item: any): string {
   
   // Talismans typically have one primary stat
   const primaryStat = item.stats[0];
-  const value = primaryStat.percentage ? `${primaryStat.value}%` : `+${primaryStat.value}`;
+  const value = formatStatValue(primaryStat.value, isPercentItemStat(primaryStat.stat, primaryStat.percentage));
   const statName = formatStatName(primaryStat.stat);
   
   return `${value} ${statName}`;

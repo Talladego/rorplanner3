@@ -324,7 +324,7 @@ export const loadoutService = {
     loadoutStoreAdapter.setActiveSide(side);
     loadoutEventEmitter.emit({ type: 'ACTIVE_SIDE_CHANGED', payload: { side }, timestamp: Date.now() });
     // Update URL with new active side
-  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
   assignSideLoadout(side: LoadoutSide, loadoutId: string | null) {
     // Dual-only: ensure A and B don't point to the same loadout id
@@ -347,7 +347,7 @@ export const loadoutService = {
     }
     loadoutEventEmitter.emit({ type: 'SIDE_LOADOUT_ASSIGNED', payload: { side, loadoutId }, timestamp: Date.now() });
     // Update URL to include the newly assigned side
-  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
   getSideLoadoutId(side: LoadoutSide): string | null {
     return loadoutStoreAdapter.getSideLoadoutId(side);
@@ -390,7 +390,11 @@ export const loadoutService = {
   // Helper: pick a side to edit, ensure it exists, and switch to it (dual-only app)
   async selectSideForEdit(side: LoadoutSide): Promise<string> {
     this.setActiveSide(side);
-    const id = this.ensureSideLoadout(side);
+    // Prefer existing assignment; only create if truly missing
+    let id = this.getSideLoadoutId(side);
+    if (!id) {
+      id = this.ensureSideLoadout(side);
+    }
     await this.switchLoadout(id);
     return id;
   },
@@ -400,6 +404,27 @@ export const loadoutService = {
   _itemDetailsCacheLimit: 200,
   // Guard to indicate character import is in progress
   _isCharacterLoading: false as boolean,
+  // Internal helper: if the referenced loadout was loaded from a character, mark it as modified
+  _maybeMarkLoadoutAsModified(loadoutId?: string) {
+    try {
+      if (this._isCharacterLoading) return;
+      const id = loadoutId ?? loadoutStoreAdapter.getCurrentLoadoutId();
+      if (!id) return;
+      const lo = loadoutStoreAdapter.getLoadouts().find(l => l.id === id);
+      if (lo && lo.isFromCharacter) {
+        loadoutStoreAdapter.markLoadoutAsModified(id);
+      }
+    } catch {
+      // best-effort; ignore
+    }
+  },
+  // Public guard for bulk apply (e.g., URL decoding flows)
+  beginBulkApply() {
+    this._isCharacterLoading = true;
+  },
+  endBulkApply() {
+    this._isCharacterLoading = false;
+  },
 
   // 1. Load data from named character
   async loadFromNamedCharacter(characterName: string) {
@@ -490,7 +515,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
 
   async updateItemForLoadout(loadoutId: string, slot: EquipSlot, item: Item | null) {
@@ -503,9 +528,11 @@ export const loadoutService = {
     }
 
     loadoutStoreAdapter.setItemForLoadout(loadoutId, slot, item);
+    // If this loadout came from a character, any change flips to non-character mode
+    this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'ITEM_UPDATED', payload: { slot, item }, timestamp: Date.now() });
     this.getStatsSummary();
-    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
 
   async updateTalisman(slot: EquipSlot, index: number, talisman: Item | null) {
@@ -526,11 +553,13 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
 
   async updateTalismanForLoadout(loadoutId: string, slot: EquipSlot, index: number, talisman: Item | null) {
     loadoutStoreAdapter.setTalismanForLoadout(loadoutId, slot, index, talisman);
+    // Any change breaks character mode
+    this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'TALISMAN_UPDATED', payload: { slot, index, talisman }, timestamp: Date.now() });
     this.getStatsSummary();
     if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
@@ -874,7 +903,7 @@ export const loadoutService = {
     }
 
     // Update URL with current loadout state
-  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
 
   async setLevel(level: number) {
@@ -896,7 +925,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
 
   async setRenownRank(renownRank: number) {
@@ -918,7 +947,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
 
   createLoadout(name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string) {
@@ -948,7 +977,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with the new loadout state
-  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
 
   async resetCurrentLoadout() {
@@ -1142,36 +1171,42 @@ export const loadoutService = {
     } finally {
       // End import guard and update URL once
       this._isCharacterLoading = false;
-      urlService.updateUrlForCurrentLoadout();
+  if (urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
     }},
 
   // Per-loadout setters used by compare flows
   setCareerForLoadout(loadoutId: string, career: Career | null) {
     loadoutStoreAdapter.setCareerForLoadout(loadoutId, career);
+    this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'CAREER_CHANGED', payload: { career }, timestamp: Date.now() });
     this.getStatsSummary();
-    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
   setLevelForLoadout(loadoutId: string, level: number) {
     loadoutStoreAdapter.setLevelForLoadout(loadoutId, level);
+    this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'LEVEL_CHANGED', payload: { level }, timestamp: Date.now() });
     this.getStatsSummary();
-    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
   setRenownForLoadout(loadoutId: string, renownRank: number) {
     loadoutStoreAdapter.setRenownForLoadout(loadoutId, renownRank);
+    this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'RENOWN_RANK_CHANGED', payload: { renownRank }, timestamp: Date.now() });
     this.getStatsSummary();
-    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
   setLoadoutNameForLoadout(loadoutId: string, name: string) {
     loadoutStoreAdapter.setLoadoutNameForLoadout(loadoutId, name);
+    // Renaming should also exit character mode
+    this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'LOADOUT_SWITCHED', payload: { loadoutId }, timestamp: Date.now() });
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
   setCharacterStatusForLoadout(loadoutId: string, isFromCharacter: boolean, characterName?: string) {
     loadoutStoreAdapter.updateLoadoutCharacterStatus(loadoutId, isFromCharacter, characterName);
     loadoutEventEmitter.emit({ type: 'LOADOUT_SWITCHED', payload: { loadoutId }, timestamp: Date.now() });
-    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
 
   // Clone an existing loadout to a new id

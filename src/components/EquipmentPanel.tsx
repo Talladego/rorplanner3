@@ -20,7 +20,9 @@ interface EquipmentPanelProps {
 export default function EquipmentPanel({ selectedCareer, loadoutId, compact = false, iconOnly = false, hideHeading = false }: EquipmentPanelProps) {
   const { currentLoadout } = useLoadoutData();
   const { loadout } = useLoadoutById(loadoutId ?? null);
-  const effectiveLoadout = loadoutId ? loadout : currentLoadout;
+  // Important: if loadoutId is explicitly provided (even null), don't fallback to currentLoadout.
+  // This ensures Dual layout doesn't mirror side A into side B when B has no assigned loadout.
+  const effectiveLoadout = (loadoutId !== undefined) ? loadout : currentLoadout;
   const [selectedSlot, setSelectedSlot] = useState<EquipSlot | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -105,7 +107,13 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
     }
   };
 
-  if (!effectiveLoadout) return <div>Loading...</div>;
+  // If no loadout is assigned for this panel (e.g., only the other side was provided in the URL),
+  // render a simple empty-state message instead of a loading indicator.
+  if (!effectiveLoadout) {
+    return (
+      <div className="text-xs text-muted italic p-2">No loadout assigned for this side.</div>
+    );
+  }
 
   // Custom slot order for the desired layout
   const slotOrder = [

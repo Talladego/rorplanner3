@@ -103,3 +103,53 @@ export function formatItemTypeName(type: ItemType): string {
 export function formatStatName(stat: Stat): string {
   return formatEnumValue(stat);
 }
+
+/**
+ * Formats a numeric stat value with optional percent sign and leading '+' for positives.
+ */
+export function formatStatValue(value: number, asPercent = false): string {
+  if (asPercent) return `${value > 0 ? '+' : ''}${value}%`;
+  return value > 0 ? `+${value}` : String(value);
+}
+
+/**
+ * Known StatsSummary keys that should be displayed as percentages in UI rows.
+ * These are the camelCase keys used in StatsSummary (not the SCREAMING_SNAKE_CASE Stat enum).
+ */
+export const PERCENT_SUMMARY_KEYS = new Set<string>([
+  'block', 'parry', 'evade', 'disrupt',
+  'criticalHitRate', 'meleeCritRate', 'rangedCritRate', 'magicCritRate', 'healCritRate',
+  'incomingDamagePercent', 'outgoingDamagePercent',
+  'outgoingHealPercent', 'incomingHealPercent',
+  'blockStrikethrough', 'parryStrikethrough', 'evadeStrikethrough', 'disruptStrikethrough',
+  'armorPenetrationReduction', 'criticalDamageTakenReduction', 'criticalHitRateReduction',
+  'autoAttackSpeed', 'autoAttackDamage',
+]);
+
+/**
+ * Decide if a StatsSummary row should render as a percent, given its key and optional contributions.
+ */
+export function isPercentSummaryKey(key: string, contributions?: Array<{ percentage?: boolean }>): boolean {
+  if (PERCENT_SUMMARY_KEYS.has(key)) return true;
+  if (contributions && contributions.some(c => !!c.percentage)) return true;
+  return false;
+}
+
+/**
+ * Decide if an item stat line should render as percent. The `percentage` flag from data is authoritative.
+ * If missing, we fallback to a small allowlist of inherently percentage-based Stat enums.
+ */
+export function isPercentItemStat(stat: Stat, percentageFlag?: boolean): boolean {
+  if (percentageFlag != null) return !!percentageFlag;
+  const percentEnumFallback = new Set<Stat>([
+    Stat.BLOCK, Stat.PARRY, Stat.EVADE, Stat.DISRUPT,
+    Stat.CRITICAL_HIT_RATE, Stat.MELEE_CRIT_RATE, Stat.RANGED_CRIT_RATE, Stat.MAGIC_CRIT_RATE, Stat.HEAL_CRIT_RATE,
+    Stat.OUTGOING_DAMAGE_PERCENT, Stat.INCOMING_DAMAGE_PERCENT,
+    Stat.OUTGOING_HEAL_PERCENT, Stat.INCOMING_HEAL_PERCENT,
+    Stat.BLOCK_STRIKETHROUGH, Stat.PARRY_STRIKETHROUGH, Stat.EVADE_STRIKETHROUGH, Stat.DISRUPT_STRIKETHROUGH,
+    Stat.ARMOR_PENETRATION_REDUCTION, Stat.CRITICAL_DAMAGE_TAKEN_REDUCTION, Stat.CRITICAL_HIT_RATE_REDUCTION,
+    // Treat auto-attack modifiers as percentages for item stat display to match compare panel semantics
+    Stat.AUTO_ATTACK_SPEED, Stat.AUTO_ATTACK_DAMAGE,
+  ]);
+  return percentEnumFallback.has(stat);
+}

@@ -19,6 +19,12 @@ function App() {
     urlService.setNavigateCallback(navigate);
   }, [navigate]);
 
+  // Explicitly disable automatic URL mutation and navigation-driven parsing by default
+  useEffect(() => {
+    urlService.setAutoUpdateEnabled(false);
+    urlService.setNavigationHandlingEnabled(false);
+  }, []);
+
   // Subscribe to URL-related events
   useEffect(() => {
     const unsubscribe = loadoutEventEmitter.subscribe('CHARACTER_LOADED_FROM_URL', () => {
@@ -58,9 +64,7 @@ function App() {
   // Handle URL parameters on app initialization
   useEffect(() => {
     const keys = Array.from(urlService.getSearchParams().keys());
-    const loadCharacter = urlService.getParam('loadCharacter');
-    const hasCompareParams = keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB')
-      || !!(urlService.getParam('career') || urlService.getParam('level') || loadCharacter || keys.some(key => key.startsWith('item.') || key.startsWith('talisman.')));
+    const hasCompareParams = keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
 
     if (hasCompareParams) {
       // Load dual compare state from URL
@@ -80,10 +84,10 @@ function App() {
 
   // Handle URL changes (when user navigates back/forward or pastes new URL)
   useEffect(() => {
+    // Respect feature flag: by default, do not handle URL changes after initial load
+    if (!urlService.isNavigationHandlingEnabled()) return;
     const keys = Array.from(urlService.getSearchParams().keys());
-    const loadCharacter = urlService.getParam('loadCharacter');
-    const hasCompareParams = keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB')
-      || !!(urlService.getParam('career') || urlService.getParam('level') || loadCharacter || keys.some(key => key.startsWith('item.') || key.startsWith('talisman.')));
+    const hasCompareParams = keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
 
     // Only load if there are parameters and we're not in an error state
     if (hasCompareParams && !errorMessage.includes('Failed to load compare')) {
