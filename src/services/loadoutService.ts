@@ -324,7 +324,7 @@ export const loadoutService = {
     loadoutStoreAdapter.setActiveSide(side);
     loadoutEventEmitter.emit({ type: 'ACTIVE_SIDE_CHANGED', payload: { side }, timestamp: Date.now() });
     // Update URL with new active side
-  urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
   assignSideLoadout(side: LoadoutSide, loadoutId: string | null) {
     // Dual-only: ensure A and B don't point to the same loadout id
@@ -347,7 +347,7 @@ export const loadoutService = {
     }
     loadoutEventEmitter.emit({ type: 'SIDE_LOADOUT_ASSIGNED', payload: { side, loadoutId }, timestamp: Date.now() });
     // Update URL to include the newly assigned side
-  urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
   getSideLoadoutId(side: LoadoutSide): string | null {
     return loadoutStoreAdapter.getSideLoadoutId(side);
@@ -398,6 +398,9 @@ export const loadoutService = {
   _itemDetailsCache: new Map<string, Item | null>(),
   _itemDetailsInflight: new Map<string, Promise<Item | null>>(),
   _itemDetailsCacheLimit: 200,
+  // Guard to indicate character import is in progress
+  _isCharacterLoading: false as boolean,
+
   // 1. Load data from named character
   async loadFromNamedCharacter(characterName: string) {
     try {
@@ -479,7 +482,7 @@ export const loadoutService = {
 
     // Mark loadout as no longer from character if it was
     const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
-    if (currentLoadout && currentLoadout.isFromCharacter) {
+    if (!this._isCharacterLoading && currentLoadout && currentLoadout.isFromCharacter) {
       loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
     }
 
@@ -487,7 +490,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-  urlService.updateUrlForCurrentLoadout();
+    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
 
   async updateItemForLoadout(loadoutId: string, slot: EquipSlot, item: Item | null) {
@@ -502,7 +505,7 @@ export const loadoutService = {
     loadoutStoreAdapter.setItemForLoadout(loadoutId, slot, item);
     loadoutEventEmitter.emit({ type: 'ITEM_UPDATED', payload: { slot, item }, timestamp: Date.now() });
     this.getStatsSummary();
-  urlService.updateUrlForCurrentLoadout();
+    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
 
   async updateTalisman(slot: EquipSlot, index: number, talisman: Item | null) {
@@ -515,7 +518,7 @@ export const loadoutService = {
 
     // Mark loadout as no longer from character if it was
     const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
-    if (currentLoadout && currentLoadout.isFromCharacter) {
+    if (!this._isCharacterLoading && currentLoadout && currentLoadout.isFromCharacter) {
       loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
     }
 
@@ -523,14 +526,14 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-  urlService.updateUrlForCurrentLoadout();
+    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
 
   async updateTalismanForLoadout(loadoutId: string, slot: EquipSlot, index: number, talisman: Item | null) {
     loadoutStoreAdapter.setTalismanForLoadout(loadoutId, slot, index, talisman);
     loadoutEventEmitter.emit({ type: 'TALISMAN_UPDATED', payload: { slot, index, talisman }, timestamp: Date.now() });
     this.getStatsSummary();
-  urlService.updateUrlForCurrentLoadout();
+    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
 
   // 3. Fetch items for equipment selection
@@ -860,7 +863,7 @@ export const loadoutService = {
 
     // Mark loadout as no longer from character if it was
     const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
-    if (currentLoadout && currentLoadout.isFromCharacter) {
+    if (!this._isCharacterLoading && currentLoadout && currentLoadout.isFromCharacter) {
       loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
     }
 
@@ -871,7 +874,7 @@ export const loadoutService = {
     }
 
     // Update URL with current loadout state
-  urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
 
   async setLevel(level: number) {
@@ -885,7 +888,7 @@ export const loadoutService = {
 
     // Mark loadout as no longer from character if it was
     const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
-    if (currentLoadout && currentLoadout.isFromCharacter) {
+    if (!this._isCharacterLoading && currentLoadout && currentLoadout.isFromCharacter) {
       loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
     }
 
@@ -893,7 +896,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-  urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
 
   async setRenownRank(renownRank: number) {
@@ -907,7 +910,7 @@ export const loadoutService = {
 
     // Mark loadout as no longer from character if it was
     const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
-    if (currentLoadout && currentLoadout.isFromCharacter) {
+    if (!this._isCharacterLoading && currentLoadout && currentLoadout.isFromCharacter) {
       loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
     }
 
@@ -915,7 +918,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-  urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
 
   createLoadout(name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string) {
@@ -945,7 +948,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with the new loadout state
-  urlService.updateUrlForCurrentLoadout();
+  if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
 
   async resetCurrentLoadout() {
@@ -965,9 +968,9 @@ export const loadoutService = {
       loadoutStoreAdapter.resetCurrentLoadout();
     }
 
-    // Clear all loadout parameters from URL
+    // Clear only this side's parameters from URL
   // urlService is statically imported at top
-  urlService.clearLoadoutFromUrl();
+  urlService.clearSideFromUrl(this.getActiveSide());
 
     loadoutEventEmitter.emit({
       type: 'LOADOUT_RESET',
@@ -1034,6 +1037,7 @@ export const loadoutService = {
   // 4. Import character data and create loadout
   async importFromCharacter(characterId: string, side?: LoadoutSide): Promise<string> {
     try {
+      this._isCharacterLoading = true;
       const targetSide = side ?? this.getActiveSide();
       const { data } = await client.query({
         query: GET_CHARACTER,
@@ -1128,105 +1132,70 @@ export const loadoutService = {
         }
       }
 
-      // Stats will be recalculated automatically by the updateItem/updateTalisman methods
-      // No need to call getStatsSummary() again since it's called in those methods
-
-      // Reset the loadout to character state and update URL
-    loadoutStoreAdapter.updateLoadoutCharacterStatus(loadoutId, true, character.name);
-  urlService.updateUrlForCurrentLoadout();
-
-      // Ensure side+career mapping aligns with the captured side
+      // Mark as loaded from character and ensure side mapping
+      loadoutStoreAdapter.updateLoadoutCharacterStatus(loadoutId, true, character.name);
       loadoutStoreAdapter.setSideCareerLoadoutId(targetSide, character.career, loadoutId);
       return loadoutId;
     } catch (error) {
       console.error('Failed to import character:', error);
       throw error;
-    }
-  },
+    } finally {
+      // End import guard and update URL once
+      this._isCharacterLoading = false;
+      urlService.updateUrlForCurrentLoadout();
+    }},
 
-  // Initialize stats on service load
-  initializeStats() {
-    this.getStatsSummary();
-  },
-
-  // Clone an existing loadout to a new id, deep copying items/talismans
-  cloneLoadout(sourceId: string, name?: string): string {
-    const all = loadoutStoreAdapter.getLoadouts();
-    const src = all.find(l => l.id === sourceId);
-    if (!src) throw new Error('Source loadout not found');
-    const newName = name || `${src.name} (Copy)`;
-    const newId = loadoutStoreAdapter.createLoadout(newName, src.level, src.renownRank, src.isFromCharacter, src.characterName);
-    // Emit creation event to notify subscribers that a new loadout exists
-    loadoutEventEmitter.emit({ type: 'LOADOUT_CREATED', payload: { loadoutId: newId, name: newName }, timestamp: Date.now() });
-    // Copy career
-    if (src.career) {
-      loadoutStoreAdapter.setCareerForLoadout(newId, src.career);
-    }
-    // Copy items and talismans
-    Object.entries(src.items).forEach(([slot, data]) => {
-      loadoutStoreAdapter.setItemForLoadout(newId, slot as EquipSlot, data.item);
-      if (data.talismans && data.talismans.length > 0) {
-        data.talismans.forEach((t, idx) => {
-          loadoutStoreAdapter.setTalismanForLoadout(newId, slot as EquipSlot, idx, t);
-        });
-      }
-    });
-    // Emit creation event already done by createLoadout; URL will be updated by caller if needed
-    return newId;
-  },
-
-  // Per-loadout setters (used for URL-driven compare loads)
+  // Per-loadout setters used by compare flows
   setCareerForLoadout(loadoutId: string, career: Career | null) {
     loadoutStoreAdapter.setCareerForLoadout(loadoutId, career);
     loadoutEventEmitter.emit({ type: 'CAREER_CHANGED', payload: { career }, timestamp: Date.now() });
-    // Level/career changes can affect eligibility; refresh stats and URL
     this.getStatsSummary();
-    urlService.updateUrlForCurrentLoadout();
+    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
   setLevelForLoadout(loadoutId: string, level: number) {
     loadoutStoreAdapter.setLevelForLoadout(loadoutId, level);
     loadoutEventEmitter.emit({ type: 'LEVEL_CHANGED', payload: { level }, timestamp: Date.now() });
     this.getStatsSummary();
-    urlService.updateUrlForCurrentLoadout();
+    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
   setRenownForLoadout(loadoutId: string, renownRank: number) {
     loadoutStoreAdapter.setRenownForLoadout(loadoutId, renownRank);
     loadoutEventEmitter.emit({ type: 'RENOWN_RANK_CHANGED', payload: { renownRank }, timestamp: Date.now() });
     this.getStatsSummary();
-    urlService.updateUrlForCurrentLoadout();
+    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
   setLoadoutNameForLoadout(loadoutId: string, name: string) {
     loadoutStoreAdapter.setLoadoutNameForLoadout(loadoutId, name);
-    // No specific event type for name changes; reuse LOADOUT_SWITCHED to trigger subscribers to refresh labels
     loadoutEventEmitter.emit({ type: 'LOADOUT_SWITCHED', payload: { loadoutId }, timestamp: Date.now() });
   },
-
-  // Update character metadata (name/from-character flag) for a specific loadout
   setCharacterStatusForLoadout(loadoutId: string, isFromCharacter: boolean, characterName?: string) {
     loadoutStoreAdapter.updateLoadoutCharacterStatus(loadoutId, isFromCharacter, characterName);
-    // Reuse LOADOUT_SWITCHED to trigger UI subscribers to refresh toolbar fields
     loadoutEventEmitter.emit({ type: 'LOADOUT_SWITCHED', payload: { loadoutId }, timestamp: Date.now() });
-    urlService.updateUrlForCurrentLoadout();
+    if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
 
-  // Compute stats for a specific loadout id without mutating state or emitting events
+  // Clone an existing loadout to a new id
+  cloneLoadout(sourceId: string, name?: string): string {
+    const src = loadoutStoreAdapter.getLoadouts().find(l => l.id === sourceId);
+    if (!src) throw new Error('Source loadout not found');
+    const newId = loadoutStoreAdapter.createLoadout(name || `${src.name} (Copy)`, src.level, src.renownRank, src.isFromCharacter, src.characterName);
+    if (src.career) loadoutStoreAdapter.setCareerForLoadout(newId, src.career);
+    Object.entries(src.items).forEach(([slot, data]) => {
+      loadoutStoreAdapter.setItemForLoadout(newId, slot as EquipSlot, data.item);
+      if (data.talismans) {
+        data.talismans.forEach((t, idx) => {
+          loadoutStoreAdapter.setTalismanForLoadout(newId, slot as EquipSlot, idx, t);
+        });
+      }
+    });
+    loadoutEventEmitter.emit({ type: 'LOADOUT_CREATED', payload: { loadoutId: newId, name: name || `${src.name} (Copy)` }, timestamp: Date.now() });
+    return newId;
+  },
+
+  // Detailed stats computation for an arbitrary loadout id
   computeStatsForLoadout(loadoutId: string): import('../types').StatsSummary {
     const loadout = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
-    if (!loadout) {
-      return {
-        strength: 0, agility: 0, willpower: 0, toughness: 0, wounds: 0, initiative: 0,
-        weaponSkill: 0, ballisticSkill: 0, intelligence: 0, spiritResistance: 0, elementalResistance: 0, corporealResistance: 0,
-        incomingDamage: 0, incomingDamagePercent: 0, outgoingDamage: 0, outgoingDamagePercent: 0,
-        armor: 0, velocity: 0, block: 0, parry: 0, evade: 0, disrupt: 0, actionPointRegen: 0, moraleRegen: 0,
-        cooldown: 0, buildTime: 0, criticalDamage: 0, range: 0, autoAttackSpeed: 0, autoAttackDamage: 0, meleePower: 0, rangedPower: 0, magicPower: 0,
-        criticalHitRate: 0, meleeCritRate: 0, rangedCritRate: 0, magicCritRate: 0, armorPenetration: 0, healingPower: 0, healthRegen: 0, maxActionPoints: 0, fortitude: 0,
-        armorPenetrationReduction: 0, criticalDamageTakenReduction: 0, criticalHitRateReduction: 0, blockStrikethrough: 0, parryStrikethrough: 0, evadeStrikethrough: 0, disruptStrikethrough: 0,
-        healCritRate: 0, mastery1Bonus: 0, mastery2Bonus: 0, mastery3Bonus: 0, outgoingHealPercent: 0, incomingHealPercent: 0,
-        goldLooted: 0, xpReceived: 0, renownReceived: 0, influenceReceived: 0, hateCaused: 0, hateReceived: 0,
-      };
-    }
-
-    const stats: import('../types').StatsSummary = {
+    const zero: import('../types').StatsSummary = {
       strength: 0, agility: 0, willpower: 0, toughness: 0, wounds: 0, initiative: 0,
       weaponSkill: 0, ballisticSkill: 0, intelligence: 0, spiritResistance: 0, elementalResistance: 0, corporealResistance: 0,
       incomingDamage: 0, incomingDamagePercent: 0, outgoingDamage: 0, outgoingDamagePercent: 0,
@@ -1237,392 +1206,142 @@ export const loadoutService = {
       healCritRate: 0, mastery1Bonus: 0, mastery2Bonus: 0, mastery3Bonus: 0, outgoingHealPercent: 0, incomingHealPercent: 0,
       goldLooted: 0, xpReceived: 0, renownReceived: 0, influenceReceived: 0, hateCaused: 0, hateReceived: 0,
     };
-
-    const isItemEligible = (item: import('../types').Item | null): boolean => {
-      if (!item) return true;
-      const levelEligible = !item.levelRequirement || item.levelRequirement <= loadout.level;
-      const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= loadout.renownRank;
-      return levelEligible && renownEligible;
+    if (!loadout) return zero;
+    const statToKey: Record<string, keyof import('../types').StatsSummary> = {
+      STRENGTH: 'strength', AGILITY: 'agility', WILLPOWER: 'willpower', TOUGHNESS: 'toughness', WOUNDS: 'wounds', INITIATIVE: 'initiative',
+      WEAPON_SKILL: 'weaponSkill', BALLISTIC_SKILL: 'ballisticSkill', INTELLIGENCE: 'intelligence', ARMOR: 'armor',
+      SPIRIT_RESISTANCE: 'spiritResistance', ELEMENTAL_RESISTANCE: 'elementalResistance', CORPOREAL_RESISTANCE: 'corporealResistance',
+      INCOMING_DAMAGE: 'incomingDamage', INCOMING_DAMAGE_PERCENT: 'incomingDamagePercent', OUTGOING_DAMAGE: 'outgoingDamage', OUTGOING_DAMAGE_PERCENT: 'outgoingDamagePercent',
+      VELOCITY: 'velocity', BLOCK: 'block', PARRY: 'parry', EVADE: 'evade', DISRUPT: 'disrupt', ACTION_POINT_REGEN: 'actionPointRegen', MORALE_REGEN: 'moraleRegen', COOLDOWN: 'cooldown', BUILD_TIME: 'buildTime', CRITICAL_DAMAGE: 'criticalDamage', RANGE: 'range', AUTO_ATTACK_SPEED: 'autoAttackSpeed', AUTO_ATTACK_DAMAGE: 'autoAttackDamage',
+      MELEE_POWER: 'meleePower', RANGED_POWER: 'rangedPower', MAGIC_POWER: 'magicPower', CRITICAL_HIT_RATE: 'criticalHitRate', MELEE_CRIT_RATE: 'meleeCritRate', RANGED_CRIT_RATE: 'rangedCritRate', MAGIC_CRIT_RATE: 'magicCritRate', ARMOR_PENETRATION: 'armorPenetration', HEALING_POWER: 'healingPower', HEALTH_REGEN: 'healthRegen', MAX_ACTION_POINTS: 'maxActionPoints', FORTITUDE: 'fortitude',
+      ARMOR_PENETRATION_REDUCTION: 'armorPenetrationReduction', CRITICAL_DAMAGE_TAKEN_REDUCTION: 'criticalDamageTakenReduction', CRITICAL_HIT_RATE_REDUCTION: 'criticalHitRateReduction', BLOCK_STRIKETHROUGH: 'blockStrikethrough', PARRY_STRIKETHROUGH: 'parryStrikethrough', EVADE_STRIKETHROUGH: 'evadeStrikethrough', DISRUPT_STRIKETHROUGH: 'disruptStrikethrough', HEAL_CRIT_RATE: 'healCritRate',
+      MASTERY_1_BONUS: 'mastery1Bonus', MASTERY_2_BONUS: 'mastery2Bonus', MASTERY_3_BONUS: 'mastery3Bonus', OUTGOING_HEAL_PERCENT: 'outgoingHealPercent', INCOMING_HEAL_PERCENT: 'incomingHealPercent', GOLD_LOOTED: 'goldLooted', XP_RECEIVED: 'xpReceived', RENOWN_RECEIVED: 'renownReceived', INFLUENCE_RECEIVED: 'influenceReceived', HATE_CAUSED: 'hateCaused', HATE_RECEIVED: 'hateReceived',
     };
-
-    const mapStatToKey = (stat: string): keyof import('../types').StatsSummary | null => {
-      const statMap: Record<string, keyof import('../types').StatsSummary> = {
-        'STRENGTH': 'strength', 'AGILITY': 'agility', 'WILLPOWER': 'willpower', 'TOUGHNESS': 'toughness', 'WOUNDS': 'wounds', 'INITIATIVE': 'initiative',
-        'WEAPON_SKILL': 'weaponSkill', 'BALLISTIC_SKILL': 'ballisticSkill', 'INTELLIGENCE': 'intelligence',
-        'SPIRIT_RESISTANCE': 'spiritResistance', 'ELEMENTAL_RESISTANCE': 'elementalResistance', 'CORPOREAL_RESISTANCE': 'corporealResistance',
-        'INCOMING_DAMAGE': 'incomingDamage', 'INCOMING_DAMAGE_PERCENT': 'incomingDamagePercent', 'OUTGOING_DAMAGE': 'outgoingDamage', 'OUTGOING_DAMAGE_PERCENT': 'outgoingDamagePercent',
-        'ARMOR': 'armor', 'VELOCITY': 'velocity', 'BLOCK': 'block', 'PARRY': 'parry', 'EVADE': 'evade', 'DISRUPT': 'disrupt',
-        'ACTION_POINT_REGEN': 'actionPointRegen', 'MORALE_REGEN': 'moraleRegen', 'COOLDOWN': 'cooldown', 'BUILD_TIME': 'buildTime', 'CRITICAL_DAMAGE': 'criticalDamage', 'RANGE': 'range', 'AUTO_ATTACK_SPEED': 'autoAttackSpeed',
-        'AUTO_ATTACK_DAMAGE': 'autoAttackDamage',
-        'MELEE_POWER': 'meleePower', 'RANGED_POWER': 'rangedPower', 'MAGIC_POWER': 'magicPower', 'MELEE_CRIT_RATE': 'meleeCritRate', 'RANGED_CRIT_RATE': 'rangedCritRate', 'MAGIC_CRIT_RATE': 'magicCritRate', 'CRITICAL_HIT_RATE': 'criticalHitRate',
-        'ARMOR_PENETRATION': 'armorPenetration', 'HEALING_POWER': 'healingPower', 'HEALTH_REGEN': 'healthRegen', 'MAX_ACTION_POINTS': 'maxActionPoints', 'FORTITUDE': 'fortitude',
-        'ARMOR_PENETRATION_REDUCTION': 'armorPenetrationReduction', 'CRITICAL_DAMAGE_TAKEN_REDUCTION': 'criticalDamageTakenReduction', 'CRITICAL_HIT_RATE_REDUCTION': 'criticalHitRateReduction', 'BLOCK_STRIKETHROUGH': 'blockStrikethrough', 'PARRY_STRIKETHROUGH': 'parryStrikethrough', 'EVADE_STRIKETHROUGH': 'evadeStrikethrough', 'DISRUPT_STRIKETHROUGH': 'disruptStrikethrough',
-        'HEAL_CRIT_RATE': 'healCritRate', 'MASTERY_1_BONUS': 'mastery1Bonus', 'MASTERY_2_BONUS': 'mastery2Bonus', 'MASTERY_3_BONUS': 'mastery3Bonus', 'OUTGOING_HEAL_PERCENT': 'outgoingHealPercent', 'INCOMING_HEAL_PERCENT': 'incomingHealPercent',
-        'GOLD_LOOTED': 'goldLooted', 'XP_RECEIVED': 'xpReceived', 'RENOWN_RECEIVED': 'renownReceived', 'INFLUENCE_RECEIVED': 'influenceReceived', 'HATE_CAUSED': 'hateCaused', 'HATE_RECEIVED': 'hateReceived',
-      };
-      return statMap[stat] || null;
+    const result = { ...zero };
+    const addStat = (statsArr?: any[]) => {
+      (statsArr || []).forEach(s => {
+        const key = statToKey[s.stat as string];
+        if (key && key in result) {
+          (result as any)[key] += Number(s.value) || 0;
+        }
+      });
     };
-
-    const setItems: Record<string, { item: import('../types').Item; set: import('../types').ItemSet }[]> = {};
-
     Object.values(loadout.items).forEach(({ item, talismans }) => {
-      if (item && isItemEligible(item)) {
-        if (item.armor && item.armor > 0) {
-          stats.armor += Number(item.armor);
+      if (item) {
+        if (item.armor) (result.armor as number) += Number(item.armor) || 0;
+        addStat(item.stats);
+      }
+      (talismans || []).forEach(t => {
+        if (t) {
+          if (t.armor) (result.armor as number) += Number(t.armor) || 0;
+          addStat(t.stats);
         }
-        if (item.stats) {
-          item.stats.forEach(({ stat, value }) => {
-            const key = mapStatToKey(stat);
-            if (key && stats[key] !== undefined) {
-              stats[key] += Number(value);
-            }
-          });
-        }
-        if (item.itemSet) {
-          const setName = item.itemSet.name;
-          if (!setItems[setName]) setItems[setName] = [];
-          setItems[setName].push({ item, set: item.itemSet });
-        }
-        if (talismans && Array.isArray(talismans)) {
-          talismans.forEach((talisman) => {
-            if (talisman && isItemEligible(talisman)) {
-              if (talisman.armor && talisman.armor > 0) {
-                stats.armor += Number(talisman.armor);
-              }
-              if (talisman.stats) {
-                talisman.stats.forEach(({ stat, value }) => {
-                  const key = mapStatToKey(stat);
-                  if (key && stats[key] !== undefined) {
-                    stats[key] += Number(value);
-                  }
-                });
-              }
-            }
-          });
-        }
+      });
+    });
+    // Basic set bonus handling (stat bonuses only)
+    const setCounts: Record<string, { count: number; bonuses: any[] } > = {};
+    Object.values(loadout.items).forEach(({ item }) => {
+      if (item && item.itemSet) {
+        const name = item.itemSet.name;
+        if (!setCounts[name]) setCounts[name] = { count: 0, bonuses: item.itemSet.bonuses || [] };
+        setCounts[name].count += 1;
       }
     });
-
-    Object.values(setItems).forEach((items) => {
-      if (items.length > 0 && items[0].set.bonuses) {
-        const setBonuses = items[0].set.bonuses;
-        setBonuses.forEach((setBonus: any) => {
-          if (items.length >= setBonus.itemsRequired) {
-            if ('stat' in setBonus.bonus) {
-              const key = mapStatToKey(setBonus.bonus.stat);
-              if (key && stats[key] !== undefined) {
-                const bonusValue = Number(setBonus.bonus.value);
-                if (!isNaN(bonusValue)) {
-                  stats[key] += bonusValue;
-                }
-              }
-            }
-          }
-        });
-      }
+    Object.values(setCounts).forEach(({ count, bonuses }) => {
+      (bonuses || []).forEach((b: any) => {
+        if (count >= b.itemsRequired && b.bonus && 'stat' in b.bonus) {
+          const key = statToKey[b.bonus.stat];
+          if (key) (result as any)[key] += Number(b.bonus.value) || 0;
+        }
+      });
     });
-
-    return stats;
+    return result;
   },
 
-  // Get detailed contributions for a given StatsSummary key for a specific loadout id (used by compare panel)
   getStatContributionsForLoadout(loadoutId: string, statKey: keyof import('../types').StatsSummary | string): Array<{ name: string; count: number; totalValue: number; percentage: boolean; color?: string }> {
     const loadout = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
     if (!loadout) return [];
-
-    const keyToEnum: Record<string, string> = {
-      strength: 'STRENGTH', agility: 'AGILITY', willpower: 'WILLPOWER', toughness: 'TOUGHNESS', wounds: 'WOUNDS', initiative: 'INITIATIVE', weaponSkill: 'WEAPON_SKILL', ballisticSkill: 'BALLISTIC_SKILL', intelligence: 'INTELLIGENCE',
-      spiritResistance: 'SPIRIT_RESISTANCE', elementalResistance: 'ELEMENTAL_RESISTANCE', corporealResistance: 'CORPOREAL_RESISTANCE', incomingDamage: 'INCOMING_DAMAGE', incomingDamagePercent: 'INCOMING_DAMAGE_PERCENT', outgoingDamage: 'OUTGOING_DAMAGE', outgoingDamagePercent: 'OUTGOING_DAMAGE_PERCENT',
-      armor: 'ARMOR', velocity: 'VELOCITY', block: 'BLOCK', parry: 'PARRY', evade: 'EVADE', disrupt: 'DISRUPT', actionPointRegen: 'ACTION_POINT_REGEN', moraleRegen: 'MORALE_REGEN', cooldown: 'COOLDOWN', buildTime: 'BUILD_TIME', criticalDamage: 'CRITICAL_DAMAGE', range: 'RANGE', autoAttackSpeed: 'AUTO_ATTACK_SPEED', autoAttackDamage: 'AUTO_ATTACK_DAMAGE',
+    const enumMap: Record<string, string> = {
+      strength: 'STRENGTH', agility: 'AGILITY', willpower: 'WILLPOWER', toughness: 'TOUGHNESS', wounds: 'WOUNDS', initiative: 'INITIATIVE',
+      weaponSkill: 'WEAPON_SKILL', ballisticSkill: 'BALLISTIC_SKILL', intelligence: 'INTELLIGENCE', armor: 'ARMOR',
+      spiritResistance: 'SPIRIT_RESISTANCE', elementalResistance: 'ELEMENTAL_RESISTANCE', corporealResistance: 'CORPOREAL_RESISTANCE',
+      incomingDamage: 'INCOMING_DAMAGE', incomingDamagePercent: 'INCOMING_DAMAGE_PERCENT', outgoingDamage: 'OUTGOING_DAMAGE', outgoingDamagePercent: 'OUTGOING_DAMAGE_PERCENT',
+      velocity: 'VELOCITY', block: 'BLOCK', parry: 'PARRY', evade: 'EVADE', disrupt: 'DISRUPT', actionPointRegen: 'ACTION_POINT_REGEN', moraleRegen: 'MORALE_REGEN', cooldown: 'COOLDOWN', buildTime: 'BUILD_TIME', criticalDamage: 'CRITICAL_DAMAGE', range: 'RANGE', autoAttackSpeed: 'AUTO_ATTACK_SPEED', autoAttackDamage: 'AUTO_ATTACK_DAMAGE',
       meleePower: 'MELEE_POWER', rangedPower: 'RANGED_POWER', magicPower: 'MAGIC_POWER', criticalHitRate: 'CRITICAL_HIT_RATE', meleeCritRate: 'MELEE_CRIT_RATE', rangedCritRate: 'RANGED_CRIT_RATE', magicCritRate: 'MAGIC_CRIT_RATE', armorPenetration: 'ARMOR_PENETRATION', healingPower: 'HEALING_POWER', healthRegen: 'HEALTH_REGEN', maxActionPoints: 'MAX_ACTION_POINTS', fortitude: 'FORTITUDE',
       armorPenetrationReduction: 'ARMOR_PENETRATION_REDUCTION', criticalDamageTakenReduction: 'CRITICAL_DAMAGE_TAKEN_REDUCTION', criticalHitRateReduction: 'CRITICAL_HIT_RATE_REDUCTION', blockStrikethrough: 'BLOCK_STRIKETHROUGH', parryStrikethrough: 'PARRY_STRIKETHROUGH', evadeStrikethrough: 'EVADE_STRIKETHROUGH', disruptStrikethrough: 'DISRUPT_STRIKETHROUGH', healCritRate: 'HEAL_CRIT_RATE',
       mastery1Bonus: 'MASTERY_1_BONUS', mastery2Bonus: 'MASTERY_2_BONUS', mastery3Bonus: 'MASTERY_3_BONUS', outgoingHealPercent: 'OUTGOING_HEAL_PERCENT', incomingHealPercent: 'INCOMING_HEAL_PERCENT', goldLooted: 'GOLD_LOOTED', xpReceived: 'XP_RECEIVED', renownReceived: 'RENOWN_RECEIVED', influenceReceived: 'INFLUENCE_RECEIVED', hateCaused: 'HATE_CAUSED', hateReceived: 'HATE_RECEIVED',
     };
-    const target = keyToEnum[String(statKey)] || '';
-
-    const isItemEligible = (item: import('../types').Item | null): boolean => {
-      if (!item) return false;
-      const levelEligible = !item.levelRequirement || item.levelRequirement <= loadout.level;
-      const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= loadout.renownRank;
-      return levelEligible && renownEligible;
-    };
-
-    const byName = new Map<string, { name: string; count: number; totalValue: number; percentage: boolean; color?: string }>();
-
+    const target = enumMap[String(statKey)] || '';
+    const res = new Map<string, { name: string; count: number; totalValue: number; percentage: boolean; color?: string }>();
     Object.values(loadout.items).forEach(({ item, talismans }) => {
-      if (item && isItemEligible(item)) {
-        if (target === 'ARMOR' && item.armor && item.armor > 0) {
+      if (item) {
+        if (target === 'ARMOR' && item.armor) {
           const key = item.name + '|armor';
-          const prev = byName.get(key) || { name: item.name, count: 0, totalValue: 0, percentage: false, color: getItemColor(item) };
-          prev.count += 1;
-          prev.totalValue += Number(item.armor);
-          byName.set(key, prev);
+          const prev = res.get(key) || { name: item.name, count: 0, totalValue: 0, percentage: false, color: getItemColor(item) };
+          prev.count += 1; prev.totalValue += Number(item.armor) || 0; res.set(key, prev);
         }
-        if (item.stats) {
-          item.stats.forEach((s) => {
+        (item.stats || []).forEach((s: any) => {
+          if (s.stat === target) {
+            const key = item.name + '|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
+            const prev = res.get(key) || { name: item.name, count: 0, totalValue: 0, percentage: !!s.percentage, color: getItemColor(item) };
+            prev.count += 1; prev.totalValue += Number(s.value) || 0; prev.percentage = !!s.percentage; res.set(key, prev);
+          }
+        });
+      }
+      (talismans || []).forEach(t => {
+        if (t) {
+          if (target === 'ARMOR' && t.armor) {
+            const key = t.name + '|armor';
+            const prev = res.get(key) || { name: t.name, count: 0, totalValue: 0, percentage: false, color: getItemColor(t) };
+            prev.count += 1; prev.totalValue += Number(t.armor) || 0; res.set(key, prev);
+          }
+          (t.stats || []).forEach((s: any) => {
             if (s.stat === target) {
-              const key = item.name + '|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
-              const prev = byName.get(key) || { name: item.name, count: 0, totalValue: 0, percentage: !!s.percentage, color: getItemColor(item) };
-              prev.count += 1;
-              prev.totalValue += Number(s.value);
-              prev.percentage = !!s.percentage;
-              byName.set(key, prev);
+              const key = t.name + '|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
+              const prev = res.get(key) || { name: t.name, count: 0, totalValue: 0, percentage: !!s.percentage, color: getItemColor(t) };
+              prev.count += 1; prev.totalValue += Number(s.value) || 0; prev.percentage = !!s.percentage; res.set(key, prev);
             }
           });
         }
-        if (talismans && Array.isArray(talismans)) {
-          talismans.forEach((talisman) => {
-            if (talisman && isItemEligible(talisman) && talisman.stats) {
-              talisman.stats.forEach((s) => {
-                if (s.stat === target) {
-                  const key = talisman.name + '|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
-                  const prev = byName.get(key) || { name: talisman.name, count: 0, totalValue: 0, percentage: !!s.percentage, color: getItemColor(talisman) };
-                  prev.count += 1;
-                  prev.totalValue += Number(s.value);
-                  prev.percentage = !!s.percentage;
-                  byName.set(key, prev);
-                }
-              });
-            }
-          });
-        }
-      }
+      });
     });
-
-    const setCounts: Record<string, number> = {};
+    // Set bonuses
+    const counts: Record<string, number> = {};
+    const bonusesMap: Record<string, any[]> = {};
     Object.values(loadout.items).forEach(({ item }) => {
-      if (item && isItemEligible(item) && item.itemSet) {
-        setCounts[item.itemSet.name] = (setCounts[item.itemSet.name] || 0) + 1;
+      if (item && item.itemSet) {
+        const name = item.itemSet.name;
+        counts[name] = (counts[name] || 0) + 1;
+        if (!bonusesMap[name]) bonusesMap[name] = item.itemSet.bonuses || [];
       }
     });
-    const setsMap: Record<string, { bonuses: any[] }> = {};
-    Object.values(loadout.items).forEach(({ item }) => {
-      if (item && isItemEligible(item) && item.itemSet && item.itemSet.bonuses) {
-        const setName = item.itemSet.name;
-        if (!setsMap[setName]) {
-          setsMap[setName] = { bonuses: item.itemSet.bonuses };
-        }
-      }
-    });
-    Object.entries(setsMap).forEach(([setName, { bonuses }]) => {
-      const pieceCount = setCounts[setName] || 0;
-      bonuses.forEach((bonus) => {
-        if (pieceCount >= bonus.itemsRequired && 'stat' in bonus.bonus) {
-          const b = bonus.bonus as any;
-          if (b.stat === target) {
-            const key = setName + '|set|' + b.stat + '|' + (b.percentage ? 'pct' : 'val');
-            const prev = byName.get(key) || { name: setName, count: 1, totalValue: 0, percentage: !!b.percentage, color: '#4ade80' };
-            prev.count = 1;
-            prev.totalValue += Number(b.value);
-            prev.percentage = !!b.percentage;
-            byName.set(key, prev);
+    Object.entries(bonusesMap).forEach(([setName, bonuses]) => {
+      const pieces = counts[setName] || 0;
+      bonuses.forEach((b: any) => {
+        if (pieces >= b.itemsRequired && b.bonus && 'stat' in b.bonus) {
+          const s = b.bonus;
+          if (s.stat === target) {
+            const key = setName + '|set|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
+            const prev = res.get(key) || { name: setName, count: 1, totalValue: 0, percentage: !!s.percentage, color: '#4ade80' };
+            prev.count = 1; prev.totalValue += Number(s.value) || 0; prev.percentage = !!s.percentage; res.set(key, prev);
           }
         }
       });
     });
-
-    return Array.from(byName.values())
-      .filter(entry => entry.totalValue !== 0)
-      .sort((a, b) => b.totalValue - a.totalValue || a.name.localeCompare(b.name));
+    return Array.from(res.values()).filter(r => r.totalValue !== 0).sort((a, b) => b.totalValue - a.totalValue || a.name.localeCompare(b.name));
   },
 
-  // Get detailed contributions for a given StatsSummary key (e.g., 'strength', 'armor', etc.)
-  getStatContributions(statKey: keyof import('../types').StatsSummary | string): Array<{ name: string; count: number; totalValue: number; percentage: boolean; color?: string }> {
-    const loadout = this.getCurrentLoadout();
-    if (!loadout) return [];
-
-    // Map StatsSummary key to Item Stat enum string
-    const keyToEnum: Record<string, string> = {
-      strength: 'STRENGTH',
-      agility: 'AGILITY',
-      willpower: 'WILLPOWER',
-      toughness: 'TOUGHNESS',
-      wounds: 'WOUNDS',
-      initiative: 'INITIATIVE',
-      weaponSkill: 'WEAPON_SKILL',
-      ballisticSkill: 'BALLISTIC_SKILL',
-      intelligence: 'INTELLIGENCE',
-      spiritResistance: 'SPIRIT_RESISTANCE',
-      elementalResistance: 'ELEMENTAL_RESISTANCE',
-      corporealResistance: 'CORPOREAL_RESISTANCE',
-      incomingDamage: 'INCOMING_DAMAGE',
-      incomingDamagePercent: 'INCOMING_DAMAGE_PERCENT',
-      outgoingDamage: 'OUTGOING_DAMAGE',
-      outgoingDamagePercent: 'OUTGOING_DAMAGE_PERCENT',
-      armor: 'ARMOR',
-      velocity: 'VELOCITY',
-      block: 'BLOCK',
-      parry: 'PARRY',
-      evade: 'EVADE',
-      disrupt: 'DISRUPT',
-      actionPointRegen: 'ACTION_POINT_REGEN',
-      moraleRegen: 'MORALE_REGEN',
-      cooldown: 'COOLDOWN',
-      buildTime: 'BUILD_TIME',
-      criticalDamage: 'CRITICAL_DAMAGE',
-      range: 'RANGE',
-      autoAttackSpeed: 'AUTO_ATTACK_SPEED',
-      meleePower: 'MELEE_POWER',
-      rangedPower: 'RANGED_POWER',
-      magicPower: 'MAGIC_POWER',
-      meleeCritRate: 'MELEE_CRIT_RATE',
-      rangedCritRate: 'RANGED_CRIT_RATE',
-      magicCritRate: 'MAGIC_CRIT_RATE',
-      armorPenetration: 'ARMOR_PENETRATION',
-      healingPower: 'HEALING_POWER',
-      healthRegen: 'HEALTH_REGEN',
-      maxActionPoints: 'MAX_ACTION_POINTS',
-      fortitude: 'FORTITUDE',
-      armorPenetrationReduction: 'ARMOR_PENETRATION_REDUCTION',
-      criticalHitRateReduction: 'CRITICAL_HIT_RATE_REDUCTION',
-      blockStrikethrough: 'BLOCK_STRIKETHROUGH',
-      parryStrikethrough: 'PARRY_STRIKETHROUGH',
-      evadeStrikethrough: 'EVADE_STRIKETHROUGH',
-      disruptStrikethrough: 'DISRUPT_STRIKETHROUGH',
-      healCritRate: 'HEAL_CRIT_RATE',
-      mastery1Bonus: 'MASTERY_1_BONUS',
-      mastery2Bonus: 'MASTERY_2_BONUS',
-      mastery3Bonus: 'MASTERY_3_BONUS',
-      outgoingHealPercent: 'OUTGOING_HEAL_PERCENT',
-      incomingHealPercent: 'INCOMING_HEAL_PERCENT',
-    };
-
-    const target = keyToEnum[String(statKey)] || '';
-
-    // Eligibility helper (same as in store)
-    const isItemEligible = (item: import('../types').Item | null): boolean => {
-      if (!item) return false;
-      const levelEligible = !item.levelRequirement || item.levelRequirement <= loadout.level;
-      const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= loadout.renownRank;
-      return levelEligible && renownEligible;
-    };
-
-    // Aggregate by name
-  const byName = new Map<string, { name: string; count: number; totalValue: number; percentage: boolean; color?: string }>();
-
-    // 1) Items and their own stats (including armor property)
-    Object.values(loadout.items).forEach(({ item, talismans }) => {
-      if (item && isItemEligible(item)) {
-        // Armor property
-        if (target === 'ARMOR' && item.armor && item.armor > 0) {
-          const key = item.name + '|armor';
-          const prev = byName.get(key) || { name: item.name, count: 0, totalValue: 0, percentage: false, color: getItemColor(item) };
-          prev.count += 1;
-          prev.totalValue += Number(item.armor);
-          byName.set(key, prev);
-        }
-
-        // Stats array
-        if (item.stats) {
-          item.stats.forEach((s) => {
-            if (s.stat === target) {
-              const key = item.name + '|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
-              const prev = byName.get(key) || { name: item.name, count: 0, totalValue: 0, percentage: !!s.percentage, color: getItemColor(item) };
-              prev.count += 1;
-              prev.totalValue += Number(s.value);
-              prev.percentage = !!s.percentage;
-              byName.set(key, prev);
-            }
-          });
-        }
-
-        // 2) Talismans on the item
-        if (talismans && Array.isArray(talismans)) {
-          talismans.forEach((talisman) => {
-            if (talisman && isItemEligible(talisman) && talisman.stats) {
-              talisman.stats.forEach((s) => {
-                if (s.stat === target) {
-                  const key = talisman.name + '|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
-                  const prev = byName.get(key) || { name: talisman.name, count: 0, totalValue: 0, percentage: !!s.percentage, color: getItemColor(talisman) };
-                  prev.count += 1;
-                  prev.totalValue += Number(s.value);
-                  prev.percentage = !!s.percentage;
-                  byName.set(key, prev);
-                }
-              });
-            }
-          });
-        }
-      }
-    });
-
-    // 3) Set bonuses that are active
-    // Count eligible items per set
-    const setCounts: Record<string, number> = {};
-    Object.values(loadout.items).forEach(({ item }) => {
-      if (item && isItemEligible(item) && item.itemSet) {
-        setCounts[item.itemSet.name] = (setCounts[item.itemSet.name] || 0) + 1;
-      }
-    });
-
-    // Build a unique map of sets present to avoid counting bonuses once per item
-    const setsMap: Record<string, { bonuses: any[] }> = {};
-    Object.values(loadout.items).forEach(({ item }) => {
-      if (item && isItemEligible(item) && item.itemSet && item.itemSet.bonuses) {
-        const setName = item.itemSet.name;
-        if (!setsMap[setName]) {
-          setsMap[setName] = { bonuses: item.itemSet.bonuses };
-        }
-      }
-    });
-
-    // For each unique set, apply active bonuses once
-    Object.entries(setsMap).forEach(([setName, { bonuses }]) => {
-      const pieceCount = setCounts[setName] || 0;
-      bonuses.forEach((bonus) => {
-        if (pieceCount >= bonus.itemsRequired && 'stat' in bonus.bonus) {
-          const b = bonus.bonus as any; // ItemStat
-          if (b.stat === target) {
-            const key = setName + '|set|' + b.stat + '|' + (b.percentage ? 'pct' : 'val');
-            const prev = byName.get(key) || { name: setName, count: 0, totalValue: 0, percentage: !!b.percentage, color: '#4ade80' };
-            prev.count = 1; // set bonus counted once per set
-            prev.totalValue += Number(b.value);
-            prev.percentage = !!b.percentage;
-            byName.set(key, prev);
-          }
-        }
-      });
-    });
-
-    return Array.from(byName.values())
-      .filter(entry => entry.totalValue !== 0)
-      .sort((a, b) => b.totalValue - a.totalValue || a.name.localeCompare(b.name));
-  },
-  // Get count of equipped items for a specific set
-  getEquippedSetItemsCount(setName: string): number {
-    const loadout = this.getCurrentLoadout();
-    if (!loadout) return 0;
-
-    let count = 0;
-    Object.values(loadout.items).forEach(loadoutItem => {
-      if (loadoutItem.item && loadoutItem.item.itemSet && loadoutItem.item.itemSet.name === setName) {
-        // Only count eligible items toward set bonuses
-        const levelEligible = !loadoutItem.item.levelRequirement || loadoutItem.item.levelRequirement <= loadout.level;
-        const renownEligible = !loadoutItem.item.renownRankRequirement || loadoutItem.item.renownRankRequirement <= loadout.renownRank;
-        if (levelEligible && renownEligible) {
-          count++;
-        }
-      }
-    });
-    return count;
-  },
-
-  // Fetch single item with full details (including descriptions)
+  // Item details fetcher with caching
   async getItemWithDetails(itemId: string): Promise<Item | null> {
     try {
-      // Return from cache if present (and refresh LRU)
       if (this._itemDetailsCache.has(itemId)) {
         const cached = this._itemDetailsCache.get(itemId) ?? null;
-        // Refresh LRU by re-inserting
         this._itemDetailsCache.delete(itemId);
         this._itemDetailsCache.set(itemId, cached);
         return cached;
       }
-
-      // Coalesce concurrent requests
       const inflight = this._itemDetailsInflight.get(itemId);
       if (inflight) return inflight;
-
       const promise = (async () => {
         const query = gql`
           query GetItem($id: ID!) {
@@ -1640,95 +1359,45 @@ export const loadoutService = {
               renownRankRequirement
               itemLevel
               uniqueEquipped
-              stats {
-                stat
-                value
-                percentage
-              }
+              stats { stat value percentage }
               careerRestriction
               raceRestriction
               iconUrl
               talismanSlots
-              itemSet {
-                id
-                name
-                bonuses {
-                  itemsRequired
-                  bonus {
-                    ... on ItemStat {
-                      stat
-                      value
-                      percentage
-                    }
-                    ... on Ability {
-                      name
-                      description
-                    }
-                  }
-                }
-              }
-              abilities {
-                name
-                description
-              }
-              buffs {
-                name
-                description
-              }
+              itemSet { id name bonuses { itemsRequired bonus { ... on ItemStat { stat value percentage } ... on Ability { name description } } } }
+              abilities { name description }
+              buffs { name description }
             }
           }
         `;
-
-        const { data } = await client.query({
-          query,
-          variables: { id: itemId },
-          fetchPolicy: 'cache-first',
-        });
+        const { data } = await client.query({ query, variables: { id: itemId }, fetchPolicy: 'cache-first' });
         const item = (data as any).item || null;
-
-        // Insert into LRU cache
         this._itemDetailsCache.set(itemId, item);
         if (this._itemDetailsCache.size > this._itemDetailsCacheLimit) {
-          // Delete the oldest entry (Map preserves insertion order)
           const firstKey = this._itemDetailsCache.keys().next().value as string | undefined;
           if (firstKey) this._itemDetailsCache.delete(firstKey);
         }
         return item;
       })();
-
       this._itemDetailsInflight.set(itemId, promise);
-      try {
-        return await promise;
-      } finally {
-        this._itemDetailsInflight.delete(itemId);
-      }
+      try { return await promise; } finally { this._itemDetailsInflight.delete(itemId); }
     } catch (error) {
       console.error('Failed to fetch item details:', error);
       throw error;
     }
   },
 
-  // Check if a talisman is already slotted in a specific item (same slot, different index)
   isTalismanAlreadySlottedInItem(talismanId: string, slot: EquipSlot, excludeIndex?: number): boolean {
     const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
     if (!currentLoadout) return false;
-
     const itemTalismans = currentLoadout.items[slot].talismans;
-    return itemTalismans.some((talisman, index) => 
-      talisman && talisman.id === talismanId && index !== excludeIndex
-    );
+    return itemTalismans.some((t, idx) => t && t.id === talismanId && idx !== excludeIndex);
   },
-
-  // Per-loadout variant used by compare views
   isTalismanAlreadySlottedInItemForLoadout(loadoutId: string, talismanId: string, slot: EquipSlot, excludeIndex?: number): boolean {
     const loadout = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
     if (!loadout) return false;
     const itemTalismans = loadout.items[slot].talismans;
-    return itemTalismans.some((talisman, index) =>
-      talisman && talisman.id === talismanId && index !== excludeIndex
-    );
+    return itemTalismans.some((t, idx) => t && t.id === talismanId && idx !== excludeIndex);
   },
-};
 
-// Initialize stats on service load
-loadoutService.initializeStats();
+};

@@ -223,13 +223,29 @@ class UrlService {
   // Update URL with dual-mode compare data for sides A and B
   updateUrlWithCompare(_aLoadout: Loadout | null, _bLoadout: Loadout | null, _activeSide: 'A' | 'B'): void {
     const params: Record<string, string | null> = {};
+    const current = this.getSearchParams();
+    // Start by clearing all A/B-prefixed params and loadCharacterA/B to avoid leftovers
+    for (const key of Array.from(current.keys())) {
+      if (key.startsWith('a.') || key.startsWith('b.')) {
+        params[key] = null; // mark for deletion
+      }
+    }
+    params.loadCharacterA = null;
+    params.loadCharacterB = null;
+
     if (_aLoadout) {
-      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', _aLoadout));
-      if (_aLoadout.isFromCharacter && _aLoadout.characterName) params.loadCharacterA = _aLoadout.characterName;
+      if (_aLoadout.isFromCharacter && _aLoadout.characterName) {
+        params.loadCharacterA = _aLoadout.characterName;
+      } else {
+        Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', _aLoadout));
+      }
     }
     if (_bLoadout) {
-      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', _bLoadout));
-      if (_bLoadout.isFromCharacter && _bLoadout.characterName) params.loadCharacterB = _bLoadout.characterName;
+      if (_bLoadout.isFromCharacter && _bLoadout.characterName) {
+        params.loadCharacterB = _bLoadout.characterName;
+      } else {
+        Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', _bLoadout));
+      }
     }
     this.updateUrl(params, { replace: true });
   }
@@ -301,7 +317,9 @@ class UrlService {
     const b = this.decodeLoadoutFromUrlWithPrefix('b');
     const keys = Array.from(params.keys());
     const hasSingle = !!(params.get('career') || params.get('level') || keys.some(k => k.startsWith('item.') || k.startsWith('talisman.')) || params.get('loadCharacter'));
-    if (!a && !b && !hasSingle) return;
+    const charA = params.get('loadCharacterA');
+    const charB = params.get('loadCharacterB');
+    if (!a && !b && !hasSingle && !charA && !charB) return;
     // Backward-compat: accept activeSide from older links, default to 'A'
     const active = (params.get('activeSide') === 'b' ? 'B' : 'A') as LoadoutSide;
     this.suppressUpdates = true;
@@ -310,7 +328,9 @@ class UrlService {
       if (!a && !b && hasSingle) {
         const s = this.decodeLoadoutFromUrl();
         const aId = await loadoutService.selectSideForEdit('A');
-        loadoutService.setLevelForLoadout(aId, s.level);
+        // Ensure mapping to A explicitly before applying
+        loadoutService.assignSideLoadout('A', aId);
+  loadoutService.setLevelForLoadout(aId, s.level);
         loadoutService.setRenownForLoadout(aId, s.renownRank);
         loadoutService.setCareerForLoadout(aId, s.career);
         const char = params.get('loadCharacter');
@@ -341,14 +361,15 @@ class UrlService {
         this.updateUrlWithCompare(aLoadout, bLoadout, 'A');
         return;
       }
-      // Apply A
+      // Apply A (prefer explicit A params over character flag)
       if (a) {
         const aId = await loadoutService.selectSideForEdit('A');
+        loadoutService.assignSideLoadout('A', aId);
         loadoutService.setLevelForLoadout(aId, a.level);
         loadoutService.setRenownForLoadout(aId, a.renownRank);
         loadoutService.setCareerForLoadout(aId, a.career);
-        const charA = params.get('loadCharacterA');
-        if (charA) loadoutService.setCharacterStatusForLoadout(aId, true, charA);
+        const charAFlag = params.get('loadCharacterA');
+        if (charAFlag) loadoutService.setCharacterStatusForLoadout(aId, true, charAFlag);
         const tasks: Promise<void>[] = [];
         Object.entries(a.items).forEach(([slotKey, data]) => {
           const slot = slotKey as unknown as EquipSlot;
@@ -368,15 +389,21 @@ class UrlService {
           });
         });
         await Promise.all(tasks);
+      } else if (charA) {
+        // State 1: load character to side A
+        const aId = await loadoutService.selectSideForEdit('A');
+        loadoutService.assignSideLoadout('A', aId);
+        await loadoutService.loadFromNamedCharacter(charA);
       }
       // Apply B
       if (b) {
         const bId = await loadoutService.selectSideForEdit('B');
+        loadoutService.assignSideLoadout('B', bId);
         loadoutService.setLevelForLoadout(bId, b.level);
         loadoutService.setRenownForLoadout(bId, b.renownRank);
         loadoutService.setCareerForLoadout(bId, b.career);
-        const charB = params.get('loadCharacterB');
-        if (charB) loadoutService.setCharacterStatusForLoadout(bId, true, charB);
+        const charBFlag = params.get('loadCharacterB');
+        if (charBFlag) loadoutService.setCharacterStatusForLoadout(bId, true, charBFlag);
         const tasks: Promise<void>[] = [];
         Object.entries(b.items).forEach(([slotKey, data]) => {
           const slot = slotKey as unknown as EquipSlot;
@@ -396,6 +423,11 @@ class UrlService {
           });
         });
         await Promise.all(tasks);
+      } else if (charB) {
+        // State 1: load character to side B
+        const bId = await loadoutService.selectSideForEdit('B');
+        loadoutService.assignSideLoadout('B', bId);
+        await loadoutService.loadFromNamedCharacter(charB);
       }
       // Set active side
       loadoutService.setActiveSide(active);
@@ -415,8 +447,10 @@ class UrlService {
 
   // Update URL when loadout is modified (replaces the old updateUrlForLoadout)
   updateUrlForCurrentLoadout(): void {
-    // Intentionally disabled: URL does not need to update live.
-    return;
+    const a = loadoutStoreAdapter.getLoadoutForSide('A');
+    const b = loadoutStoreAdapter.getLoadoutForSide('B');
+    if (!a && !b) return; // avoid nuking params during early init
+    this.updateUrlWithCompare(a, b, loadoutStoreAdapter.getActiveSide());
   }
 
   // Clear character parameter from URL
@@ -434,17 +468,47 @@ class UrlService {
     this.updateUrl(Object.fromEntries(params.entries()), { replace: true });
   }
 
+  // Clear only one side's parameters from URL
+  clearSideFromUrl(side: LoadoutSide): void {
+    const params = this.getSearchParams();
+    const prefix = side === 'A' ? 'a.' : 'b.';
+    const toDelete: Record<string, string | null> = {};
+    for (const key of Array.from(params.keys())) {
+      if (key.startsWith(prefix)) {
+        toDelete[key] = null;
+      }
+    }
+    if (side === 'A') toDelete.loadCharacterA = null;
+    if (side === 'B') toDelete.loadCharacterB = null;
+    this.updateUrl(toDelete, { replace: true });
+  }
+
   // Build a shareable URL for current compare state
   buildCompareShareUrl(a: Loadout | null, b: Loadout | null, _active: LoadoutSide): string {
-    const base = window.location.href.split('#')[0];
+    let base = window.location.href.split('#')[0];
+    // Improve Codespaces behavior: if running on localhost in an embedded browser,
+    // use the referrer (likely the forwarded github.dev URL) as the share base.
+    try {
+      const isLocal = /^https?:\/\/localhost[:/]/.test(base) || /^https?:\/\/127\.0\.0\.1[:/]/.test(base);
+      const ref = (document && document.referrer) || '';
+      if (isLocal && ref && /\.github\.dev\//.test(ref)) {
+        base = ref.split('#')[0];
+      }
+    } catch {}
     const params: Record<string, string | null> = {};
     if (a) {
-      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', a));
-      if (a.isFromCharacter && a.characterName) params.loadCharacterA = a.characterName;
+      if (a.isFromCharacter && a.characterName) {
+        params.loadCharacterA = a.characterName;
+      } else {
+        Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', a));
+      }
     }
     if (b) {
-      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', b));
-      if (b.isFromCharacter && b.characterName) params.loadCharacterB = b.characterName;
+      if (b.isFromCharacter && b.characterName) {
+        params.loadCharacterB = b.characterName;
+      } else {
+        Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', b));
+      }
     }
     const qs = new URLSearchParams(Object.entries(params).filter(([,v]) => v != null) as [string,string][]).toString();
     return `${base}#/?${qs}`;

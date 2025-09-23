@@ -42,17 +42,21 @@ function SideToolbar({ side }: SideToolbarProps) {
     return unsub;
   }, [side]);
 
-  // Ensure side loadout exists on mount
+  // Ensure side loadout exists on mount (skip if URL already has params to be parsed)
   useEffect(() => {
     try {
-  loadoutService.ensureSideLoadout(side);
-      const lo = loadoutService.getLoadoutForSide(side);
-      setLoadout(lo);
-      if (lo) {
-        setSelectedCareer(lo.career || '');
-        setLevel(lo.level);
-        setRenownRank(lo.renownRank);
-        setCharacterName(lo.characterName || '');
+      const hash = window.location.hash || '';
+      const hasParams = hash.includes('?');
+      if (!hasParams) {
+        loadoutService.ensureSideLoadout(side);
+        const lo = loadoutService.getLoadoutForSide(side);
+        setLoadout(lo);
+        if (lo) {
+          setSelectedCareer(lo.career || '');
+          setLevel(lo.level);
+          setRenownRank(lo.renownRank);
+          setCharacterName(lo.characterName || '');
+        }
       }
     } catch (_err) {
       // intentionally ignore; ensuring side loadout can be a no-op during init

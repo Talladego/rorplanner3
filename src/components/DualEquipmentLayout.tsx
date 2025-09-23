@@ -11,12 +11,16 @@ export default function DualEquipmentLayout() {
   const [summaryOpenFor, setSummaryOpenFor] = useState<'A' | 'B' | null>(null);
 
   useEffect(() => {
-    // Ensure both sides have loadouts assigned when mounting compare layout
+    // Ensure both sides exist only if no URL params are present
     try {
-      loadoutService.ensureSideLoadout('A');
-      loadoutService.ensureSideLoadout('B');
-      setSideA(loadoutService.getLoadoutForSide('A'));
-      setSideB(loadoutService.getLoadoutForSide('B'));
+      const hash = window.location.hash || '';
+      const hasParams = hash.includes('?');
+      if (!hasParams) {
+        loadoutService.ensureSideLoadout('A');
+        loadoutService.ensureSideLoadout('B');
+        setSideA(loadoutService.getLoadoutForSide('A'));
+        setSideB(loadoutService.getLoadoutForSide('B'));
+      }
     } catch {
       // non-fatal; event subscription below will reconcile state
     }
