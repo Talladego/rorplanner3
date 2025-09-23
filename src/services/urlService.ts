@@ -65,8 +65,12 @@ class UrlService {
     if (loadout.career) {
       params.career = loadout.career;
     }
-    params.level = loadout.level.toString();
-    params.renownRank = loadout.renownRank.toString();
+    if (loadout.level !== 40) {
+      params.level = String(loadout.level);
+    }
+    if (loadout.renownRank !== 80) {
+      params.renownRank = String(loadout.renownRank);
+    }
 
     // Encode items
     Object.entries(loadout.items).forEach(([slot, slotData]: [string, LoadoutItem]) => {
@@ -218,7 +222,7 @@ class UrlService {
 
   // Update URL with dual-mode compare data for sides A and B
   updateUrlWithCompare(_aLoadout: Loadout | null, _bLoadout: Loadout | null, _activeSide: 'A' | 'B'): void {
-    const params: Record<string, string | null> = { activeSide: _activeSide.toLowerCase() };
+    const params: Record<string, string | null> = {};
     if (_aLoadout) {
       Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', _aLoadout));
       if (_aLoadout.isFromCharacter && _aLoadout.characterName) params.loadCharacterA = _aLoadout.characterName;
@@ -298,6 +302,7 @@ class UrlService {
     const keys = Array.from(params.keys());
     const hasSingle = !!(params.get('career') || params.get('level') || keys.some(k => k.startsWith('item.') || k.startsWith('talisman.')) || params.get('loadCharacter'));
     if (!a && !b && !hasSingle) return;
+    // Backward-compat: accept activeSide from older links, default to 'A'
     const active = (params.get('activeSide') === 'b' ? 'B' : 'A') as LoadoutSide;
     this.suppressUpdates = true;
     try {
@@ -430,9 +435,9 @@ class UrlService {
   }
 
   // Build a shareable URL for current compare state
-  buildCompareShareUrl(a: Loadout | null, b: Loadout | null, active: LoadoutSide): string {
+  buildCompareShareUrl(a: Loadout | null, b: Loadout | null, _active: LoadoutSide): string {
     const base = window.location.href.split('#')[0];
-    const params: Record<string, string | null> = { activeSide: active.toLowerCase() };
+    const params: Record<string, string | null> = {};
     if (a) {
       Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', a));
       if (a.isFromCharacter && a.characterName) params.loadCharacterA = a.characterName;
