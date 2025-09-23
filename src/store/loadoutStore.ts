@@ -87,9 +87,11 @@ const initialStats: StatsSummary = {
   criticalDamage: 0,
   range: 0,
   autoAttackSpeed: 0,
+  autoAttackDamage: 0,
   meleePower: 0,
   rangedPower: 0,
   magicPower: 0,
+  criticalHitRate: 0,
   meleeCritRate: 0,
   rangedCritRate: 0,
   magicCritRate: 0,
@@ -99,6 +101,7 @@ const initialStats: StatsSummary = {
   maxActionPoints: 0,
   fortitude: 0,
   armorPenetrationReduction: 0,
+  criticalDamageTakenReduction: 0,
   criticalHitRateReduction: 0,
   blockStrikethrough: 0,
   parryStrikethrough: 0,
@@ -110,6 +113,12 @@ const initialStats: StatsSummary = {
   mastery3Bonus: 0,
   outgoingHealPercent: 0,
   incomingHealPercent: 0,
+  goldLooted: 0,
+  xpReceived: 0,
+  renownReceived: 0,
+  influenceReceived: 0,
+  hateCaused: 0,
+  hateReceived: 0,
 };
 
 export const useLoadoutStore = create<LoadoutState>((set, get) => ({

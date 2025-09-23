@@ -22,7 +22,7 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
 
   const selectedLabel = value ? formatCareerName(value as Career) : placeholder;
   const iconSize = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
-  const itemPadding = size === 'sm' ? 'py-1 px-2 text-xs' : 'py-2 px-3 text-sm';
+  const itemPadding = size === 'sm' ? 'py-0.5 px-2 text-xs' : 'py-2 px-3 text-sm';
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -77,19 +77,19 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
       <button
         ref={buttonRef}
         type="button"
-        className={`form-input form-input-text w-full ${itemPadding} rounded-md flex items-center justify-between`}
+        className={`form-input form-input-text control-compact w-full ${itemPadding} rounded-md flex items-center justify-between text-left`}
         onClick={() => (open ? setOpen(false) : openMenu())}
         onKeyDown={onKeyDown}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="flex items-center gap-2">
+        <span className="flex items-center gap-2 min-w-0 flex-1">
           {value ? (
             <img src={getCareerIconUrl(value as Career)} alt={selectedLabel} className={`${iconSize} rounded`} />
           ) : (
             <div className={`${iconSize}`} />
           )}
-          <span>{selectedLabel}</span>
+          <span className="truncate">{selectedLabel}</span>
         </span>
         <svg className="w-4 h-4 text-secondary" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fillRule="evenodd" d="M10 12a1 1 0 01-.707-.293l-4-4a1 1 0 111.414-1.414L10 9.586l3.293-3.293a1 1 0 111.414 1.414l-4 4A1 1 0 0110 12z" clipRule="evenodd" />

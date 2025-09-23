@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import EquipmentPanel from './EquipmentPanel';
 import StatsComparePanel from './StatsComparePanel';
 import { loadoutService } from '../services/loadoutService';
-import { Loadout } from '../types';
+import { Loadout, EquipSlot } from '../types';
+import LoadoutSummaryModal from './summary/LoadoutSummaryModal';
 
 export default function DualEquipmentLayout() {
   const [sideA, setSideA] = useState<Loadout | null>(loadoutService.getLoadoutForSide('A'));
   const [sideB, setSideB] = useState<Loadout | null>(loadoutService.getLoadoutForSide('B'));
+  const [summaryOpenFor, setSummaryOpenFor] = useState<'A' | 'B' | null>(null);
 
   useEffect(() => {
     // Ensure both sides have loadouts assigned when mounting compare layout
@@ -39,11 +41,51 @@ export default function DualEquipmentLayout() {
     return unsub;
   }, []);
 
-  const sideHeader = (label: string) => (
+  const clearSide = async (side: 'A' | 'B') => {
+    // Select side to edit, then reset its current loadout state only
+    await loadoutService.selectSideForEdit(side);
+    await loadoutService.resetCurrentLoadout();
+  };
+
+  const copySide = async (from: 'A' | 'B', to: 'A' | 'B') => {
+    if (from === to) return;
+    const source = loadoutService.getLoadoutForSide(from);
+    const targetId = loadoutService.getSideLoadoutId(to);
+    if (!source || !targetId) return;
+
+    await loadoutService.selectSideForEdit(to);
+
+  // Copy basic fields
+    loadoutService.setCareerForLoadout(targetId, source.career);
+    loadoutService.setLevelForLoadout(targetId, source.level);
+    loadoutService.setRenownForLoadout(targetId, source.renownRank);
+  // Copy character metadata (toolbar load field)
+  loadoutService.setCharacterStatusForLoadout(targetId, !!source.isFromCharacter, source.characterName);
+
+    // Copy items and talismans across all slots
+    for (const [slotKey, data] of Object.entries(source.items)) {
+      const slot = slotKey as unknown as EquipSlot;
+      await loadoutService.updateItemForLoadout(targetId, slot, data.item);
+      const talismans = data.talismans || [];
+      for (let idx = 0; idx < talismans.length; idx++) {
+        await loadoutService.updateTalismanForLoadout(targetId, slot, idx, talismans[idx]);
+      }
+    }
+  };
+
+  const sideHeader = (label: 'A' | 'B') => (
     <div className="flex items-center justify-between mb-2">
       <div className="flex items-center gap-2">
-  <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${label === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{label}</span>
-        {/* Intentionally omit loadout name, career, and character for minimalist compare UI */}
+        <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${label === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{label}</span>
+      </div>
+      <div className="flex items-center gap-1">
+        {label === 'A' ? (
+          <button onClick={() => copySide('B','A')} className="btn btn-primary btn-sm whitespace-nowrap">Copy from B</button>
+        ) : (
+          <button onClick={() => copySide('A','B')} className="btn btn-primary btn-sm whitespace-nowrap">Copy from A</button>
+        )}
+        <button onClick={() => setSummaryOpenFor(label)} className="btn btn-primary btn-sm whitespace-nowrap">Summary</button>
+        <button onClick={() => clearSide(label)} className="btn btn-primary btn-sm whitespace-nowrap">Clear</button>
       </div>
     </div>
   );
@@ -70,6 +112,15 @@ export default function DualEquipmentLayout() {
           <EquipmentPanel selectedCareer={sideB?.career || ''} loadoutId={sideB?.id || null} iconOnly hideHeading compact />
         </div>
       </div>
+      {/* Summary Modal */}
+      {summaryOpenFor && (
+        <LoadoutSummaryModal
+          open={true}
+          onClose={() => setSummaryOpenFor(null)}
+          loadout={summaryOpenFor === 'A' ? sideA : sideB}
+          sideLabel={summaryOpenFor}
+        />
+      )}
     </div>
   );
 }

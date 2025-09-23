@@ -82,6 +82,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   const [currentPage, setCurrentPage] = useState(1);
   const [pageHistory, setPageHistory] = useState<string[]>([]); // Track cursors for back navigation
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const allowedStatOptions = loadoutService.getAllowedFilterStats();
 
   // Handle click outside to close
   useEffect(() => {
@@ -284,7 +285,11 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
           {/* Stats Filter */}
           <div className="w-48">
             <select
-              value={statsFilter.length === 0 ? '' : statsFilter[0]}
+              value={
+                statsFilter.length === 0 || !allowedStatOptions.includes(statsFilter[0])
+                  ? ''
+                  : statsFilter[0]
+              }
               onChange={(e) => {
                 const selectedStat = e.target.value as Stat;
                 const newStatsFilter = selectedStat ? [selectedStat] : [];
@@ -296,7 +301,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">All Stats</option>
-              {Object.values(Stat).map(stat => (
+              {allowedStatOptions.map(stat => (
                 <option key={stat} value={stat}>
                   {formatStatName(stat)}
                 </option>

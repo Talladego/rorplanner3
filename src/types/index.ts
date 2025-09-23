@@ -413,9 +413,11 @@ export interface StatsSummary {
   criticalDamage: number;
   range: number;
   autoAttackSpeed: number;
+  autoAttackDamage: number;
   meleePower: number;
   rangedPower: number;
   magicPower: number;
+  criticalHitRate: number;
   meleeCritRate: number;
   rangedCritRate: number;
   magicCritRate: number;
@@ -425,6 +427,7 @@ export interface StatsSummary {
   maxActionPoints: number;
   fortitude: number;
   armorPenetrationReduction: number;
+  criticalDamageTakenReduction: number;
   criticalHitRateReduction: number;
   blockStrikethrough: number;
   parryStrikethrough: number;
@@ -436,4 +439,10 @@ export interface StatsSummary {
   mastery3Bonus: number;
   outgoingHealPercent: number;
   incomingHealPercent: number;
+  goldLooted: number;
+  xpReceived: number;
+  renownReceived: number;
+  influenceReceived: number;
+  hateCaused: number;
+  hateReceived: number;
 }

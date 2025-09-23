@@ -25,6 +25,28 @@ const SEARCH_CHARACTERS = gql`
   }
 `;
 
+// Allowed stat filters (service-enforced)
+const ALLOWED_FILTER_STATS: Stat[] = [
+  // Base Stats
+  'STRENGTH', 'BALLISTIC_SKILL', 'INTELLIGENCE', 'TOUGHNESS', 'WEAPON_SKILL', 'INITIATIVE', 'WILLPOWER', 'WOUNDS',
+  // Defense
+  'ARMOR', 'SPIRIT_RESISTANCE', 'ELEMENTAL_RESISTANCE', 'CORPOREAL_RESISTANCE', 'BLOCK', 'PARRY', 'EVADE', 'DISRUPT',
+  'CRITICAL_DAMAGE_TAKEN_REDUCTION', 'ARMOR_PENETRATION_REDUCTION', 'CRITICAL_HIT_RATE_REDUCTION', 'FORTITUDE',
+  // Combat
+  'ARMOR_PENETRATION', 'CRITICAL_DAMAGE', 'CRITICAL_HIT_RATE', 'MELEE_POWER', 'MELEE_CRIT_RATE', 'RANGED_POWER', 'RANGED_CRIT_RATE',
+  'AUTO_ATTACK_SPEED', 'AUTO_ATTACK_DAMAGE', 'BLOCK_STRIKETHROUGH', 'PARRY_STRIKETHROUGH', 'EVADE_STRIKETHROUGH',
+  // Magic
+  'MAGIC_POWER', 'MAGIC_CRIT_RATE', 'HEALING_POWER', 'HEAL_CRIT_RATE', 'DISRUPT_STRIKETHROUGH',
+  // Other
+  'ACTION_POINT_REGEN', 'HEALTH_REGEN', 'MORALE_REGEN', 'GOLD_LOOTED', 'XP_RECEIVED', 'RENOWN_RECEIVED', 'INFLUENCE_RECEIVED', 'HATE_CAUSED', 'HATE_RECEIVED',
+] as unknown as Stat[];
+
+function sanitizeHasStats(hasStats?: Stat[]): Stat[] | undefined {
+  if (!hasStats || hasStats.length === 0) return undefined;
+  const filtered = hasStats.filter(s => (ALLOWED_FILTER_STATS as unknown as string[]).includes(s as unknown as string));
+  return filtered.length ? filtered as Stat[] : undefined;
+}
+
 const GET_CHARACTER = gql`
   query GetCharacter($id: ID!) {
     character(id: $id) {
@@ -514,6 +536,7 @@ export const loadoutService = {
   // 3. Fetch items for equipment selection
   async getItemsForSlot(slot: EquipSlot, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
     try {
+      const allowedStats = sanitizeHasStats(hasStats);
       // Check if we need compatibility slots
       const needsCompatibility = (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4);
 
@@ -533,7 +556,7 @@ export const loadoutService = {
         // Query each slot separately and combine results
         const allResults = [];
         for (const slotToQuery of compatibleSlots) {
-          const result = await this.getItemsForSingleSlot(slotToQuery, career, compatibilityLimit, after, levelRequirement, renownRankRequirement, nameFilter, hasStats, hasRarities);
+          const result = await this.getItemsForSingleSlot(slotToQuery, career, compatibilityLimit, after, levelRequirement, renownRankRequirement, nameFilter, allowedStats, hasRarities);
           if (result.edges) {
             allResults.push(...result.edges);
           }
@@ -550,10 +573,10 @@ export const loadoutService = {
         });
 
         // Apply client-side stat filtering if hasStats is provided
-        if (hasStats && hasStats.length > 0) {
+        if (allowedStats && allowedStats.length > 0) {
           uniqueEdges = uniqueEdges.filter((edge: any) => {
             const item = edge.node;
-            return item.stats && item.stats.some((stat: any) => hasStats.includes(stat.stat));
+            return item.stats && item.stats.some((stat: any) => allowedStats.includes(stat.stat));
           });
         }
 
@@ -582,7 +605,7 @@ export const loadoutService = {
             levelRequirement,
             renownRankRequirement,
             nameFilter,
-            hasStats,
+            allowedStats,
             hasRarities
           );
           if (result.edges) {
@@ -601,10 +624,10 @@ export const loadoutService = {
         });
 
         // Apply client-side stat filtering if hasStats is provided
-        if (hasStats && hasStats.length > 0) {
+        if (allowedStats && allowedStats.length > 0) {
           uniqueEdges = uniqueEdges.filter((edge: any) => {
             const item = edge.node;
-            return item.stats && item.stats.some((stat: any) => hasStats.includes(stat.stat));
+            return item.stats && item.stats.some((stat: any) => allowedStats.includes(stat.stat));
           });
         }
 
@@ -639,7 +662,7 @@ export const loadoutService = {
         };
       } else {
         // Use the original single-slot query
-        const result = await this.getItemsForSingleSlot(slot, career, limit, after, levelRequirement, renownRankRequirement, nameFilter, hasStats, hasRarities);
+  const result = await this.getItemsForSingleSlot(slot, career, limit, after, levelRequirement, renownRankRequirement, nameFilter, allowedStats, hasRarities);
         
         return result;
       }
@@ -716,8 +739,9 @@ export const loadoutService = {
         variables.after = after;
       }
 
-      if (hasStats && hasStats.length > 0) {
-        variables.hasStats = hasStats;
+      const allowedStats = sanitizeHasStats(hasStats);
+      if (allowedStats && allowedStats.length > 0) {
+        variables.hasStats = allowedStats;
       }
 
       // Build the where clause dynamically
@@ -745,6 +769,11 @@ export const loadoutService = {
       console.error('Failed to fetch talismans for level req:', error);
       throw error;
     }
+  },
+
+  // Expose allowed filter stats for UI consumption
+  getAllowedFilterStats(): Stat[] {
+    return ALLOWED_FILTER_STATS as unknown as Stat[];
   },
 
   // 3.7. Get talismans for a specific slot (no special cases)
@@ -942,7 +971,7 @@ export const loadoutService = {
 
     loadoutEventEmitter.emit({
       type: 'LOADOUT_RESET',
-      payload: { loadoutId: 'reset' },
+      payload: { loadoutId: current ? current.id : 'reset' },
       timestamp: Date.now(),
     });
     // Recalculate stats after reset
@@ -1127,6 +1156,8 @@ export const loadoutService = {
     if (!src) throw new Error('Source loadout not found');
     const newName = name || `${src.name} (Copy)`;
     const newId = loadoutStoreAdapter.createLoadout(newName, src.level, src.renownRank, src.isFromCharacter, src.characterName);
+    // Emit creation event to notify subscribers that a new loadout exists
+    loadoutEventEmitter.emit({ type: 'LOADOUT_CREATED', payload: { loadoutId: newId, name: newName }, timestamp: Date.now() });
     // Copy career
     if (src.career) {
       loadoutStoreAdapter.setCareerForLoadout(newId, src.career);
@@ -1148,19 +1179,34 @@ export const loadoutService = {
   setCareerForLoadout(loadoutId: string, career: Career | null) {
     loadoutStoreAdapter.setCareerForLoadout(loadoutId, career);
     loadoutEventEmitter.emit({ type: 'CAREER_CHANGED', payload: { career }, timestamp: Date.now() });
+    // Level/career changes can affect eligibility; refresh stats and URL
+    this.getStatsSummary();
+    urlService.updateUrlForCurrentLoadout();
   },
   setLevelForLoadout(loadoutId: string, level: number) {
     loadoutStoreAdapter.setLevelForLoadout(loadoutId, level);
     loadoutEventEmitter.emit({ type: 'LEVEL_CHANGED', payload: { level }, timestamp: Date.now() });
+    this.getStatsSummary();
+    urlService.updateUrlForCurrentLoadout();
   },
   setRenownForLoadout(loadoutId: string, renownRank: number) {
     loadoutStoreAdapter.setRenownForLoadout(loadoutId, renownRank);
     loadoutEventEmitter.emit({ type: 'RENOWN_RANK_CHANGED', payload: { renownRank }, timestamp: Date.now() });
+    this.getStatsSummary();
+    urlService.updateUrlForCurrentLoadout();
   },
   setLoadoutNameForLoadout(loadoutId: string, name: string) {
     loadoutStoreAdapter.setLoadoutNameForLoadout(loadoutId, name);
     // No specific event type for name changes; reuse LOADOUT_SWITCHED to trigger subscribers to refresh labels
     loadoutEventEmitter.emit({ type: 'LOADOUT_SWITCHED', payload: { loadoutId }, timestamp: Date.now() });
+  },
+
+  // Update character metadata (name/from-character flag) for a specific loadout
+  setCharacterStatusForLoadout(loadoutId: string, isFromCharacter: boolean, characterName?: string) {
+    loadoutStoreAdapter.updateLoadoutCharacterStatus(loadoutId, isFromCharacter, characterName);
+    // Reuse LOADOUT_SWITCHED to trigger UI subscribers to refresh toolbar fields
+    loadoutEventEmitter.emit({ type: 'LOADOUT_SWITCHED', payload: { loadoutId }, timestamp: Date.now() });
+    urlService.updateUrlForCurrentLoadout();
   },
 
   // Compute stats for a specific loadout id without mutating state or emitting events
@@ -1172,10 +1218,11 @@ export const loadoutService = {
         weaponSkill: 0, ballisticSkill: 0, intelligence: 0, spiritResistance: 0, elementalResistance: 0, corporealResistance: 0,
         incomingDamage: 0, incomingDamagePercent: 0, outgoingDamage: 0, outgoingDamagePercent: 0,
         armor: 0, velocity: 0, block: 0, parry: 0, evade: 0, disrupt: 0, actionPointRegen: 0, moraleRegen: 0,
-        cooldown: 0, buildTime: 0, criticalDamage: 0, range: 0, autoAttackSpeed: 0, meleePower: 0, rangedPower: 0, magicPower: 0,
-        meleeCritRate: 0, rangedCritRate: 0, magicCritRate: 0, armorPenetration: 0, healingPower: 0, healthRegen: 0, maxActionPoints: 0, fortitude: 0,
-        armorPenetrationReduction: 0, criticalHitRateReduction: 0, blockStrikethrough: 0, parryStrikethrough: 0, evadeStrikethrough: 0, disruptStrikethrough: 0,
+        cooldown: 0, buildTime: 0, criticalDamage: 0, range: 0, autoAttackSpeed: 0, autoAttackDamage: 0, meleePower: 0, rangedPower: 0, magicPower: 0,
+        criticalHitRate: 0, meleeCritRate: 0, rangedCritRate: 0, magicCritRate: 0, armorPenetration: 0, healingPower: 0, healthRegen: 0, maxActionPoints: 0, fortitude: 0,
+        armorPenetrationReduction: 0, criticalDamageTakenReduction: 0, criticalHitRateReduction: 0, blockStrikethrough: 0, parryStrikethrough: 0, evadeStrikethrough: 0, disruptStrikethrough: 0,
         healCritRate: 0, mastery1Bonus: 0, mastery2Bonus: 0, mastery3Bonus: 0, outgoingHealPercent: 0, incomingHealPercent: 0,
+        goldLooted: 0, xpReceived: 0, renownReceived: 0, influenceReceived: 0, hateCaused: 0, hateReceived: 0,
       };
     }
 
@@ -1184,10 +1231,11 @@ export const loadoutService = {
       weaponSkill: 0, ballisticSkill: 0, intelligence: 0, spiritResistance: 0, elementalResistance: 0, corporealResistance: 0,
       incomingDamage: 0, incomingDamagePercent: 0, outgoingDamage: 0, outgoingDamagePercent: 0,
       armor: 0, velocity: 0, block: 0, parry: 0, evade: 0, disrupt: 0, actionPointRegen: 0, moraleRegen: 0,
-      cooldown: 0, buildTime: 0, criticalDamage: 0, range: 0, autoAttackSpeed: 0, meleePower: 0, rangedPower: 0, magicPower: 0,
-      meleeCritRate: 0, rangedCritRate: 0, magicCritRate: 0, armorPenetration: 0, healingPower: 0, healthRegen: 0, maxActionPoints: 0, fortitude: 0,
-      armorPenetrationReduction: 0, criticalHitRateReduction: 0, blockStrikethrough: 0, parryStrikethrough: 0, evadeStrikethrough: 0, disruptStrikethrough: 0,
+      cooldown: 0, buildTime: 0, criticalDamage: 0, range: 0, autoAttackSpeed: 0, autoAttackDamage: 0, meleePower: 0, rangedPower: 0, magicPower: 0,
+      criticalHitRate: 0, meleeCritRate: 0, rangedCritRate: 0, magicCritRate: 0, armorPenetration: 0, healingPower: 0, healthRegen: 0, maxActionPoints: 0, fortitude: 0,
+      armorPenetrationReduction: 0, criticalDamageTakenReduction: 0, criticalHitRateReduction: 0, blockStrikethrough: 0, parryStrikethrough: 0, evadeStrikethrough: 0, disruptStrikethrough: 0,
       healCritRate: 0, mastery1Bonus: 0, mastery2Bonus: 0, mastery3Bonus: 0, outgoingHealPercent: 0, incomingHealPercent: 0,
+      goldLooted: 0, xpReceived: 0, renownReceived: 0, influenceReceived: 0, hateCaused: 0, hateReceived: 0,
     };
 
     const isItemEligible = (item: import('../types').Item | null): boolean => {
@@ -1205,10 +1253,12 @@ export const loadoutService = {
         'INCOMING_DAMAGE': 'incomingDamage', 'INCOMING_DAMAGE_PERCENT': 'incomingDamagePercent', 'OUTGOING_DAMAGE': 'outgoingDamage', 'OUTGOING_DAMAGE_PERCENT': 'outgoingDamagePercent',
         'ARMOR': 'armor', 'VELOCITY': 'velocity', 'BLOCK': 'block', 'PARRY': 'parry', 'EVADE': 'evade', 'DISRUPT': 'disrupt',
         'ACTION_POINT_REGEN': 'actionPointRegen', 'MORALE_REGEN': 'moraleRegen', 'COOLDOWN': 'cooldown', 'BUILD_TIME': 'buildTime', 'CRITICAL_DAMAGE': 'criticalDamage', 'RANGE': 'range', 'AUTO_ATTACK_SPEED': 'autoAttackSpeed',
-        'MELEE_POWER': 'meleePower', 'RANGED_POWER': 'rangedPower', 'MAGIC_POWER': 'magicPower', 'MELEE_CRIT_RATE': 'meleeCritRate', 'RANGED_CRIT_RATE': 'rangedCritRate', 'MAGIC_CRIT_RATE': 'magicCritRate',
+        'AUTO_ATTACK_DAMAGE': 'autoAttackDamage',
+        'MELEE_POWER': 'meleePower', 'RANGED_POWER': 'rangedPower', 'MAGIC_POWER': 'magicPower', 'MELEE_CRIT_RATE': 'meleeCritRate', 'RANGED_CRIT_RATE': 'rangedCritRate', 'MAGIC_CRIT_RATE': 'magicCritRate', 'CRITICAL_HIT_RATE': 'criticalHitRate',
         'ARMOR_PENETRATION': 'armorPenetration', 'HEALING_POWER': 'healingPower', 'HEALTH_REGEN': 'healthRegen', 'MAX_ACTION_POINTS': 'maxActionPoints', 'FORTITUDE': 'fortitude',
-        'ARMOR_PENETRATION_REDUCTION': 'armorPenetrationReduction', 'CRITICAL_HIT_RATE_REDUCTION': 'criticalHitRateReduction', 'BLOCK_STRIKETHROUGH': 'blockStrikethrough', 'PARRY_STRIKETHROUGH': 'parryStrikethrough', 'EVADE_STRIKETHROUGH': 'evadeStrikethrough', 'DISRUPT_STRIKETHROUGH': 'disruptStrikethrough',
+        'ARMOR_PENETRATION_REDUCTION': 'armorPenetrationReduction', 'CRITICAL_DAMAGE_TAKEN_REDUCTION': 'criticalDamageTakenReduction', 'CRITICAL_HIT_RATE_REDUCTION': 'criticalHitRateReduction', 'BLOCK_STRIKETHROUGH': 'blockStrikethrough', 'PARRY_STRIKETHROUGH': 'parryStrikethrough', 'EVADE_STRIKETHROUGH': 'evadeStrikethrough', 'DISRUPT_STRIKETHROUGH': 'disruptStrikethrough',
         'HEAL_CRIT_RATE': 'healCritRate', 'MASTERY_1_BONUS': 'mastery1Bonus', 'MASTERY_2_BONUS': 'mastery2Bonus', 'MASTERY_3_BONUS': 'mastery3Bonus', 'OUTGOING_HEAL_PERCENT': 'outgoingHealPercent', 'INCOMING_HEAL_PERCENT': 'incomingHealPercent',
+        'GOLD_LOOTED': 'goldLooted', 'XP_RECEIVED': 'xpReceived', 'RENOWN_RECEIVED': 'renownReceived', 'INFLUENCE_RECEIVED': 'influenceReceived', 'HATE_CAUSED': 'hateCaused', 'HATE_RECEIVED': 'hateReceived',
       };
       return statMap[stat] || null;
     };
@@ -1283,10 +1333,10 @@ export const loadoutService = {
     const keyToEnum: Record<string, string> = {
       strength: 'STRENGTH', agility: 'AGILITY', willpower: 'WILLPOWER', toughness: 'TOUGHNESS', wounds: 'WOUNDS', initiative: 'INITIATIVE', weaponSkill: 'WEAPON_SKILL', ballisticSkill: 'BALLISTIC_SKILL', intelligence: 'INTELLIGENCE',
       spiritResistance: 'SPIRIT_RESISTANCE', elementalResistance: 'ELEMENTAL_RESISTANCE', corporealResistance: 'CORPOREAL_RESISTANCE', incomingDamage: 'INCOMING_DAMAGE', incomingDamagePercent: 'INCOMING_DAMAGE_PERCENT', outgoingDamage: 'OUTGOING_DAMAGE', outgoingDamagePercent: 'OUTGOING_DAMAGE_PERCENT',
-      armor: 'ARMOR', velocity: 'VELOCITY', block: 'BLOCK', parry: 'PARRY', evade: 'EVADE', disrupt: 'DISRUPT', actionPointRegen: 'ACTION_POINT_REGEN', moraleRegen: 'MORALE_REGEN', cooldown: 'COOLDOWN', buildTime: 'BUILD_TIME', criticalDamage: 'CRITICAL_DAMAGE', range: 'RANGE', autoAttackSpeed: 'AUTO_ATTACK_SPEED',
-      meleePower: 'MELEE_POWER', rangedPower: 'RANGED_POWER', magicPower: 'MAGIC_POWER', meleeCritRate: 'MELEE_CRIT_RATE', rangedCritRate: 'RANGED_CRIT_RATE', magicCritRate: 'MAGIC_CRIT_RATE', armorPenetration: 'ARMOR_PENETRATION', healingPower: 'HEALING_POWER', healthRegen: 'HEALTH_REGEN', maxActionPoints: 'MAX_ACTION_POINTS', fortitude: 'FORTITUDE',
-      armorPenetrationReduction: 'ARMOR_PENETRATION_REDUCTION', criticalHitRateReduction: 'CRITICAL_HIT_RATE_REDUCTION', blockStrikethrough: 'BLOCK_STRIKETHROUGH', parryStrikethrough: 'PARRY_STRIKETHROUGH', evadeStrikethrough: 'EVADE_STRIKETHROUGH', disruptStrikethrough: 'DISRUPT_STRIKETHROUGH', healCritRate: 'HEAL_CRIT_RATE',
-      mastery1Bonus: 'MASTERY_1_BONUS', mastery2Bonus: 'MASTERY_2_BONUS', mastery3Bonus: 'MASTERY_3_BONUS', outgoingHealPercent: 'OUTGOING_HEAL_PERCENT', incomingHealPercent: 'INCOMING_HEAL_PERCENT',
+      armor: 'ARMOR', velocity: 'VELOCITY', block: 'BLOCK', parry: 'PARRY', evade: 'EVADE', disrupt: 'DISRUPT', actionPointRegen: 'ACTION_POINT_REGEN', moraleRegen: 'MORALE_REGEN', cooldown: 'COOLDOWN', buildTime: 'BUILD_TIME', criticalDamage: 'CRITICAL_DAMAGE', range: 'RANGE', autoAttackSpeed: 'AUTO_ATTACK_SPEED', autoAttackDamage: 'AUTO_ATTACK_DAMAGE',
+      meleePower: 'MELEE_POWER', rangedPower: 'RANGED_POWER', magicPower: 'MAGIC_POWER', criticalHitRate: 'CRITICAL_HIT_RATE', meleeCritRate: 'MELEE_CRIT_RATE', rangedCritRate: 'RANGED_CRIT_RATE', magicCritRate: 'MAGIC_CRIT_RATE', armorPenetration: 'ARMOR_PENETRATION', healingPower: 'HEALING_POWER', healthRegen: 'HEALTH_REGEN', maxActionPoints: 'MAX_ACTION_POINTS', fortitude: 'FORTITUDE',
+      armorPenetrationReduction: 'ARMOR_PENETRATION_REDUCTION', criticalDamageTakenReduction: 'CRITICAL_DAMAGE_TAKEN_REDUCTION', criticalHitRateReduction: 'CRITICAL_HIT_RATE_REDUCTION', blockStrikethrough: 'BLOCK_STRIKETHROUGH', parryStrikethrough: 'PARRY_STRIKETHROUGH', evadeStrikethrough: 'EVADE_STRIKETHROUGH', disruptStrikethrough: 'DISRUPT_STRIKETHROUGH', healCritRate: 'HEAL_CRIT_RATE',
+      mastery1Bonus: 'MASTERY_1_BONUS', mastery2Bonus: 'MASTERY_2_BONUS', mastery3Bonus: 'MASTERY_3_BONUS', outgoingHealPercent: 'OUTGOING_HEAL_PERCENT', incomingHealPercent: 'INCOMING_HEAL_PERCENT', goldLooted: 'GOLD_LOOTED', xpReceived: 'XP_RECEIVED', renownReceived: 'RENOWN_RECEIVED', influenceReceived: 'INFLUENCE_RECEIVED', hateCaused: 'HATE_CAUSED', hateReceived: 'HATE_RECEIVED',
     };
     const target = keyToEnum[String(statKey)] || '';
 

@@ -14,6 +14,7 @@ function formatStatValue(value: number, isPercentage: boolean = false): string {
 export default function StatsComparePanel() {
   const [aId, setAId] = useState<string | null>(loadoutService.getSideLoadoutId('A'));
   const [bId, setBId] = useState<string | null>(loadoutService.getSideLoadoutId('B'));
+  const [tick, setTick] = useState(0); // force rerender on stats updates
   // no external version tick needed; event updates of ids trigger rerender
 
   useEffect(() => {
@@ -34,8 +35,11 @@ export default function StatsComparePanel() {
         'CAREER_CHANGED',
         'SIDE_LOADOUT_ASSIGNED',
         'ACTIVE_SIDE_CHANGED',
+        'STATS_UPDATED',
       ].includes(ev.type)) {
         pull();
+        // Force rerender to recompute stats even if ids unchanged
+        setTick((t) => t + 1);
       }
     });
     return unsub;
@@ -71,9 +75,11 @@ export default function StatsComparePanel() {
     criticalDamage: 0,
     range: 0,
     autoAttackSpeed: 0,
+    autoAttackDamage: 0,
     meleePower: 0,
     rangedPower: 0,
     magicPower: 0,
+    criticalHitRate: 0,
     meleeCritRate: 0,
     rangedCritRate: 0,
     magicCritRate: 0,
@@ -83,6 +89,7 @@ export default function StatsComparePanel() {
     maxActionPoints: 0,
     fortitude: 0,
     armorPenetrationReduction: 0,
+    criticalDamageTakenReduction: 0,
     criticalHitRateReduction: 0,
     blockStrikethrough: 0,
     parryStrikethrough: 0,
@@ -94,10 +101,22 @@ export default function StatsComparePanel() {
     mastery3Bonus: 0,
     outgoingHealPercent: 0,
     incomingHealPercent: 0,
+    goldLooted: 0,
+    xpReceived: 0,
+    renownReceived: 0,
+    influenceReceived: 0,
+    hateCaused: 0,
+    hateReceived: 0,
   }), []);
 
-  const statsA: StatsSummary = aId ? loadoutService.computeStatsForLoadout(aId) : empty;
-  const statsB: StatsSummary = bId ? loadoutService.computeStatsForLoadout(bId) : empty;
+  const statsA: StatsSummary = useMemo(
+    () => (aId ? loadoutService.computeStatsForLoadout(aId) : empty),
+    [aId, tick]
+  );
+  const statsB: StatsSummary = useMemo(
+    () => (bId ? loadoutService.computeStatsForLoadout(bId) : empty),
+    [bId, tick]
+  );
 
   // Removed A/B equipped counts and related helpers per request
 
@@ -108,7 +127,6 @@ export default function StatsComparePanel() {
 
   const baseDefs = [
     { key: 'strength' as const },
-    { key: 'agility' as const },
     { key: 'ballisticSkill' as const },
     { key: 'intelligence' as const },
     { key: 'toughness' as const },
@@ -121,25 +139,28 @@ export default function StatsComparePanel() {
   const defenseDefs = [
     { key: 'armor' as const },
     { key: 'spiritResistance' as const },
-    { key: 'corporealResistance' as const },
     { key: 'elementalResistance' as const },
+    { key: 'corporealResistance' as const },
     { key: 'block' as const, isPercentage: true },
     { key: 'parry' as const, isPercentage: true },
-    { key: 'disrupt' as const, isPercentage: true },
     { key: 'evade' as const, isPercentage: true },
+    { key: 'disrupt' as const, isPercentage: true },
+    { key: 'criticalDamageTakenReduction' as const },
     { key: 'armorPenetrationReduction' as const },
     { key: 'criticalHitRateReduction' as const },
+    { key: 'fortitude' as const },
   ];
 
   const combatDefs = [
-    { key: 'outgoingDamage' as const },
-    { key: 'criticalDamage' as const },
-    { key: 'incomingDamage' as const },
-    { key: 'meleePower' as const },
-    { key: 'rangedPower' as const },
     { key: 'armorPenetration' as const },
+    { key: 'criticalDamage' as const },
+    { key: 'criticalHitRate' as const, isPercentage: true },
+    { key: 'meleePower' as const },
     { key: 'meleeCritRate' as const, isPercentage: true },
+    { key: 'rangedPower' as const },
     { key: 'rangedCritRate' as const, isPercentage: true },
+    { key: 'autoAttackSpeed' as const },
+    { key: 'autoAttackDamage' as const },
     { key: 'blockStrikethrough' as const },
     { key: 'parryStrikethrough' as const },
     { key: 'evadeStrikethrough' as const },
@@ -150,27 +171,19 @@ export default function StatsComparePanel() {
     { key: 'magicCritRate' as const, isPercentage: true },
     { key: 'healingPower' as const },
     { key: 'healCritRate' as const, isPercentage: true },
-    { key: 'outgoingHealPercent' as const, isPercentage: true },
-    { key: 'incomingHealPercent' as const, isPercentage: true },
     { key: 'disruptStrikethrough' as const },
   ];
 
   const otherDefs = [
-    { key: 'velocity' as const },
     { key: 'actionPointRegen' as const },
-    { key: 'moraleRegen' as const },
-    { key: 'cooldown' as const },
-    { key: 'range' as const },
-    { key: 'autoAttackSpeed' as const },
-    { key: 'outgoingDamagePercent' as const, isPercentage: true },
-    { key: 'incomingDamagePercent' as const, isPercentage: true },
-    { key: 'buildTime' as const },
     { key: 'healthRegen' as const },
-    { key: 'maxActionPoints' as const },
-    { key: 'fortitude' as const },
-    { key: 'mastery1Bonus' as const },
-    { key: 'mastery2Bonus' as const },
-    { key: 'mastery3Bonus' as const },
+    { key: 'moraleRegen' as const },
+    { key: 'goldLooted' as const },
+    { key: 'xpReceived' as const },
+    { key: 'renownReceived' as const },
+    { key: 'influenceReceived' as const },
+    { key: 'hateCaused' as const },
+    { key: 'hateReceived' as const },
   ];
 
   const baseRows = makeRows(baseDefs);

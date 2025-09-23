@@ -15,6 +15,9 @@ export function useLoadoutById(loadoutId: string | null) {
       switch (ev.type) {
         case 'ITEM_UPDATED':
         case 'TALISMAN_UPDATED':
+        case 'CAREER_CHANGED':
+        case 'LEVEL_CHANGED':
+        case 'RENOWN_RANK_CHANGED':
         case 'LOADOUT_RESET':
         case 'LOADOUT_CREATED':
         case 'LOADOUT_SWITCHED':
