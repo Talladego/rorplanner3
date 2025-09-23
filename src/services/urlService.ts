@@ -1,19 +1,30 @@
-import { Career, Loadout, LoadoutItem } from '../types';
+import { Career, Loadout, LoadoutItem, EquipSlot, LoadoutSide } from '../types';
+import { loadoutStoreAdapter } from '../store/loadoutStoreAdapter';
+import { loadoutService } from './loadoutService';
 
 class UrlService {
-  // URL handling unplugged; navigate callback disabled
-  // Keeping API shape but not storing any callback
+  // Navigation callback provided by App via react-router's navigate
+  private navigateCb: ((path: string, options?: { replace?: boolean }) => void) | null = null;
+  // Suppress URL updates while applying state from URL
+  private suppressUpdates = false;
 
   // Set the navigation callback (to be called from React components)
   setNavigateCallback(_callback: (path: string, options?: { replace?: boolean }) => void) {
-    // No-op while URL handling is unplugged
-    void _callback;
-    return;
+    this.navigateCb = _callback;
   }
 
   // Get URL search parameters (works with HashRouter)
   getSearchParams(): URLSearchParams {
-    return new URLSearchParams();
+    // HashRouter puts the search after the '#'
+    const hash = window.location.hash || '';
+    const qIndex = hash.indexOf('?');
+    if (qIndex >= 0) {
+      const qs = hash.substring(qIndex + 1);
+      return new URLSearchParams(qs);
+    }
+    // Fallback to standard search if present
+    const search = window.location.search || '';
+    return new URLSearchParams(search.startsWith('?') ? search.substring(1) : search);
   }
 
   // Get a specific URL parameter
@@ -23,10 +34,27 @@ class UrlService {
 
   // Update the URL with new search parameters
   updateUrl(_params: Record<string, string | null>, _options: { replace?: boolean } = {}) {
-    // No-op while URL handling is unplugged
-    void _params;
-    void _options;
-    return;
+    if (this.suppressUpdates) return;
+    const params = this.getSearchParams();
+    // Merge
+    Object.entries(_params).forEach(([k, v]) => {
+      if (v === null || v === undefined) params.delete(k);
+      else params.set(k, v);
+    });
+    const qs = params.toString();
+    const path = `?${qs}`;
+    if (this.navigateCb) {
+      this.navigateCb(path, _options);
+    } else {
+      // Fallback update for hash routing
+      const base = window.location.href.split('#')[0];
+      const newHash = `#/${qs ? `?${qs}` : ''}`;
+      if (_options.replace) {
+        window.history.replaceState(null, '', `${base}${newHash}`);
+      } else {
+        window.location.hash = `/${qs ? `?${qs}` : ''}`;
+      }
+    }
   }
 
   // Encode loadout data into URL parameters
@@ -184,37 +212,158 @@ class UrlService {
 
   // Update URL with current loadout data
   updateUrlWithLoadout(_loadout: Loadout): void {
-    // No-op while URL handling is unplugged
-    void _loadout;
-    return;
+    const params = this.encodeLoadoutToUrl(_loadout);
+    this.updateUrl({ ...params, mode: null, activeSide: null });
   }
 
   // Update URL with dual-mode compare data for sides A and B
   updateUrlWithCompare(_aLoadout: Loadout | null, _bLoadout: Loadout | null, _activeSide: 'A' | 'B'): void {
-    // No-op while URL handling is unplugged
-    void _aLoadout;
-    void _bLoadout;
-    void _activeSide;
-    return;
+    const params: Record<string, string | null> = { mode: 'dual', activeSide: _activeSide.toLowerCase() };
+    if (_aLoadout) {
+      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', _aLoadout));
+      if (_aLoadout.isFromCharacter && _aLoadout.characterName) params.loadCharacterA = _aLoadout.characterName;
+    }
+    if (_bLoadout) {
+      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', _bLoadout));
+      if (_bLoadout.isFromCharacter && _bLoadout.characterName) params.loadCharacterB = _bLoadout.characterName;
+    }
+    this.updateUrl(params, { replace: true });
   }
 
   // Handle character loading from URL
   async handleCharacterFromUrl(_characterName: string): Promise<void> {
-    // Disabled
-    void _characterName;
-    return;
+    if (!_characterName) return;
+    // Delegate to service; URL updates during load suppressed
+    this.suppressUpdates = true;
+    try {
+      await loadoutService.loadFromNamedCharacter(_characterName);
+    } finally {
+      this.suppressUpdates = false;
+    }
   }
 
   // Handle loadout loading from URL parameters
   async handleLoadoutFromUrlParams(): Promise<void> {
-    // Disabled
-    return;
+    const decoded = this.decodeLoadoutFromUrl();
+    if (!decoded) return;
+    this.suppressUpdates = true;
+    try {
+      // Apply to active side (default 'A')
+      const side: LoadoutSide = 'A';
+      const id = await loadoutService.selectSideForEdit(side);
+      const char = this.getParam('loadCharacter');
+      // Core fields
+      loadoutService.setLevelForLoadout(id, decoded.level);
+      loadoutService.setRenownForLoadout(id, decoded.renownRank);
+      loadoutService.setCareerForLoadout(id, decoded.career);
+      if (char) {
+        loadoutService.setCharacterStatusForLoadout(id, true, char);
+      }
+      // Items and talismans
+      const itemPromises: Promise<void>[] = [];
+      Object.entries(decoded.items).forEach(([slotKey, data]) => {
+        const slot = slotKey as unknown as EquipSlot;
+        if (data.item?.id) {
+          itemPromises.push(
+            (async () => {
+              const item = await loadoutService.getItemWithDetails(data.item!.id);
+              await loadoutService.updateItemForLoadout(id, slot, item);
+            })()
+          );
+        }
+        data.talismans.forEach((t, idx) => {
+          if (t?.id) {
+            itemPromises.push(
+              (async () => {
+                const tal = await loadoutService.getItemWithDetails(t.id);
+                await loadoutService.updateTalismanForLoadout(id, slot, idx, tal);
+              })()
+            );
+          }
+        });
+      });
+      await Promise.all(itemPromises);
+      // Ensure URL reflects single loadout form
+      this.updateUrlWithLoadout(loadoutStoreAdapter.getLoadoutForSide(side)!);
+    } finally {
+      this.suppressUpdates = false;
+    }
   }
 
   // Handle dual compare state from URL
   async handleCompareFromUrl(): Promise<void> {
-    // Disabled
-    return;
+    const params = this.getSearchParams();
+    const a = this.decodeLoadoutFromUrlWithPrefix('a');
+    const b = this.decodeLoadoutFromUrlWithPrefix('b');
+    if (!a && !b) return;
+    const active = (params.get('activeSide') === 'b' ? 'B' : 'A') as LoadoutSide;
+    this.suppressUpdates = true;
+    try {
+      // Apply A
+      if (a) {
+        const aId = await loadoutService.selectSideForEdit('A');
+        loadoutService.setLevelForLoadout(aId, a.level);
+        loadoutService.setRenownForLoadout(aId, a.renownRank);
+        loadoutService.setCareerForLoadout(aId, a.career);
+        const charA = params.get('loadCharacterA');
+        if (charA) loadoutService.setCharacterStatusForLoadout(aId, true, charA);
+        const tasks: Promise<void>[] = [];
+        Object.entries(a.items).forEach(([slotKey, data]) => {
+          const slot = slotKey as unknown as EquipSlot;
+          if (data.item?.id) {
+            tasks.push((async () => {
+              const item = await loadoutService.getItemWithDetails(data.item!.id);
+              await loadoutService.updateItemForLoadout(aId, slot, item);
+            })());
+          }
+          data.talismans.forEach((t, idx) => {
+            if (t?.id) {
+              tasks.push((async () => {
+                const tal = await loadoutService.getItemWithDetails(t.id);
+                await loadoutService.updateTalismanForLoadout(aId, slot, idx, tal);
+              })());
+            }
+          });
+        });
+        await Promise.all(tasks);
+      }
+      // Apply B
+      if (b) {
+        const bId = await loadoutService.selectSideForEdit('B');
+        loadoutService.setLevelForLoadout(bId, b.level);
+        loadoutService.setRenownForLoadout(bId, b.renownRank);
+        loadoutService.setCareerForLoadout(bId, b.career);
+        const charB = params.get('loadCharacterB');
+        if (charB) loadoutService.setCharacterStatusForLoadout(bId, true, charB);
+        const tasks: Promise<void>[] = [];
+        Object.entries(b.items).forEach(([slotKey, data]) => {
+          const slot = slotKey as unknown as EquipSlot;
+          if (data.item?.id) {
+            tasks.push((async () => {
+              const item = await loadoutService.getItemWithDetails(data.item!.id);
+              await loadoutService.updateItemForLoadout(bId, slot, item);
+            })());
+          }
+          data.talismans.forEach((t, idx) => {
+            if (t?.id) {
+              tasks.push((async () => {
+                const tal = await loadoutService.getItemWithDetails(t.id);
+                await loadoutService.updateTalismanForLoadout(bId, slot, idx, tal);
+              })());
+            }
+          });
+        });
+        await Promise.all(tasks);
+      }
+      // Set active side
+      loadoutService.setActiveSide(active);
+      // Normalize URL to reflect full compare state
+      const aLoadout = loadoutStoreAdapter.getLoadoutForSide('A');
+      const bLoadout = loadoutStoreAdapter.getLoadoutForSide('B');
+      this.updateUrlWithCompare(aLoadout, bLoadout, active);
+    } finally {
+      this.suppressUpdates = false;
+    }
   }
 
   // Update URL when character is loaded manually
@@ -224,8 +373,11 @@ class UrlService {
 
   // Update URL when loadout is modified (replaces the old updateUrlForLoadout)
   updateUrlForCurrentLoadout(): void {
-    // Disabled
-    return;
+    if (this.suppressUpdates) return;
+    const a = loadoutStoreAdapter.getLoadoutForSide('A');
+    const b = loadoutStoreAdapter.getLoadoutForSide('B');
+    const active = loadoutStoreAdapter.getActiveSide();
+    this.updateUrlWithCompare(a, b, active);
   }
 
   // Clear character parameter from URL
@@ -236,8 +388,27 @@ class UrlService {
 
   // Clear all loadout parameters from URL
   clearLoadoutFromUrl(): void {
-    // Disabled
-    return;
+    const params = this.getSearchParams();
+    // Remove all known keys
+    const keys = Array.from(params.keys());
+    keys.forEach(k => params.delete(k));
+    this.updateUrl(Object.fromEntries(params.entries()), { replace: true });
+  }
+
+  // Build a shareable URL for current compare state
+  buildCompareShareUrl(a: Loadout | null, b: Loadout | null, active: LoadoutSide): string {
+    const base = window.location.href.split('#')[0];
+    const params: Record<string, string | null> = { mode: 'dual', activeSide: active.toLowerCase() };
+    if (a) {
+      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', a));
+      if (a.isFromCharacter && a.characterName) params.loadCharacterA = a.characterName;
+    }
+    if (b) {
+      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', b));
+      if (b.isFromCharacter && b.characterName) params.loadCharacterB = b.characterName;
+    }
+    const qs = new URLSearchParams(Object.entries(params).filter(([,v]) => v != null) as [string,string][]).toString();
+    return `${base}#/?${qs}`;
   }
 }
 

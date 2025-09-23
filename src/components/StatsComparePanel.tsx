@@ -3,6 +3,7 @@ import { loadoutService } from '../services/loadoutService';
 import { formatCamelCase } from '../utils/formatters';
 import HoverTooltip from './HoverTooltip';
 import type { StatsSummary } from '../types';
+import { urlService } from '../services/urlService';
 
 function formatStatValue(value: number, isPercentage: boolean = false): string {
   if (isPercentage) {
@@ -15,6 +16,8 @@ export default function StatsComparePanel() {
   const [aId, setAId] = useState<string | null>(loadoutService.getSideLoadoutId('A'));
   const [bId, setBId] = useState<string | null>(loadoutService.getSideLoadoutId('B'));
   const [tick, setTick] = useState(0); // force rerender on stats updates
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
   // no external version tick needed; event updates of ids trigger rerender
 
   useEffect(() => {
@@ -301,7 +304,22 @@ export default function StatsComparePanel() {
 
   return (
     <div className="panel-container">
-      <h2 className="panel-heading">Compare Stats</h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="panel-heading mb-0">Compare Stats</h2>
+        <button
+          className="btn btn-primary btn-sm"
+          onClick={() => {
+            const a = aId ? loadoutService.getLoadoutForSide('A') : null;
+            const b = bId ? loadoutService.getLoadoutForSide('B') : null;
+            const active = loadoutService.getActiveSide();
+            const url = urlService.buildCompareShareUrl(a, b, active);
+            setShareUrl(url);
+            setShareOpen(true);
+          }}
+        >
+          Share
+        </button>
+      </div>
       {(!aId || !bId) && (
         <div className="text-xs text-muted mb-2">Assign loadouts to both A and B to compare.</div>
       )}
@@ -330,6 +348,42 @@ export default function StatsComparePanel() {
       <div className="stats-section">
         {renderSection('Other', otherRows)}
       </div>
+
+      {shareOpen && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShareOpen(false);
+          }}
+        >
+          <div className="modal-container max-w-2xl">
+            <div className="modal-header">
+              <h3 className="modal-title">Share Link</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(shareUrl);
+                    } catch {}
+                  }}
+                >Copy</button>
+                <button className="btn btn-primary btn-sm" onClick={() => setShareOpen(false)}>Close</button>
+              </div>
+            </div>
+            <div>
+              <input
+                readOnly
+                value={shareUrl}
+                className="form-input form-input-text w-full rounded-md p-2"
+                onFocus={(e) => e.currentTarget.select()}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
