@@ -59,34 +59,14 @@ function App() {
   useEffect(() => {
     const keys = Array.from(urlService.getSearchParams().keys());
     const loadCharacter = urlService.getParam('loadCharacter');
-    const hasLoadoutParams = urlService.getParam('career') || urlService.getParam('level') ||
-                             keys.some(key => key.startsWith('item.') || key.startsWith('talisman.'));
-    const hasCompareParams = urlService.getParam('mode') === 'dual' ||
-                             keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
+    const hasCompareParams = keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB')
+      || !!(urlService.getParam('career') || urlService.getParam('level') || loadCharacter || keys.some(key => key.startsWith('item.') || key.startsWith('talisman.')));
 
     if (hasCompareParams) {
       // Load dual compare state from URL
       urlService.handleCompareFromUrl()
         .then(() => setErrorMessage(''))
         .catch((error) => setErrorMessage(`Failed to load compare from URL: ${(error as Error).message}`));
-    } else if (loadCharacter) {
-      // Load character from URL parameter
-      urlService.handleCharacterFromUrl(loadCharacter)
-        .then(() => {
-          setErrorMessage(''); // Clear any previous error
-        })
-        .catch((error) => {
-          setErrorMessage(`Failed to load character "${loadCharacter}" from URL: ${(error as Error).message}`);
-        });
-    } else if (hasLoadoutParams) {
-      // Load loadout from URL parameters
-      urlService.handleLoadoutFromUrlParams()
-        .then(() => {
-          setErrorMessage(''); // Clear any previous error
-        })
-        .catch((error) => {
-          setErrorMessage(`Failed to load loadout from URL parameters: ${(error as Error).message}`);
-        });
     } else {
       // Default path: ensure dual compare mode has both sides initialized
       try {
@@ -102,32 +82,14 @@ function App() {
   useEffect(() => {
     const keys = Array.from(urlService.getSearchParams().keys());
     const loadCharacter = urlService.getParam('loadCharacter');
-    const hasLoadoutParams = urlService.getParam('career') || urlService.getParam('level') ||
-                             keys.some(key => key.startsWith('item.') || key.startsWith('talisman.'));
-    const hasCompareParams = urlService.getParam('mode') === 'dual' ||
-                             keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
+    const hasCompareParams = keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB')
+      || !!(urlService.getParam('career') || urlService.getParam('level') || loadCharacter || keys.some(key => key.startsWith('item.') || key.startsWith('talisman.')));
 
     // Only load if there are parameters and we're not in an error state
     if (hasCompareParams && !errorMessage.includes('Failed to load compare')) {
       urlService.handleCompareFromUrl()
         .then(() => setErrorMessage(''))
         .catch((error) => setErrorMessage(`Failed to load compare from URL: ${(error as Error).message}`));
-    } else if (loadCharacter && !errorMessage.includes('Failed to load character')) {
-      urlService.handleCharacterFromUrl(loadCharacter)
-        .then(() => {
-          setErrorMessage(''); // Clear any previous error
-        })
-        .catch((error) => {
-          setErrorMessage(`Failed to load character "${loadCharacter}" from URL: ${(error as Error).message}`);
-        });
-    } else if (hasLoadoutParams && !errorMessage.includes('Failed to load loadout')) {
-      urlService.handleLoadoutFromUrlParams()
-        .then(() => {
-          setErrorMessage(''); // Clear any previous error
-        })
-        .catch((error) => {
-          setErrorMessage(`Failed to load loadout from URL parameters: ${(error as Error).message}`);
-        });
     }
   }, [location.search, errorMessage]); // Re-run when URL search params change or error state changes
 

@@ -218,7 +218,7 @@ class UrlService {
 
   // Update URL with dual-mode compare data for sides A and B
   updateUrlWithCompare(_aLoadout: Loadout | null, _bLoadout: Loadout | null, _activeSide: 'A' | 'B'): void {
-    const params: Record<string, string | null> = { mode: 'dual', activeSide: _activeSide.toLowerCase() };
+    const params: Record<string, string | null> = { activeSide: _activeSide.toLowerCase() };
     if (_aLoadout) {
       Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', _aLoadout));
       if (_aLoadout.isFromCharacter && _aLoadout.characterName) params.loadCharacterA = _aLoadout.characterName;
@@ -295,10 +295,47 @@ class UrlService {
     const params = this.getSearchParams();
     const a = this.decodeLoadoutFromUrlWithPrefix('a');
     const b = this.decodeLoadoutFromUrlWithPrefix('b');
-    if (!a && !b) return;
+    const keys = Array.from(params.keys());
+    const hasSingle = !!(params.get('career') || params.get('level') || keys.some(k => k.startsWith('item.') || k.startsWith('talisman.')) || params.get('loadCharacter'));
+    if (!a && !b && !hasSingle) return;
     const active = (params.get('activeSide') === 'b' ? 'B' : 'A') as LoadoutSide;
     this.suppressUpdates = true;
     try {
+      // Fallback: treat legacy single-mode params as side A
+      if (!a && !b && hasSingle) {
+        const s = this.decodeLoadoutFromUrl();
+        const aId = await loadoutService.selectSideForEdit('A');
+        loadoutService.setLevelForLoadout(aId, s.level);
+        loadoutService.setRenownForLoadout(aId, s.renownRank);
+        loadoutService.setCareerForLoadout(aId, s.career);
+        const char = params.get('loadCharacter');
+        if (char) loadoutService.setCharacterStatusForLoadout(aId, true, char);
+        const tasks: Promise<void>[] = [];
+        Object.entries(s.items).forEach(([slotKey, data]) => {
+          const slot = slotKey as unknown as EquipSlot;
+          if (data.item?.id) {
+            tasks.push((async () => {
+              const item = await loadoutService.getItemWithDetails(data.item!.id);
+              await loadoutService.updateItemForLoadout(aId, slot, item);
+            })());
+          }
+          data.talismans.forEach((t, idx) => {
+            if (t?.id) {
+              tasks.push((async () => {
+                const tal = await loadoutService.getItemWithDetails(t.id);
+                await loadoutService.updateTalismanForLoadout(aId, slot, idx, tal);
+              })());
+            }
+          });
+        });
+        await Promise.all(tasks);
+        // Ensure a B loadout exists for compare mode
+        loadoutService.ensureSideLoadout('B');
+        const aLoadout = loadoutStoreAdapter.getLoadoutForSide('A');
+        const bLoadout = loadoutStoreAdapter.getLoadoutForSide('B');
+        this.updateUrlWithCompare(aLoadout, bLoadout, 'A');
+        return;
+      }
       // Apply A
       if (a) {
         const aId = await loadoutService.selectSideForEdit('A');
@@ -373,11 +410,8 @@ class UrlService {
 
   // Update URL when loadout is modified (replaces the old updateUrlForLoadout)
   updateUrlForCurrentLoadout(): void {
-    if (this.suppressUpdates) return;
-    const a = loadoutStoreAdapter.getLoadoutForSide('A');
-    const b = loadoutStoreAdapter.getLoadoutForSide('B');
-    const active = loadoutStoreAdapter.getActiveSide();
-    this.updateUrlWithCompare(a, b, active);
+    // Intentionally disabled: URL does not need to update live.
+    return;
   }
 
   // Clear character parameter from URL
@@ -398,7 +432,7 @@ class UrlService {
   // Build a shareable URL for current compare state
   buildCompareShareUrl(a: Loadout | null, b: Loadout | null, active: LoadoutSide): string {
     const base = window.location.href.split('#')[0];
-    const params: Record<string, string | null> = { mode: 'dual', activeSide: active.toLowerCase() };
+    const params: Record<string, string | null> = { activeSide: active.toLowerCase() };
     if (a) {
       Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', a));
       if (a.isFromCharacter && a.characterName) params.loadCharacterA = a.characterName;
