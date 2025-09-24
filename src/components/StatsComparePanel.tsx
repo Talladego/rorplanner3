@@ -300,7 +300,7 @@ export default function StatsComparePanel() {
         {(!aId || !bId) && (
           <div className="text-xs text-muted mb-2">Assign loadouts to both A and B to compare.</div>
         )}
-        <div className="stats-empty-message">Equip items to see stat bonuses</div>
+        <div className="stats-empty-message">Select a career and equip items or load a character to see stat bonuses</div>
       </div>
     );
   }

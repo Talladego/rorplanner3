@@ -48,10 +48,14 @@ function buildSummary(loadout: Loadout | null) {
 
   orderedSlots.forEach((slot) => {
     const data = loadout.items[slot];
-    const itemName = data?.item?.name || '—';
-    out += line(`- ${formatSlotName(slot)}: ${itemName}`);
-    if (data?.talismans && data.talismans.length > 0) {
-      const tl = data.talismans.map(t => t?.name || '—').filter(Boolean);
+    const hasItem = !!data?.item;
+    const talismans = data?.talismans || [];
+    const hasTalismans = talismans.some(t => !!t);
+    if (!hasItem && !hasTalismans) return; // skip empty slots entirely
+    const itemName = data?.item?.name || '';
+    out += line(`- ${formatSlotName(slot)}: ${itemName || '(talisman only)'}`);
+    if (hasTalismans) {
+      const tl = talismans.map(t => t?.name).filter((n): n is string => !!n);
       if (tl.length) out += line(`  Talismans: ${tl.join(', ')}`);
     }
   });

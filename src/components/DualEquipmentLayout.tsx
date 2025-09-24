@@ -77,22 +77,57 @@ export default function DualEquipmentLayout() {
     }
   };
 
-  const sideHeader = (label: 'A' | 'B') => (
-    <div className="flex items-center justify-between mb-2">
-      <div className="flex items-center gap-2">
-        <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${label === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{label}</span>
+  const isLoadoutEmpty = (lo: Loadout | null): boolean => {
+    if (!lo) return true;
+    // Consider empty if no items are equipped (all items null) and no talismans present
+    for (const data of Object.values(lo.items)) {
+      if (data.item) return false;
+      if (data.talismans && data.talismans.some(t => !!t)) return false;
+    }
+    return true;
+  };
+
+  const sideHeader = (label: 'A' | 'B') => {
+    const other = label === 'A' ? sideB : sideA;
+    const self = label === 'A' ? sideA : sideB;
+    const otherEmpty = isLoadoutEmpty(other);
+    const selfEmpty = isLoadoutEmpty(self);
+    return (
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${label === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{label}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {/* Summary first, to the left of Copy buttons */}
+          <button onClick={() => setSummaryOpenFor(label)} className="btn btn-primary btn-sm whitespace-nowrap">Summary</button>
+          {label === 'A' ? (
+            <button
+              onClick={() => copySide('B','A')}
+              className={`btn btn-primary btn-sm whitespace-nowrap ${otherEmpty ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={otherEmpty}
+            >
+              Copy from B
+            </button>
+          ) : (
+            <button
+              onClick={() => copySide('A','B')}
+              className={`btn btn-primary btn-sm whitespace-nowrap ${otherEmpty ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={otherEmpty}
+            >
+              Copy from A
+            </button>
+          )}
+          <button
+            onClick={() => clearSide(label)}
+            className={`btn btn-primary btn-sm whitespace-nowrap ${selfEmpty ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={selfEmpty}
+          >
+            Clear
+          </button>
+        </div>
       </div>
-      <div className="flex items-center gap-1">
-        {label === 'A' ? (
-          <button onClick={() => copySide('B','A')} className="btn btn-primary btn-sm whitespace-nowrap">Copy from B</button>
-        ) : (
-          <button onClick={() => copySide('A','B')} className="btn btn-primary btn-sm whitespace-nowrap">Copy from A</button>
-        )}
-        <button onClick={() => setSummaryOpenFor(label)} className="btn btn-primary btn-sm whitespace-nowrap">Summary</button>
-        <button onClick={() => clearSide(label)} className="btn btn-primary btn-sm whitespace-nowrap">Clear</button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="grid grid-cols-3 gap-8">
@@ -100,7 +135,7 @@ export default function DualEquipmentLayout() {
       <div className="xl:col-span-1">
   <div className="panel-container panel-border-green-600">
           {sideHeader('A')}
-          <EquipmentPanel selectedCareer={sideA?.career || ''} loadoutId={sideA?.id || null} iconOnly hideHeading compact />
+          <EquipmentPanel side="A" selectedCareer={sideA?.career || ''} loadoutId={sideA?.id || null} iconOnly hideHeading compact />
         </div>
       </div>
 
@@ -113,7 +148,7 @@ export default function DualEquipmentLayout() {
       <div className="xl:col-span-1">
   <div className="panel-container panel-border-red-600">
           {sideHeader('B')}
-          <EquipmentPanel selectedCareer={sideB?.career || ''} loadoutId={sideB?.id || null} iconOnly hideHeading compact />
+          <EquipmentPanel side="B" selectedCareer={sideB?.career || ''} loadoutId={sideB?.id || null} iconOnly hideHeading compact />
         </div>
       </div>
       {/* Summary Modal */}
