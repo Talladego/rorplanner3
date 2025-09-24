@@ -523,7 +523,10 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
     const otherLo = loadoutService.getLoadoutForSide(otherSide);
     if (!otherLo) return null;
     const data = otherLo.items[slot as EquipSlot];
-    const oi = typeof talismanIndex === 'number' ? (data?.talismans?.[talismanIndex] || null) : (data?.item || null);
+    const oi = typeof talismanIndex === 'number'
+      ? (data?.talismans?.[talismanIndex] || null)
+      // For main item mirror tooltip, attach the slotted talismans so they render
+      : (data?.item ? ({ ...data.item, talismans: data?.talismans }) : null);
     return oi;
   })();
   const otherDisplayItem = otherDetailedItem && otherItemBase && otherDetailedItem.id === otherItemBase.id
