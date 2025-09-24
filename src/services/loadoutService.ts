@@ -1253,6 +1253,12 @@ export const loadoutService = {
       MASTERY_1_BONUS: 'mastery1Bonus', MASTERY_2_BONUS: 'mastery2Bonus', MASTERY_3_BONUS: 'mastery3Bonus', OUTGOING_HEAL_PERCENT: 'outgoingHealPercent', INCOMING_HEAL_PERCENT: 'incomingHealPercent', GOLD_LOOTED: 'goldLooted', XP_RECEIVED: 'xpReceived', RENOWN_RECEIVED: 'renownReceived', INFLUENCE_RECEIVED: 'influenceReceived', HATE_CAUSED: 'hateCaused', HATE_RECEIVED: 'hateReceived',
     };
     const result = { ...zero };
+    const isEligible = (it: any | null): boolean => {
+      if (!it) return false;
+      const levelOk = !it.levelRequirement || it.levelRequirement <= loadout.level;
+      const rrOk = !it.renownRankRequirement || it.renownRankRequirement <= loadout.renownRank;
+      return levelOk && rrOk;
+    };
     const addStat = (statsArr?: any[]) => {
       (statsArr || []).forEach(s => {
         const key = statToKey[s.stat as string];
@@ -1262,12 +1268,14 @@ export const loadoutService = {
       });
     };
     Object.values(loadout.items).forEach(({ item, talismans }) => {
-      if (item) {
+      const itemEligible = isEligible(item);
+      if (item && itemEligible) {
         if (item.armor) (result.armor as number) += Number(item.armor) || 0;
         addStat(item.stats);
       }
       (talismans || []).forEach(t => {
-        if (t) {
+        const talismanEligible = isEligible(t);
+        if (t && itemEligible && talismanEligible) {
           if (t.armor) (result.armor as number) += Number(t.armor) || 0;
           addStat(t.stats);
         }
@@ -1276,7 +1284,7 @@ export const loadoutService = {
     // Basic set bonus handling (stat bonuses only)
     const setCounts: Record<string, { count: number; bonuses: any[] } > = {};
     Object.values(loadout.items).forEach(({ item }) => {
-      if (item && item.itemSet) {
+      if (item && item.itemSet && isEligible(item)) {
         const name = item.itemSet.name;
         if (!setCounts[name]) setCounts[name] = { count: 0, bonuses: item.itemSet.bonuses || [] };
         setCounts[name].count += 1;
@@ -1308,8 +1316,15 @@ export const loadoutService = {
     };
     const target = enumMap[String(statKey)] || '';
     const res = new Map<string, { name: string; count: number; totalValue: number; percentage: boolean; color?: string }>();
+    const isEligible = (it: any | null): boolean => {
+      if (!it) return false;
+      const levelOk = !it.levelRequirement || it.levelRequirement <= loadout.level;
+      const rrOk = !it.renownRankRequirement || it.renownRankRequirement <= loadout.renownRank;
+      return levelOk && rrOk;
+    };
     Object.values(loadout.items).forEach(({ item, talismans }) => {
-      if (item) {
+      const itemEligible = isEligible(item);
+      if (item && itemEligible) {
         if (target === 'ARMOR' && item.armor) {
           const key = item.name + '|armor';
           const prev = res.get(key) || { name: item.name, count: 0, totalValue: 0, percentage: false, color: getItemColor(item) };
@@ -1324,7 +1339,8 @@ export const loadoutService = {
         });
       }
       (talismans || []).forEach(t => {
-        if (t) {
+        const talismanEligible = isEligible(t);
+        if (t && itemEligible && talismanEligible) {
           if (target === 'ARMOR' && t.armor) {
             const key = t.name + '|armor';
             const prev = res.get(key) || { name: t.name, count: 0, totalValue: 0, percentage: false, color: getItemColor(t) };
@@ -1344,7 +1360,7 @@ export const loadoutService = {
     const counts: Record<string, number> = {};
     const bonusesMap: Record<string, any[]> = {};
     Object.values(loadout.items).forEach(({ item }) => {
-      if (item && item.itemSet) {
+      if (item && item.itemSet && isEligible(item)) {
         const name = item.itemSet.name;
         counts[name] = (counts[name] || 0) + 1;
         if (!bonusesMap[name]) bonusesMap[name] = item.itemSet.bonuses || [];

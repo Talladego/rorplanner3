@@ -532,7 +532,8 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
   const otherDisplayItem = otherDetailedItem && otherItemBase && otherDetailedItem.id === otherItemBase.id
     ? { ...otherItemBase, ...otherDetailedItem }
     : otherItemBase;
-  const otherEligible = isItemEligible(otherDisplayItem);
+  const otherLoadoutCtx = side ? loadoutService.getLoadoutForSide(side === 'A' ? 'B' : 'A') : null;
+  const otherEligible = isItemEligibleForLoadout(otherLoadoutCtx, otherDisplayItem);
   const itemEligible = isItemEligible(displayItem);
 
   return (
