@@ -124,6 +124,11 @@ export const PERCENT_SUMMARY_KEYS = new Set<string>([
   'blockStrikethrough', 'parryStrikethrough', 'evadeStrikethrough', 'disruptStrikethrough',
   'armorPenetrationReduction', 'criticalDamageTakenReduction', 'criticalHitRateReduction',
   'autoAttackSpeed', 'autoAttackDamage',
+  // Treat Armor Penetration as a percentage stat in summaries
+  'armorPenetration',
+  // Economic/utility modifiers are percentage-based
+  'goldLooted', 'xpReceived', 'renownReceived', 'influenceReceived',
+  'hateCaused', 'hateReceived',
 ]);
 
 /**
@@ -140,7 +145,6 @@ export function isPercentSummaryKey(key: string, contributions?: Array<{ percent
  * If missing, we fallback to a small allowlist of inherently percentage-based Stat enums.
  */
 export function isPercentItemStat(stat: Stat, percentageFlag?: boolean): boolean {
-  if (percentageFlag != null) return !!percentageFlag;
   const percentEnumFallback = new Set<Stat>([
     Stat.BLOCK, Stat.PARRY, Stat.EVADE, Stat.DISRUPT,
     Stat.CRITICAL_HIT_RATE, Stat.MELEE_CRIT_RATE, Stat.RANGED_CRIT_RATE, Stat.MAGIC_CRIT_RATE, Stat.HEAL_CRIT_RATE,
@@ -148,8 +152,23 @@ export function isPercentItemStat(stat: Stat, percentageFlag?: boolean): boolean
     Stat.OUTGOING_HEAL_PERCENT, Stat.INCOMING_HEAL_PERCENT,
     Stat.BLOCK_STRIKETHROUGH, Stat.PARRY_STRIKETHROUGH, Stat.EVADE_STRIKETHROUGH, Stat.DISRUPT_STRIKETHROUGH,
     Stat.ARMOR_PENETRATION_REDUCTION, Stat.CRITICAL_DAMAGE_TAKEN_REDUCTION, Stat.CRITICAL_HIT_RATE_REDUCTION,
+    // Treat Armor Penetration as a percentage stat for item display
+    Stat.ARMOR_PENETRATION,
     // Treat auto-attack modifiers as percentages for item stat display to match compare panel semantics
     Stat.AUTO_ATTACK_SPEED, Stat.AUTO_ATTACK_DAMAGE,
+    // Other inherently percentage item stats
+    Stat.LOOT_CHANCE, Stat.DISMOUNT_CHANCE, Stat.OFFHAND_PROC_CHANCE,
+    Stat.GOLD_LOOTED, Stat.XP_RECEIVED, Stat.RENOWN_RECEIVED, Stat.INFLUENCE_RECEIVED,
+    Stat.HATE_CAUSED, Stat.HATE_RECEIVED,
   ]);
-  return percentEnumFallback.has(stat);
+  // Name-based heuristic: flags in enum name that imply percentages
+  const name = String(stat);
+  const nameImpliesPercent = (
+    name.includes('PERCENT') ||
+    name.endsWith('_RATE') ||
+    name.endsWith('_REDUCTION') ||
+    name.endsWith('_STRIKETHROUGH')
+  );
+  // If data marks it explicitly as percentage, or name/allowlist implies it, treat as percent
+  return !!percentageFlag || nameImpliesPercent || percentEnumFallback.has(stat);
 }
