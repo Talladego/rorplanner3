@@ -108,12 +108,20 @@ export default function StatsComparePanel() {
   }), []);
 
   const statsA: StatsSummary = useMemo(
-    () => (aId ? loadoutService.computeStatsForLoadout(aId) : empty),
-    [aId, tick]
+    () => {
+      // reference tick to intentionally recompute on stat updates
+      void tick;
+      return aId ? loadoutService.computeStatsForLoadout(aId) : empty;
+    },
+    [aId, tick, empty]
   );
   const statsB: StatsSummary = useMemo(
-    () => (bId ? loadoutService.computeStatsForLoadout(bId) : empty),
-    [bId, tick]
+    () => {
+      // reference tick to intentionally recompute on stat updates
+      void tick;
+      return bId ? loadoutService.computeStatsForLoadout(bId) : empty;
+    },
+    [bId, tick, empty]
   );
 
   // Removed A/B equipped counts and related helpers per request
@@ -314,8 +322,7 @@ export default function StatsComparePanel() {
           onClick={() => {
             const a = aId ? loadoutService.getLoadoutForSide('A') : null;
             const b = bId ? loadoutService.getLoadoutForSide('B') : null;
-            const active = loadoutService.getActiveSide();
-            const url = urlService.buildCompareShareUrl(a, b, active);
+            const url = urlService.buildCompareShareUrl(a, b);
             setShareUrl(url);
             setShareOpen(true);
           }}
@@ -370,7 +377,9 @@ export default function StatsComparePanel() {
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(shareUrl);
-                    } catch {}
+                    } catch {
+                      // ignore clipboard write failures (e.g., restricted context)
+                    }
                   }}
                 >Copy</button>
                 <button className="btn btn-primary btn-sm" onClick={() => setShareOpen(false)}>Close</button>

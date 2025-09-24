@@ -159,7 +159,7 @@ class UrlService {
   }
 
   // Update URL with dual-mode compare data for sides A and B
-  updateUrlWithCompare(_aLoadout: Loadout | null, _bLoadout: Loadout | null, _activeSide: 'A' | 'B'): void {
+  updateUrlWithCompare(aLoadout: Loadout | null, bLoadout: Loadout | null): void {
     if (!this.autoUpdateEnabled) return;
     const params: Record<string, string | null> = {};
     const current = this.getSearchParams();
@@ -173,13 +173,13 @@ class UrlService {
     params.loadCharacterA = null;
     params.loadCharacterB = null;
 
-    if (_aLoadout) {
+    if (aLoadout) {
       // Always snapshot A into URL for reliable sharing
-      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', _aLoadout));
+      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', aLoadout));
     }
-    if (_bLoadout) {
+    if (bLoadout) {
       // Always snapshot B into URL for reliable sharing
-      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', _bLoadout));
+      Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', bLoadout));
     }
     this.updateUrl(params, { replace: true });
   }
@@ -285,7 +285,7 @@ class UrlService {
       // Normalize URL to reflect full compare state
       const aLoadout = loadoutStoreAdapter.getLoadoutForSide('A');
       const bLoadout = loadoutStoreAdapter.getLoadoutForSide('B');
-  if (this.autoUpdateEnabled) this.updateUrlWithCompare(aLoadout, bLoadout, active);
+  if (this.autoUpdateEnabled) this.updateUrlWithCompare(aLoadout, bLoadout);
     } finally {
       this.suppressUpdates = false;
       loadoutService.endBulkApply();
@@ -297,7 +297,7 @@ class UrlService {
     const a = loadoutStoreAdapter.getLoadoutForSide('A');
     const b = loadoutStoreAdapter.getLoadoutForSide('B');
     if (!a && !b) return; // avoid nuking params during early init
-    this.updateUrlWithCompare(a, b, loadoutStoreAdapter.getActiveSide());
+  this.updateUrlWithCompare(a, b);
   }
 
   // Clear character parameter from URL
@@ -331,7 +331,7 @@ class UrlService {
   }
 
   // Build a shareable URL for current compare state
-  buildCompareShareUrl(a: Loadout | null, b: Loadout | null, _active: LoadoutSide): string {
+  buildCompareShareUrl(a: Loadout | null, b: Loadout | null): string {
     let base = window.location.href.split('#')[0];
     // Improve Codespaces behavior: if running on localhost in an embedded browser,
     // use the referrer (likely the forwarded github.dev URL) as the share base.
@@ -341,7 +341,9 @@ class UrlService {
       if (isLocal && ref && /\.github\.dev\//.test(ref)) {
         base = ref.split('#')[0];
       }
-    } catch {}
+    } catch {
+      // ignore referrer access issues (cross-origin)
+    }
     const params: Record<string, string | null> = {};
     if (a) {
       // Always include full snapshot of side A for share stability

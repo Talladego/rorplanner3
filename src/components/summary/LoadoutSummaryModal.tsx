@@ -63,26 +63,26 @@ function buildSummary(loadout: Loadout | null) {
 }
 
 export default function LoadoutSummaryModal({ open, onClose, loadout }: LoadoutSummaryModalProps) {
-  if (!open) return null;
-  const text = buildSummary(loadout);
+  // Hooks must be called unconditionally
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [copied, setCopied] = useState(false);
+  const text = buildSummary(loadout);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    window.addEventListener('keydown', handler);
+    if (open) window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [onClose, open]);
 
   useEffect(() => {
     // Autofocus and select text for quick copy
-    if (textareaRef.current) {
+    if (open && textareaRef.current) {
       textareaRef.current.focus();
       textareaRef.current.select();
     }
-  }, [text]);
+  }, [text, open]);
 
   const handleCopy = async () => {
     try {
@@ -93,6 +93,7 @@ export default function LoadoutSummaryModal({ open, onClose, loadout }: LoadoutS
       // ignore copy errors
     }
   };
+  if (!open) return null;
   return (
     <div
       className="modal-overlay"

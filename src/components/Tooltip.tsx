@@ -415,7 +415,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
       } else {
         setMirrorVisible(false);
       }
-    } catch (err) {
+    } catch {
       setMirrorVisible(false);
     }
 
