@@ -412,6 +412,7 @@ export interface StatsSummary {
   buildTime: number;
   criticalDamage: number;
   range: number;
+  radius: number;
   autoAttackSpeed: number;
   autoAttackDamage: number;
   meleePower: number;

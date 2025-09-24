@@ -113,6 +113,19 @@ export function formatStatValue(value: number, asPercent = false): string {
 }
 
 /**
+ * Normalize raw stat values for display.
+ * RANGE and RADIUS are stored in inches (game units), but should be shown in feet (divide by 12).
+ * Accepts either a StatsSummary key (camelCase) or a Stat enum.
+ */
+export function normalizeStatDisplayValue(stat: Stat | string, value: number): number {
+  const key = typeof stat === 'string' ? stat : String(stat);
+  if (key === 'range' || key === 'radius' || stat === Stat.RANGE || stat === Stat.RADIUS) {
+    return value / 12;
+  }
+  return value;
+}
+
+/**
  * Known StatsSummary keys that should be displayed as percentages in UI rows.
  * These are the camelCase keys used in StatsSummary (not the SCREAMING_SNAKE_CASE Stat enum).
  */
@@ -129,6 +142,7 @@ export const PERCENT_SUMMARY_KEYS = new Set<string>([
   // Economic/utility modifiers are percentage-based
   'goldLooted', 'xpReceived', 'renownReceived', 'influenceReceived',
   'hateCaused', 'hateReceived',
+  // Note: range and radius are distances, not percentages
 ]);
 
 /**

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Item, ItemSetBonusValue, ItemStat, Ability, Loadout, EquipSlot } from '../types';
-import { formatItemTypeName, formatStatName, formatSlotName, formatCareerName, formatRaceName, formatStatValue, isPercentItemStat } from '../utils/formatters';
+import { formatItemTypeName, formatStatName, formatSlotName, formatCareerName, formatRaceName, formatStatValue, isPercentItemStat, normalizeStatDisplayValue } from '../utils/formatters';
 import { loadoutService } from '../services/loadoutService';
 
 interface TooltipProps {
@@ -116,7 +116,11 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
                       {' ('}
                       {t.stats.map((stat: ItemStat, idx: number) => (
                         <span key={idx}>
-                          {formatStatValue(stat.value, isPercentItemStat(stat.stat, stat.percentage))} {formatStatName(stat.stat)}
+                          {(() => {
+                            const isPct = isPercentItemStat(stat.stat, stat.percentage);
+                            const normalized = isPct ? stat.value : normalizeStatDisplayValue(stat.stat, stat.value);
+                            return formatStatValue(normalized, isPct);
+                          })()} {formatStatName(stat.stat)}
                           {idx < t.stats.length - 1 && <span className="mx-1">/</span>}
                         </span>
                       ))}
@@ -174,11 +178,16 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           {targetItem.armor > 0 && <div>{targetItem.armor} Armor</div>}
           {targetItem.dps > 0 && <div>{(targetItem.dps / 10).toFixed(1)} DPS</div>}
           {targetItem.speed > 0 && <div>{(targetItem.speed / 100).toFixed(1)} Speed</div>}
-          {targetItem.stats && targetItem.stats.length > 0 && targetItem.stats.map((stat: ItemStat, idx: number) => (
-            <div key={idx}>
-              {formatStatValue(stat.value, isPercentItemStat(stat.stat, stat.percentage))} {formatStatName(stat.stat)}
-            </div>
-          ))}
+          {targetItem.stats && targetItem.stats.length > 0 && targetItem.stats.map((stat: ItemStat, idx: number) => {
+            const isPct = isPercentItemStat(stat.stat, stat.percentage);
+            const raw = stat.value;
+            const normalized = isPct ? raw : normalizeStatDisplayValue(stat.stat, raw);
+            return (
+              <div key={idx}>
+                {formatStatValue(normalized, isPct)} {formatStatName(stat.stat)}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -224,7 +233,9 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
                     if ('stat' in bonusValue) {
                       const itemStat = bonusValue as ItemStat;
                       const statName = formatStatName(itemStat.stat);
-                      return <span>{formatStatValue(itemStat.value, isPercentItemStat(itemStat.stat, itemStat.percentage))} {statName}</span>;
+                      const isPct = isPercentItemStat(itemStat.stat, itemStat.percentage);
+                      const normalized = isPct ? itemStat.value : normalizeStatDisplayValue(itemStat.stat, itemStat.value);
+                      return <span>{formatStatValue(normalized, isPct)} {statName}</span>;
                     } else if ('name' in bonusValue || 'description' in bonusValue) {
                       const ability = bonusValue as Ability;
                       return <span className="text-xs italic">+ {ability.description || ability.name}</span>;

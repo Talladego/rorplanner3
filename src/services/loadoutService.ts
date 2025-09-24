@@ -38,7 +38,7 @@ const ALLOWED_FILTER_STATS: Stat[] = [
   // Magic
   'MAGIC_POWER', 'MAGIC_CRIT_RATE', 'HEALING_POWER', 'HEAL_CRIT_RATE', 'DISRUPT_STRIKETHROUGH',
   // Other
-  'ACTION_POINT_REGEN', 'HEALTH_REGEN', 'MORALE_REGEN', 'GOLD_LOOTED', 'XP_RECEIVED', 'RENOWN_RECEIVED', 'INFLUENCE_RECEIVED', 'HATE_CAUSED', 'HATE_RECEIVED',
+  'RANGE', 'RADIUS', 'ACTION_POINT_REGEN', 'HEALTH_REGEN', 'MORALE_REGEN', 'GOLD_LOOTED', 'XP_RECEIVED', 'RENOWN_RECEIVED', 'INFLUENCE_RECEIVED', 'HATE_CAUSED', 'HATE_RECEIVED',
 ] as unknown as Stat[];
 
 function sanitizeHasStats(hasStats?: Stat[]): Stat[] | undefined {
@@ -1235,7 +1235,7 @@ export const loadoutService = {
       weaponSkill: 0, ballisticSkill: 0, intelligence: 0, spiritResistance: 0, elementalResistance: 0, corporealResistance: 0,
       incomingDamage: 0, incomingDamagePercent: 0, outgoingDamage: 0, outgoingDamagePercent: 0,
       armor: 0, velocity: 0, block: 0, parry: 0, evade: 0, disrupt: 0, actionPointRegen: 0, moraleRegen: 0,
-      cooldown: 0, buildTime: 0, criticalDamage: 0, range: 0, autoAttackSpeed: 0, autoAttackDamage: 0, meleePower: 0, rangedPower: 0, magicPower: 0,
+  cooldown: 0, buildTime: 0, criticalDamage: 0, range: 0, radius: 0, autoAttackSpeed: 0, autoAttackDamage: 0, meleePower: 0, rangedPower: 0, magicPower: 0,
       criticalHitRate: 0, meleeCritRate: 0, rangedCritRate: 0, magicCritRate: 0, armorPenetration: 0, healingPower: 0, healthRegen: 0, maxActionPoints: 0, fortitude: 0,
       armorPenetrationReduction: 0, criticalDamageTakenReduction: 0, criticalHitRateReduction: 0, blockStrikethrough: 0, parryStrikethrough: 0, evadeStrikethrough: 0, disruptStrikethrough: 0,
       healCritRate: 0, mastery1Bonus: 0, mastery2Bonus: 0, mastery3Bonus: 0, outgoingHealPercent: 0, incomingHealPercent: 0,
@@ -1247,7 +1247,7 @@ export const loadoutService = {
       WEAPON_SKILL: 'weaponSkill', BALLISTIC_SKILL: 'ballisticSkill', INTELLIGENCE: 'intelligence', ARMOR: 'armor',
       SPIRIT_RESISTANCE: 'spiritResistance', ELEMENTAL_RESISTANCE: 'elementalResistance', CORPOREAL_RESISTANCE: 'corporealResistance',
       INCOMING_DAMAGE: 'incomingDamage', INCOMING_DAMAGE_PERCENT: 'incomingDamagePercent', OUTGOING_DAMAGE: 'outgoingDamage', OUTGOING_DAMAGE_PERCENT: 'outgoingDamagePercent',
-      VELOCITY: 'velocity', BLOCK: 'block', PARRY: 'parry', EVADE: 'evade', DISRUPT: 'disrupt', ACTION_POINT_REGEN: 'actionPointRegen', MORALE_REGEN: 'moraleRegen', COOLDOWN: 'cooldown', BUILD_TIME: 'buildTime', CRITICAL_DAMAGE: 'criticalDamage', RANGE: 'range', AUTO_ATTACK_SPEED: 'autoAttackSpeed', AUTO_ATTACK_DAMAGE: 'autoAttackDamage',
+  VELOCITY: 'velocity', BLOCK: 'block', PARRY: 'parry', EVADE: 'evade', DISRUPT: 'disrupt', ACTION_POINT_REGEN: 'actionPointRegen', MORALE_REGEN: 'moraleRegen', COOLDOWN: 'cooldown', BUILD_TIME: 'buildTime', CRITICAL_DAMAGE: 'criticalDamage', RANGE: 'range', RADIUS: 'radius', AUTO_ATTACK_SPEED: 'autoAttackSpeed', AUTO_ATTACK_DAMAGE: 'autoAttackDamage',
       MELEE_POWER: 'meleePower', RANGED_POWER: 'rangedPower', MAGIC_POWER: 'magicPower', CRITICAL_HIT_RATE: 'criticalHitRate', MELEE_CRIT_RATE: 'meleeCritRate', RANGED_CRIT_RATE: 'rangedCritRate', MAGIC_CRIT_RATE: 'magicCritRate', ARMOR_PENETRATION: 'armorPenetration', HEALING_POWER: 'healingPower', HEALTH_REGEN: 'healthRegen', MAX_ACTION_POINTS: 'maxActionPoints', FORTITUDE: 'fortitude',
       ARMOR_PENETRATION_REDUCTION: 'armorPenetrationReduction', CRITICAL_DAMAGE_TAKEN_REDUCTION: 'criticalDamageTakenReduction', CRITICAL_HIT_RATE_REDUCTION: 'criticalHitRateReduction', BLOCK_STRIKETHROUGH: 'blockStrikethrough', PARRY_STRIKETHROUGH: 'parryStrikethrough', EVADE_STRIKETHROUGH: 'evadeStrikethrough', DISRUPT_STRIKETHROUGH: 'disruptStrikethrough', HEAL_CRIT_RATE: 'healCritRate',
       MASTERY_1_BONUS: 'mastery1Bonus', MASTERY_2_BONUS: 'mastery2Bonus', MASTERY_3_BONUS: 'mastery3Bonus', OUTGOING_HEAL_PERCENT: 'outgoingHealPercent', INCOMING_HEAL_PERCENT: 'incomingHealPercent', GOLD_LOOTED: 'goldLooted', XP_RECEIVED: 'xpReceived', RENOWN_RECEIVED: 'renownReceived', INFLUENCE_RECEIVED: 'influenceReceived', HATE_CAUSED: 'hateCaused', HATE_RECEIVED: 'hateReceived',
@@ -1301,7 +1301,7 @@ export const loadoutService = {
       weaponSkill: 'WEAPON_SKILL', ballisticSkill: 'BALLISTIC_SKILL', intelligence: 'INTELLIGENCE', armor: 'ARMOR',
       spiritResistance: 'SPIRIT_RESISTANCE', elementalResistance: 'ELEMENTAL_RESISTANCE', corporealResistance: 'CORPOREAL_RESISTANCE',
       incomingDamage: 'INCOMING_DAMAGE', incomingDamagePercent: 'INCOMING_DAMAGE_PERCENT', outgoingDamage: 'OUTGOING_DAMAGE', outgoingDamagePercent: 'OUTGOING_DAMAGE_PERCENT',
-      velocity: 'VELOCITY', block: 'BLOCK', parry: 'PARRY', evade: 'EVADE', disrupt: 'DISRUPT', actionPointRegen: 'ACTION_POINT_REGEN', moraleRegen: 'MORALE_REGEN', cooldown: 'COOLDOWN', buildTime: 'BUILD_TIME', criticalDamage: 'CRITICAL_DAMAGE', range: 'RANGE', autoAttackSpeed: 'AUTO_ATTACK_SPEED', autoAttackDamage: 'AUTO_ATTACK_DAMAGE',
+  velocity: 'VELOCITY', block: 'BLOCK', parry: 'PARRY', evade: 'EVADE', disrupt: 'DISRUPT', actionPointRegen: 'ACTION_POINT_REGEN', moraleRegen: 'MORALE_REGEN', cooldown: 'COOLDOWN', buildTime: 'BUILD_TIME', criticalDamage: 'CRITICAL_DAMAGE', range: 'RANGE', radius: 'RADIUS', autoAttackSpeed: 'AUTO_ATTACK_SPEED', autoAttackDamage: 'AUTO_ATTACK_DAMAGE',
       meleePower: 'MELEE_POWER', rangedPower: 'RANGED_POWER', magicPower: 'MAGIC_POWER', criticalHitRate: 'CRITICAL_HIT_RATE', meleeCritRate: 'MELEE_CRIT_RATE', rangedCritRate: 'RANGED_CRIT_RATE', magicCritRate: 'MAGIC_CRIT_RATE', armorPenetration: 'ARMOR_PENETRATION', healingPower: 'HEALING_POWER', healthRegen: 'HEALTH_REGEN', maxActionPoints: 'MAX_ACTION_POINTS', fortitude: 'FORTITUDE',
       armorPenetrationReduction: 'ARMOR_PENETRATION_REDUCTION', criticalDamageTakenReduction: 'CRITICAL_DAMAGE_TAKEN_REDUCTION', criticalHitRateReduction: 'CRITICAL_HIT_RATE_REDUCTION', blockStrikethrough: 'BLOCK_STRIKETHROUGH', parryStrikethrough: 'PARRY_STRIKETHROUGH', evadeStrikethrough: 'EVADE_STRIKETHROUGH', disruptStrikethrough: 'DISRUPT_STRIKETHROUGH', healCritRate: 'HEAL_CRIT_RATE',
       mastery1Bonus: 'MASTERY_1_BONUS', mastery2Bonus: 'MASTERY_2_BONUS', mastery3Bonus: 'MASTERY_3_BONUS', outgoingHealPercent: 'OUTGOING_HEAL_PERCENT', incomingHealPercent: 'INCOMING_HEAL_PERCENT', goldLooted: 'GOLD_LOOTED', xpReceived: 'XP_RECEIVED', renownReceived: 'RENOWN_RECEIVED', influenceReceived: 'INFLUENCE_RECEIVED', hateCaused: 'HATE_CAUSED', hateReceived: 'HATE_RECEIVED',

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadoutService } from '../services/loadoutService';
-import { formatCamelCase, formatStatValue, isPercentSummaryKey } from '../utils/formatters';
+import { formatCamelCase, formatStatValue, isPercentSummaryKey, normalizeStatDisplayValue } from '../utils/formatters';
 import HoverTooltip from './HoverTooltip';
 import type { StatsSummary } from '../types';
 import { urlService } from '../services/urlService';
@@ -72,6 +72,7 @@ export default function StatsComparePanel() {
     buildTime: 0,
     criticalDamage: 0,
     range: 0,
+  radius: 0,
     autoAttackSpeed: 0,
     autoAttackDamage: 0,
     meleePower: 0,
@@ -183,6 +184,8 @@ export default function StatsComparePanel() {
   ];
 
   const otherDefs = [
+    { key: 'range' as const },
+    { key: 'radius' as const },
     { key: 'actionPointRegen' as const },
     { key: 'healthRegen' as const },
     { key: 'moraleRegen' as const },
@@ -218,6 +221,7 @@ export default function StatsComparePanel() {
               const aContrib = aId ? loadoutService.getStatContributionsForLoadout(aId, r.key) : [];
               const bContrib = bId ? loadoutService.getStatContributionsForLoadout(bId, r.key) : [];
               const isPercentRow = isPercentSummaryKey(r.key, [...aContrib, ...bContrib]);
+              const needsUnitNormalization = r.key === 'range' || r.key === 'radius';
               return (
               <div key={r.key} className="stats-row rounded px-1 -mx-1 hover:bg-gray-800/60 hover:ring-1 hover:ring-gray-700 transition-colors">
                 <span className="text-xs">{formatCamelCase(r.key)}:</span>
@@ -244,7 +248,7 @@ export default function StatsComparePanel() {
                                       <span className="ml-1 text-gray-400">(x{c.count})</span>
                                     )}
                                   </span>
-                                  <span className="text-gray-200">{formatStatValue(c.totalValue, isPercentRow || c.percentage)}</span>
+                                  <span className="text-gray-200">{formatStatValue(needsUnitNormalization && !c.percentage ? normalizeStatDisplayValue(r.key, c.totalValue) : c.totalValue, isPercentRow || c.percentage)}</span>
                                 </li>
                               ));
                             })()}
@@ -252,7 +256,7 @@ export default function StatsComparePanel() {
                         </div>
                       }
                     >
-                      <span className={`text-right inline-block w-20 whitespace-nowrap tabular-nums ${r.a > r.b ? 'font-bold text-green-300' : 'text-green-400'}`}>{formatStatValue(r.a, isPercentRow)}</span>
+                      <span className={`text-right inline-block w-20 whitespace-nowrap tabular-nums ${r.a > r.b ? 'font-bold text-green-300' : 'text-green-400'}`}>{formatStatValue(needsUnitNormalization ? normalizeStatDisplayValue(r.key, r.a) : r.a, isPercentRow)}</span>
                     </HoverTooltip>
 
                     {/* B side (red) value with contribution tooltip */}
@@ -276,7 +280,7 @@ export default function StatsComparePanel() {
                                       <span className="ml-1 text-gray-400">(x{c.count})</span>
                                     )}
                                   </span>
-                                  <span className="text-gray-200">{formatStatValue(c.totalValue, isPercentRow || c.percentage)}</span>
+                                  <span className="text-gray-200">{formatStatValue(needsUnitNormalization && !c.percentage ? normalizeStatDisplayValue(r.key, c.totalValue) : c.totalValue, isPercentRow || c.percentage)}</span>
                                 </li>
                               ));
                             })()}
@@ -284,7 +288,7 @@ export default function StatsComparePanel() {
                         </div>
                       }
                     >
-                      <span className={`text-right inline-block w-20 whitespace-nowrap tabular-nums ${r.b > r.a ? 'font-bold text-red-300' : 'text-red-400'}`}>{formatStatValue(r.b, isPercentRow)}</span>
+                      <span className={`text-right inline-block w-20 whitespace-nowrap tabular-nums ${r.b > r.a ? 'font-bold text-red-300' : 'text-red-400'}`}>{formatStatValue(needsUnitNormalization ? normalizeStatDisplayValue(r.key, r.b) : r.b, isPercentRow)}</span>
                     </HoverTooltip>
                   </div>
                 </span>
