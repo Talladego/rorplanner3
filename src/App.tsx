@@ -6,7 +6,7 @@ import DualToolbar from './components/DualToolbar';
 import DualEquipmentLayout from './components/DualEquipmentLayout';
 import ApolloProviderWrapper from './components/ApolloProviderWrapper';
 import ErrorBoundary from './components/ErrorBoundary';
-import { loadoutEventEmitter } from './services/loadoutEventEmitter';
+// Presentation layer should subscribe through the service API, not the raw emitter
 
 function App() {
   const navigate = useNavigate();
@@ -27,19 +27,15 @@ function App() {
 
   // Subscribe to URL-related events
   useEffect(() => {
-    const unsubscribe = loadoutEventEmitter.subscribe('CHARACTER_LOADED_FROM_URL', () => {
-      // Handle any UI updates needed when character is loaded from URL
+    const unsub1 = loadoutService.subscribeToEvents('CHARACTER_LOADED_FROM_URL', () => {
       setCharacterLoaded(true);
     });
-
-    const unsubscribe2 = loadoutEventEmitter.subscribe('CHARACTER_LOADED', () => {
-      // Handle any UI updates needed when character is loaded from button
+    const unsub2 = loadoutService.subscribeToEvents('CHARACTER_LOADED', () => {
       setCharacterLoaded(true);
     });
-
     return () => {
-      unsubscribe();
-      unsubscribe2();
+      unsub1();
+      unsub2();
     };
   }, []);
 

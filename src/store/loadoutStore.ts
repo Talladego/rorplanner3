@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Loadout, LoadoutItem, EquipSlot, Career, Item, StatsSummary, ItemSetBonus, ItemSet, LoadoutSide } from '../types';
-import { loadoutService } from '../services/loadoutService';
+// Note: The data layer must not depend on the service layer. Do not import loadoutService here.
 
 interface LoadoutState {
   loadouts: Loadout[];
@@ -39,7 +39,6 @@ interface LoadoutState {
   switchLoadout: (id: string) => Promise<void>;
   markLoadoutAsModified: (id: string) => void; // Mark loadout as no longer from character
   updateLoadoutCharacterStatus: (id: string, isFromCharacter: boolean, characterName?: string) => void; // Update character status
-  importFromCharacter: (characterId: string) => Promise<string>; // Will use GraphQL
   getCurrentLoadout: () => Loadout | null;
 }
 
@@ -513,9 +512,4 @@ export const useLoadoutStore = create<LoadoutState>((set, get) => ({
       l.id === id ? { ...l, isFromCharacter, characterName } : l
     ),
   })),
-
-  importFromCharacter: async (characterId) => {
-    // Delegate to service layer for proper separation of concerns
-    return loadoutService.importFromCharacter(characterId);
-  },
 }));

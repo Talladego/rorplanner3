@@ -121,12 +121,6 @@ class LoadoutStoreAdapter implements ILoadoutStore {
   updateLoadoutCharacterStatus(id: string, isFromCharacter: boolean, characterName?: string): void {
     useLoadoutStore.getState().updateLoadoutCharacterStatus(id, isFromCharacter, characterName);
   }
-
-  async importFromCharacter(characterId: string, _side?: LoadoutSide): Promise<void> {
-    // _side is intentionally unused here; API kept for compatibility
-    void _side;
-    await useLoadoutStore.getState().importFromCharacter(characterId);
-  }
 }
 
 // Export a singleton instance

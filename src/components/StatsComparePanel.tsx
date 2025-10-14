@@ -4,6 +4,7 @@ import { formatCamelCase, formatStatValue, isPercentSummaryKey, normalizeStatDis
 import HoverTooltip from './HoverTooltip';
 import type { StatsSummary } from '../types';
 import { urlService } from '../services/urlService';
+import { getCareerBaseStats, withBaseStats } from '../constants/careerBaseStats';
 
 // Per-UI helpers moved to formatters for reuse across components
 
@@ -13,6 +14,7 @@ export default function StatsComparePanel() {
   const [tick, setTick] = useState(0); // force rerender on stats updates
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
+  const [includeBaseStats, setIncludeBaseStats] = useState(true);
   // no external version tick needed; event updates of ids trigger rerender
 
   useEffect(() => {
@@ -112,25 +114,36 @@ export default function StatsComparePanel() {
     () => {
       // reference tick to intentionally recompute on stat updates
       void tick;
-      return aId ? loadoutService.computeStatsForLoadout(aId) : empty;
+      const base = aId ? loadoutService.getLoadoutForSide('A') : null;
+      const computed = aId ? loadoutService.computeStatsForLoadout(aId) : empty;
+      if (!base) return computed;
+      if (!includeBaseStats) return computed;
+      const baseStats = getCareerBaseStats(base.career, base.level);
+      return withBaseStats(computed, baseStats);
     },
-    [aId, tick, empty]
+    [aId, tick, empty, includeBaseStats]
   );
   const statsB: StatsSummary = useMemo(
     () => {
       // reference tick to intentionally recompute on stat updates
       void tick;
-      return bId ? loadoutService.computeStatsForLoadout(bId) : empty;
+      const base = bId ? loadoutService.getLoadoutForSide('B') : null;
+      const computed = bId ? loadoutService.computeStatsForLoadout(bId) : empty;
+      if (!base) return computed;
+      if (!includeBaseStats) return computed;
+      const baseStats = getCareerBaseStats(base.career, base.level);
+      return withBaseStats(computed, baseStats);
     },
-    [bId, tick, empty]
+    [bId, tick, empty, includeBaseStats]
   );
 
   // Removed A/B equipped counts and related helpers per request
 
   type Row = { key: string; a: number; b: number };
-  const makeRows = (defs: Array<{ key: keyof StatsSummary }>): Row[] =>
-    defs.map(d => ({ key: d.key as string, a: statsA[d.key], b: statsB[d.key] }))
-        .filter(r => r.a !== 0 || r.b !== 0);
+  const makeRows = (defs: Array<{ key: keyof StatsSummary }>, alwaysShow?: Set<string>): Row[] =>
+    defs
+      .map(d => ({ key: d.key as string, a: statsA[d.key], b: statsB[d.key] }))
+      .filter(r => (alwaysShow?.has(r.key) ?? false) || r.a !== 0 || r.b !== 0);
 
   const baseDefs = [
     { key: 'strength' as const },
@@ -199,21 +212,41 @@ export default function StatsComparePanel() {
     { key: 'hateReceived' as const },
   ];
 
-  const baseRows = makeRows(baseDefs);
+  // Always show these base and defense stats even when zero
+  const ALWAYS_BASE_KEYS = new Set<string>([
+    'strength','ballisticSkill','intelligence','toughness','weaponSkill','initiative','willpower','wounds',
+  ]);
+
+  const baseRows = makeRows(baseDefs, ALWAYS_BASE_KEYS);
   const defenseRows = makeRows(defenseDefs);
   const combatRows = makeRows(combatDefs);
   const magicRows = makeRows(magicDefs);
   const otherRows = makeRows(otherDefs);
-  const isAllZero = [
-    ...Object.values(statsA),
-    ...Object.values(statsB)
-  ].every(v => v === 0);
+  // Determine if any side has a selected career
+  const loadoutA = aId ? loadoutService.getLoadoutForSide('A') : null;
+  const loadoutB = bId ? loadoutService.getLoadoutForSide('B') : null;
+  const hasAnyCareer = Boolean(loadoutA?.career || loadoutB?.career);
 
   const renderSection = (title: string, rows: Row[], showIfEmpty = false) => {
     if (!showIfEmpty && rows.length === 0) return null;
     return (
       <div>
-        <h3 className="stats-section-title">{title}</h3>
+        {title === 'Base Stats' ? (
+          <div className="flex items-center justify-between">
+            <h3 className="stats-section-title mb-0">{title}</h3>
+            <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+              <input
+                type="checkbox"
+                className="form-checkbox h-3 w-3"
+                checked={includeBaseStats}
+                onChange={(e) => setIncludeBaseStats(e.currentTarget.checked)}
+              />
+              Include base stats
+            </label>
+          </div>
+        ) : (
+          <h3 className="stats-section-title">{title}</h3>
+        )}
         <div className="space-y-0.5">
           {rows.length > 0 ? (
             rows.map(r => {
@@ -305,14 +338,11 @@ export default function StatsComparePanel() {
     );
   };
 
-  if (isAllZero) {
+  if (!hasAnyCareer) {
     return (
       <div className="panel-container">
         <h2 className="panel-heading">Compare Stats</h2>
-        {(!aId || !bId) && (
-          <div className="text-xs text-muted mb-2">Assign loadouts to both A and B to compare.</div>
-        )}
-        <div className="stats-empty-message">Select a career and equip items or load a character to see stat bonuses</div>
+        <div className="stats-empty-message">Select a career to see stats</div>
       </div>
     );
   }
@@ -321,24 +351,26 @@ export default function StatsComparePanel() {
     <div className="panel-container">
       <div className="flex items-center justify-between mb-2">
         <h2 className="panel-heading mb-0">Compare Stats</h2>
-        <button
-          className="btn btn-primary btn-sm"
-          onClick={() => {
-            const a = aId ? loadoutService.getLoadoutForSide('A') : null;
-            const b = bId ? loadoutService.getLoadoutForSide('B') : null;
-            const url = urlService.buildCompareShareUrl(a, b);
-            setShareUrl(url);
-            setShareOpen(true);
-          }}
-        >
-          Share
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => {
+              const a = aId ? loadoutService.getLoadoutForSide('A') : null;
+              const b = bId ? loadoutService.getLoadoutForSide('B') : null;
+              const url = urlService.buildCompareShareUrl(a, b);
+              setShareUrl(url);
+              setShareOpen(true);
+            }}
+          >
+            Share
+          </button>
+        </div>
       </div>
       {(!aId || !bId) && (
         <div className="text-xs text-muted mb-2">Assign loadouts to both A and B to compare.</div>
       )}
 
-      {/* Base Stats - Always show */}
+      {/* Base Stats - Always show; values reflect totals with or without base per toggle */}
       <div className="stats-section">
         {renderSection('Base Stats', baseRows, true)}
       </div>

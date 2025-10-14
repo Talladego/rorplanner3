@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Career, Loadout } from '../types';
 import { loadoutService } from '../services/loadoutService';
 import { urlService } from '../services/urlService';
@@ -14,6 +14,8 @@ function SideToolbar({ side }: SideToolbarProps) {
   const [level, setLevel] = useState(40);
   const [renownRank, setRenownRank] = useState(80);
   const [characterName, setCharacterName] = useState('');
+  // Track pending name during async character load to suppress store-driven reversions
+  const pendingNameRef = useRef<string | null>(null);
   const [, setLoadout] = useState<Loadout | null>(loadoutService.getLoadoutForSide(side));
 
   // Sync with events
@@ -35,7 +37,14 @@ function SideToolbar({ side }: SideToolbarProps) {
           setSelectedCareer(lo.career || '');
           setLevel(lo.level);
           setRenownRank(lo.renownRank);
-          setCharacterName(lo.characterName || '');
+          // Suppress store-driven name updates while a new character load is in-flight.
+          // Only update from store when the character has finished loading.
+          if (ev.type === 'CHARACTER_LOADED' || ev.type === 'CHARACTER_LOADED_FROM_URL') {
+            setCharacterName(lo.characterName || pendingNameRef.current || '');
+            pendingNameRef.current = null;
+          } else if (!pendingNameRef.current) {
+            setCharacterName(lo.characterName || '');
+          }
         }
       }
     });
@@ -84,16 +93,25 @@ function SideToolbar({ side }: SideToolbarProps) {
     await loadoutService.setRenownRank(val);
   };
 
+  // Reset full loadout for this side: career, level, renown, items
+  const onResetSide = async () => {
+    await loadoutService.selectSideForEdit(side);
+    await loadoutService.resetCurrentLoadout();
+  };
+
   const onLoadCharacter = async () => {
     if (!characterName) return;
     await loadoutService.selectSideForEdit(side);
     try {
+  pendingNameRef.current = characterName;
       await loadoutService.loadFromNamedCharacter(characterName);
     } catch (_err) {
       // swallow per-side errors; global error UI handled in parent Toolbar before
       // Optionally, we could surface a tiny side-local message; omitted for now
       // console.warn(e);
       void _err;
+    } finally {
+      // no-op; pendingNameRef cleared on character loaded event
     }
   };
 
@@ -103,8 +121,8 @@ function SideToolbar({ side }: SideToolbarProps) {
         <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${side === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{side}</span>
       </div>
   <div className="grid grid-cols-12 gap-x-1 gap-y-1 items-stretch">
-        {/* Group 1: Career + Lvl + RR */}
-        <div className="col-span-6 h-full">
+        {/* Group 1: Career + Lvl + RR + Reset */}
+        <div className="col-span-7 h-full">
           <div className="field-group h-full">
             <div className="grid grid-cols-12 gap-x-1 items-end">
               <div className="col-span-6">
@@ -118,7 +136,7 @@ function SideToolbar({ side }: SideToolbarProps) {
                   />
                 </div>
               </div>
-              <div className="col-span-3">
+              <div className="col-span-2">
                 <label className="form-label text-xs">Lvl</label>
                 <input
                   type="number"
@@ -129,7 +147,7 @@ function SideToolbar({ side }: SideToolbarProps) {
                   className="form-input form-input-text control-compact mt-0.5 block w-full pl-2 pr-2 text-xs rounded-md"
                 />
               </div>
-              <div className="col-span-3">
+              <div className="col-span-2">
                 <label className="form-label text-xs">RR</label>
                 <input
                   type="number"
@@ -140,12 +158,16 @@ function SideToolbar({ side }: SideToolbarProps) {
                   className="form-input form-input-text control-compact mt-0.5 block w-full pl-2 pr-2 text-xs rounded-md"
                 />
               </div>
+              {/* Reset button to the right of RR */}
+              <div className="col-span-2 flex items-end">
+                <button onClick={onResetSide} className="btn btn-primary text-xs py-0.5 px-2 whitespace-nowrap w-full">Reset</button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Group 2: Character + Load */}
-        <div className="col-span-6 h-full">
+        {/* Group 2: Character + Load (slightly narrower) */}
+        <div className="col-span-5 h-full">
           <div className="field-group h-full">
             <div className="grid grid-cols-12 gap-x-1 items-end">
               <div className="col-span-7">

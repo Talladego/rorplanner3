@@ -30,10 +30,15 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   const [talismanSlot, setTalismanSlot] = useState<{ slot: EquipSlot; index: number } | null>(null);
   const hasCareer = !!selectedCareer;
 
-  // Persistent filter state shared across all equipment selections
-  const [nameFilter, setNameFilter] = useState('');
-  const [statsFilter, setStatsFilter] = useState<Stat[]>([]);
-  const [rarityFilter, setRarityFilter] = useState<ItemRarity[]>([]);
+  // Persistent filter state for items (carry across equipment slots within this panel)
+  const [itemNameFilter, setItemNameFilter] = useState('');
+  const [itemStatsFilter, setItemStatsFilter] = useState<Stat[]>([]);
+  const [itemRarityFilter, setItemRarityFilter] = useState<ItemRarity[]>([]);
+
+  // Persistent filter state for talismans (carry across talisman slots within this panel)
+  const [talismanNameFilter, setTalismanNameFilter] = useState('');
+  const [talismanStatsFilter, setTalismanStatsFilter] = useState<Stat[]>([]);
+  const [talismanRarityFilter, setTalismanRarityFilter] = useState<ItemRarity[]>([]);
 
   // Helper function to check if an item is eligible based on level/renown requirements
   const isItemEligible = (item: Item | null): boolean => {
@@ -302,12 +307,12 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   holdingItemLevelReq={talismanSlot ? effectiveLoadout?.items[talismanSlot.slot].item?.levelRequirement : undefined}
         talismanSlotIndex={talismanSlot?.index}
         loadoutId={loadoutId || null}
-        nameFilter={nameFilter}
-        statsFilter={statsFilter}
-        rarityFilter={rarityFilter}
-        onNameFilterChange={setNameFilter}
-        onStatsFilterChange={setStatsFilter}
-        onRarityFilterChange={setRarityFilter}
+        nameFilter={talismanSlot ? talismanNameFilter : itemNameFilter}
+        statsFilter={talismanSlot ? talismanStatsFilter : itemStatsFilter}
+        rarityFilter={talismanSlot ? talismanRarityFilter : itemRarityFilter}
+        onNameFilterChange={talismanSlot ? setTalismanNameFilter : setItemNameFilter}
+        onStatsFilterChange={talismanSlot ? setTalismanStatsFilter : setItemStatsFilter}
+        onRarityFilterChange={talismanSlot ? setTalismanRarityFilter : setItemRarityFilter}
         selectedCareer={selectedCareer}
       />
     </div>

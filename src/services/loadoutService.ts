@@ -154,13 +154,15 @@ const GET_CHARACTER = gql`
 
 
 const GET_POCKET_ITEMS = gql`
-  query GetPocketItems($first: Int, $after: String, $hasStats: [Stat!], $usableByCareer: Career, $where: ItemFilterInput) {
+  query GetPocketItems($first: Int, $after: String, $last: Int, $before: String, $hasStats: [Stat!], $usableByCareer: Career, $where: ItemFilterInput) {
     items(
       where: $where,
       hasStats: $hasStats,
       usableByCareer: $usableByCareer,
       first: $first,
       after: $after,
+      last: $last,
+      before: $before,
       order: [
         { rarity: DESC },
         { itemLevel: DESC },
@@ -236,12 +238,14 @@ const GET_POCKET_ITEMS = gql`
 `;
 
 const GET_TALISMANS = gql`
-  query GetTalismans($first: Int, $after: String, $hasStats: [Stat!], $where: ItemFilterInput) {
+  query GetTalismans($first: Int, $after: String, $last: Int, $before: String, $hasStats: [Stat!], $where: ItemFilterInput) {
     items(
       where: $where,
       hasStats: $hasStats,
       first: $first,
       after: $after,
+      last: $last,
+      before: $before,
       order: [
         { rarity: DESC },
         { itemLevel: DESC },
@@ -566,135 +570,14 @@ export const loadoutService = {
   },
 
   // 3. Fetch items for equipment selection
-  async getItemsForSlot(slot: EquipSlot, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
+  async getItemsForSlot(slot: EquipSlot | null, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
     try {
       const allowedStats = sanitizeHasStats(hasStats);
-      // Check if we need compatibility slots
-      const needsCompatibility = (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4);
+  // Hand and jewellery compatibility are handled via server-side IN filters in getItemsForSingleSlot
 
-      // Check if we need to include EITHER_HAND items for hand slots
-      const needsEitherHand = (slot === EquipSlot.MAIN_HAND || slot === EquipSlot.OFF_HAND);
-
-      if (needsCompatibility) {
-        // For compatibility slots, use a higher limit since pagination is disabled
-        const compatibilityLimit = Math.max(limit * 5, 50); // At least 50 items or 5x the requested limit
-
-        // Make separate queries for each compatible slot and combine results
-        const compatibleSlots: EquipSlot[] = [slot];
-        if (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4) {
-          compatibleSlots.push(EquipSlot.JEWELLERY1);
-        }
-
-        // Query each slot separately and combine results
-        const allResults = [];
-        for (const slotToQuery of compatibleSlots) {
-          const result = await this.getItemsForSingleSlot(slotToQuery, career, compatibilityLimit, after, levelRequirement, renownRankRequirement, nameFilter, allowedStats, hasRarities);
-          if (result.edges) {
-            allResults.push(...result.edges);
-          }
-        }
-
-        // Remove duplicates based on item id
-        const seenIds = new Set();
-        let uniqueEdges = allResults.filter(edge => {
-          if (seenIds.has(edge.node.id)) {
-            return false;
-          }
-          seenIds.add(edge.node.id);
-          return true;
-        });
-
-        // Apply client-side stat filtering if hasStats is provided
-        if (allowedStats && allowedStats.length > 0) {
-          uniqueEdges = uniqueEdges.filter((edge: any) => {
-            const item = edge.node;
-            return item.stats && item.stats.some((stat: any) => allowedStats.includes(stat.stat));
-          });
-        }
-
-        return {
-          edges: uniqueEdges,
-          nodes: uniqueEdges.map(edge => edge.node),
-          pageInfo: { hasNextPage: false, hasPreviousPage: false }, // Simplified for compatibility
-          totalCount: uniqueEdges.length
-        };
-      } else if (needsEitherHand) {
-        // For hand slots, include both specific slot and EITHER_HAND items
-        const handLimit = Math.max(limit * 2, 50); // At least 50 items or 2x the requested limit
-
-        // Make separate queries for the specific slot and EITHER_HAND, then combine results
-        const handSlots: EquipSlot[] = [slot, EquipSlot.EITHER_HAND];
-
-        // Query each slot separately and combine results
-        const allResults = [];
-        for (const slotToQuery of handSlots) {
-          // Ensure rarity filters are respected for hand slots as well
-          const result = await this.getItemsForSingleSlot(
-            slotToQuery,
-            career,
-            handLimit,
-            after,
-            levelRequirement,
-            renownRankRequirement,
-            nameFilter,
-            allowedStats,
-            hasRarities
-          );
-          if (result.edges) {
-            allResults.push(...result.edges);
-          }
-        }
-
-        // Remove duplicates based on item id
-        const seenIds = new Set();
-        let uniqueEdges = allResults.filter(edge => {
-          if (seenIds.has(edge.node.id)) {
-            return false;
-          }
-          seenIds.add(edge.node.id);
-          return true;
-        });
-
-        // Apply client-side stat filtering if hasStats is provided
-        if (allowedStats && allowedStats.length > 0) {
-          uniqueEdges = uniqueEdges.filter((edge: any) => {
-            const item = edge.node;
-            return item.stats && item.stats.some((stat: any) => allowedStats.includes(stat.stat));
-          });
-        }
-
-        // Apply client-side rarity filtering if requested (safety net)
-        if (hasRarities && hasRarities.length > 0) {
-          uniqueEdges = uniqueEdges.filter((edge: any) => hasRarities.includes(edge.node.rarity));
-        }
-
-        // Apply global sorting to match GraphQL query order: rarity DESC, itemLevel DESC, name ASC
-        const rarityOrder: Record<string, number> = { MYTHIC: 6, VERY_RARE: 5, RARE: 4, UNCOMMON: 3, COMMON: 2, UTILITY: 1 };
-        uniqueEdges.sort((a: any, b: any) => {
-          const itemA = a.node;
-          const itemB = b.node;
-          
-          // First sort by rarity DESC
-          const rarityDiff = (rarityOrder[itemB.rarity] || 0) - (rarityOrder[itemA.rarity] || 0);
-          if (rarityDiff !== 0) return rarityDiff;
-          
-          // Then sort by itemLevel DESC
-          const levelDiff = itemB.itemLevel - itemA.itemLevel;
-          if (levelDiff !== 0) return levelDiff;
-          
-          // Finally sort by name ASC
-          return itemA.name.localeCompare(itemB.name);
-        });
-
-        return {
-          edges: uniqueEdges,
-          nodes: uniqueEdges.map(edge => edge.node),
-          pageInfo: { hasNextPage: false, hasPreviousPage: false }, // Simplified for compatibility
-          totalCount: uniqueEdges.length
-        };
-      } else {
+  {
         // Use the original single-slot query
-  const result = await this.getItemsForSingleSlot(slot, career, limit, after, levelRequirement, renownRankRequirement, nameFilter, allowedStats, hasRarities);
+  const result = await this.getItemsForSingleSlot(slot, career, limit, after, levelRequirement, renownRankRequirement, nameFilter, allowedStats, hasRarities, before, last);
         
         return result;
       }
@@ -705,7 +588,7 @@ export const loadoutService = {
   },
 
   // Helper method for single slot queries
-  async getItemsForSingleSlot(slot: EquipSlot, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
+  async getItemsForSingleSlot(slot: EquipSlot | null, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
     let query;
     let variables: any = { 
       first: limit
@@ -713,6 +596,16 @@ export const loadoutService = {
 
     if (after) {
       variables.after = after;
+    }
+
+    // Backwards pagination support
+    if (before) {
+      variables.before = before;
+      // When using 'before', GraphQL connections expect 'last' to specify the page size from the end
+      variables.last = last ?? limit;
+      // Clear forward args if we go backwards
+      delete variables.first;
+      delete variables.after;
     }
 
     if (hasStats && hasStats.length > 0) {
@@ -726,14 +619,44 @@ export const loadoutService = {
       name: { contains: nameFilter || '' }
     };
 
-    // Exclude NONE type items for non-pocket slots
+    // Exclude NONE type items for non-pocket slots (and when slot is not provided)
     if (slot !== EquipSlot.POCKET1 && slot !== EquipSlot.POCKET2) {
       where.type = { neq: 'NONE' };
     }
 
-    if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
+    if (slot == null || slot === EquipSlot.NONE) {
+      // When slot is not specified, search across all equipment-capable slots only
+      // to avoid pulling in non-equipment items that may violate enum constraints (e.g., rarity)
+      where.slot = {
+        in: [
+          EquipSlot.MAIN_HAND,
+          EquipSlot.OFF_HAND,
+          EquipSlot.RANGED_WEAPON,
+          EquipSlot.EITHER_HAND,
+          EquipSlot.HELM,
+          EquipSlot.SHOULDER,
+          EquipSlot.BODY,
+          EquipSlot.GLOVES,
+          EquipSlot.BOOTS,
+          EquipSlot.BACK,
+          EquipSlot.BELT,
+          EquipSlot.JEWELLERY1,
+          EquipSlot.JEWELLERY2,
+          EquipSlot.JEWELLERY3,
+          EquipSlot.JEWELLERY4,
+          EquipSlot.POCKET1,
+          EquipSlot.POCKET2,
+        ]
+      };
+    } else if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
       // For pocket items, allow both POCKET1 and POCKET2 slots
       where.slot = { in: [EquipSlot.POCKET1, EquipSlot.POCKET2] };
+    } else if (slot === EquipSlot.MAIN_HAND || slot === EquipSlot.OFF_HAND) {
+      // For hand slots, include either-hand items as well
+      where.slot = { in: [slot, EquipSlot.EITHER_HAND] };
+    } else if (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4) {
+      // For secondary jewellery slots, include items compatible with JEWELLERY1 as well
+      where.slot = { in: [slot, EquipSlot.JEWELLERY1] };
     } else {
       where.slot = { eq: slot };
     }
@@ -760,7 +683,7 @@ export const loadoutService = {
 
   // 3.5. Fetch talismans for holding item's level requirement
   // Rule (from in-game testing): talisman.levelRequirement ≤ holdingItem.levelRequirement
-  async getTalismansForItemLevel(holdingLevelRequirement: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
+  async getTalismansForItemLevel(holdingLevelRequirement: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
     try {
       const query = GET_TALISMANS;
       const variables: any = {
@@ -769,6 +692,13 @@ export const loadoutService = {
 
       if (after) {
         variables.after = after;
+      }
+
+      if (before) {
+        variables.before = before;
+        variables.last = last ?? limit;
+        delete variables.first;
+        delete variables.after;
       }
 
       const allowedStats = sanitizeHasStats(hasStats);
@@ -809,8 +739,8 @@ export const loadoutService = {
   },
 
   // 3.7. Get talismans for a specific slot (no special cases)
-  async getTalismansForSlot(_slot: EquipSlot, holdingLevelRequirement: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[]): Promise<any> {
-    return await this.getTalismansForItemLevel(holdingLevelRequirement, limit, after, nameFilter, hasStats, hasRarities);
+  async getTalismansForSlot(_slot: EquipSlot, holdingLevelRequirement: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
+    return await this.getTalismansForItemLevel(holdingLevelRequirement, limit, after, nameFilter, hasStats, hasRarities, before, last);
   },
 
   // Removed legendary talisman special-case as the required info cannot be reliably extracted from the schema
