@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type React from 'react';
-import { createPortal } from 'react-dom';
 import { EquipSlot, Item, Stat, CAREER_RACE_MAPPING, Career, ItemRarity } from '../types';
 import { useLoadoutData } from '../hooks/useLoadoutData';
 import { loadoutService } from '../services/loadoutService';
 import { formatSlotName, formatStatName, formatItemTypeName, formatStatValue, isPercentItemStat, normalizeStatDisplayValue, formatCareerName, formatRarityName } from '../utils/formatters';
 import { getCareerIconUrl } from '../constants/careerIcons';
 import Tooltip from './Tooltip';
+import Dropdown from './primitives/Dropdown';
 import { useLoadoutById } from '../hooks/useLoadoutById';
 
 interface EquipmentSelectorProps {
@@ -82,8 +82,6 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   const effectiveLoadout = loadoutId ? explicitLoadout : currentLoadout;
   const career = selectedCareer;
   const modalRef = useRef<HTMLDivElement>(null);
-  const careerButtonRef = useRef<HTMLButtonElement>(null);
-  const careerPortalRef = useRef<HTMLDivElement>(null);
   
   // Store previous context to detect changes
   const prevContextRef = useRef<{ isTalismanMode: boolean; career: Career | null }>({
@@ -110,16 +108,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   const [careerFilter, setCareerFilter] = useState<Career | ''>(selectedCareer || '');
   const [slotFilter, setSlotFilter] = useState<EquipSlot | ''>(slot || '');
   const wasOpenRef = useRef<boolean>(false);
-  const [isCareerOpen, setIsCareerOpen] = useState(false);
-  const careerSelectRef = useRef<HTMLDivElement>(null);
-  const [isRarityOpen, setIsRarityOpen] = useState(false);
-  const raritySelectRef = useRef<HTMLDivElement>(null);
-  const rarityButtonRef = useRef<HTMLButtonElement>(null);
-  const rarityPortalRef = useRef<HTMLDivElement>(null);
-  const [isSlotOpen, setIsSlotOpen] = useState(false);
-  const slotSelectRef = useRef<HTMLDivElement>(null);
-  const slotButtonRef = useRef<HTMLButtonElement>(null);
-  const slotPortalRef = useRef<HTMLDivElement>(null);
+  // Dropdowns are handled by the Dropdown primitive with its own portal/outside-click logic
 
   // Equipment-capable slots for UI (exclude NONE, EVENT, STANDARD, EITHER_HAND)
   const EQUIPMENT_SLOTS: EquipSlot[] = [
@@ -141,15 +130,10 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
     EquipSlot.POCKET2,
   ];
 
-  // Handle click outside to close
+  // Handle click outside to close modal
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      // If click is inside the portal dropdown, ignore
-      if (careerPortalRef.current && careerPortalRef.current.contains(target)) return;
-      if (rarityPortalRef.current && rarityPortalRef.current.contains(target)) return;
-      if (slotPortalRef.current && slotPortalRef.current.contains(target)) return;
-      // Otherwise, close modal when clicking outside modal container
       if (modalRef.current && !modalRef.current.contains(target)) {
         onClose();
       }
@@ -164,148 +148,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
     };
   }, [isOpen, onClose]);
 
-  // Close dropdowns on outside click (but allow clicks inside the portal containers)
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (careerPortalRef.current && careerPortalRef.current.contains(target)) return;
-      if (rarityPortalRef.current && rarityPortalRef.current.contains(target)) return;
-      if (slotPortalRef.current && slotPortalRef.current.contains(target)) return;
-      if (careerSelectRef.current && !careerSelectRef.current.contains(target)) {
-        setIsCareerOpen(false);
-      }
-      if (raritySelectRef.current && !raritySelectRef.current.contains(target)) {
-        setIsRarityOpen(false);
-      }
-      if (slotSelectRef.current && !slotSelectRef.current.contains(target)) {
-        setIsSlotOpen(false);
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('mousedown', handler);
-    }
-    return () => document.removeEventListener('mousedown', handler);
-  }, [isOpen]);
-
-  // Compute and store portal dropdown position
-  const [careerDropdownStyle, setCareerDropdownStyle] = useState<React.CSSProperties | null>(null);
-  const computeCareerDropdownPosition = useCallback(() => {
-    const btn = careerButtonRef.current;
-    if (!btn) return;
-    const rect = btn.getBoundingClientRect();
-    const viewportH = window.innerHeight;
-    const belowSpace = viewportH - rect.bottom - 8; // px margin
-    const aboveSpace = rect.top - 8;
-    const desiredHeight = 240; // roughly 10 items
-    let style: React.CSSProperties = {
-      position: 'fixed',
-      left: Math.round(rect.left),
-      width: Math.round(rect.width),
-      zIndex: 60,
-      maxHeight: Math.max(120, Math.min(desiredHeight, belowSpace))
-    };
-    // Flip if not enough space below
-    if (belowSpace < 160 && aboveSpace > belowSpace) {
-      style = {
-        ...style,
-        bottom: Math.round(viewportH - rect.top),
-        maxHeight: Math.max(120, Math.min(desiredHeight, aboveSpace))
-      };
-    } else {
-      style = {
-        ...style,
-        top: Math.round(rect.bottom)
-      };
-    }
-    setCareerDropdownStyle(style);
-  }, []);
-
-  // Recompute on open/resize/scroll
-  useEffect(() => {
-    if (!isCareerOpen) return;
-    computeCareerDropdownPosition();
-    const onRescroll = () => computeCareerDropdownPosition();
-    window.addEventListener('resize', onRescroll);
-    window.addEventListener('scroll', onRescroll, true);
-    return () => {
-      window.removeEventListener('resize', onRescroll);
-      window.removeEventListener('scroll', onRescroll, true);
-    };
-  }, [isCareerOpen, computeCareerDropdownPosition]);
-
-  // Rarity dropdown positioning
-  const [rarityDropdownStyle, setRarityDropdownStyle] = useState<React.CSSProperties | null>(null);
-  const computeRarityDropdownPosition = useCallback(() => {
-    const btn = rarityButtonRef.current;
-    if (!btn) return;
-    const rect = btn.getBoundingClientRect();
-    const viewportH = window.innerHeight;
-    const belowSpace = viewportH - rect.bottom - 8;
-    const aboveSpace = rect.top - 8;
-    const desiredHeight = 240;
-    let style: React.CSSProperties = {
-      position: 'fixed',
-      left: Math.round(rect.left),
-      width: Math.round(rect.width),
-      zIndex: 60,
-      maxHeight: Math.max(120, Math.min(desiredHeight, belowSpace))
-    };
-    if (belowSpace < 160 && aboveSpace > belowSpace) {
-      style = { ...style, bottom: Math.round(viewportH - rect.top), maxHeight: Math.max(120, Math.min(desiredHeight, aboveSpace)) };
-    } else {
-      style = { ...style, top: Math.round(rect.bottom) };
-    }
-    setRarityDropdownStyle(style);
-  }, []);
-
-  useEffect(() => {
-    if (!isRarityOpen) return;
-    computeRarityDropdownPosition();
-    const onRescroll = () => computeRarityDropdownPosition();
-    window.addEventListener('resize', onRescroll);
-    window.addEventListener('scroll', onRescroll, true);
-    return () => {
-      window.removeEventListener('resize', onRescroll);
-      window.removeEventListener('scroll', onRescroll, true);
-    };
-  }, [isRarityOpen, computeRarityDropdownPosition]);
-
-  // Slot dropdown positioning
-  const [slotDropdownStyle, setSlotDropdownStyle] = useState<React.CSSProperties | null>(null);
-  const computeSlotDropdownPosition = useCallback(() => {
-    const btn = slotButtonRef.current;
-    if (!btn) return;
-    const rect = btn.getBoundingClientRect();
-    const viewportH = window.innerHeight;
-    const belowSpace = viewportH - rect.bottom - 8;
-    const aboveSpace = rect.top - 8;
-    const desiredHeight = 240;
-    let style: React.CSSProperties = {
-      position: 'fixed',
-      left: Math.round(rect.left),
-      width: Math.round(rect.width),
-      zIndex: 60,
-      maxHeight: Math.max(120, Math.min(desiredHeight, belowSpace))
-    };
-    if (belowSpace < 160 && aboveSpace > belowSpace) {
-      style = { ...style, bottom: Math.round(viewportH - rect.top), maxHeight: Math.max(120, Math.min(desiredHeight, aboveSpace)) };
-    } else {
-      style = { ...style, top: Math.round(rect.bottom) };
-    }
-    setSlotDropdownStyle(style);
-  }, []);
-
-  useEffect(() => {
-    if (!isSlotOpen) return;
-    computeSlotDropdownPosition();
-    const onRescroll = () => computeSlotDropdownPosition();
-    window.addEventListener('resize', onRescroll);
-    window.addEventListener('scroll', onRescroll, true);
-    return () => {
-      window.removeEventListener('resize', onRescroll);
-      window.removeEventListener('scroll', onRescroll, true);
-    };
-  }, [isSlotOpen, computeSlotDropdownPosition]);
+  // Dropdown positioning is handled by the Dropdown primitive
 
   // Fetch items for current page
   const fetchItems = useCallback(async (
@@ -485,126 +328,37 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
     {/* Filters: Career/Slot row above, then Name/Rarity/Stat/Reset in talisman grid below. */}
     {!isTalismanMode && (
       <div className="mb-1 flex gap-1 items-center">
-        <div ref={careerSelectRef} className="w-[10rem] min-w-[10rem] max-w-[10rem] shrink-0">
-          {/* ...Career dropdown button code... */}
-          <button
-            type="button"
-            ref={careerButtonRef}
-            onClick={() => setIsCareerOpen(o => !o)}
-            className="w-full py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent px-3 flex items-center gap-2 min-w-0"
-            aria-haspopup="listbox"
-            aria-expanded={isCareerOpen}
-          >
-            <>
-              {careerFilter && <img src={getCareerIconUrl(careerFilter as Career)} alt="" className="w-5 h-5" />}
-              <span className={`truncate flex-1 min-w-0 text-left ${careerFilter ? '' : 'text-muted'}`}>
-                {careerFilter ? formatCareerName(careerFilter as Career) : 'Any Career'}
-              </span>
-            </>
-            <span className="ml-auto">▾</span>
-          </button>
-          {isCareerOpen && careerDropdownStyle && createPortal(
-            <div
-              ref={careerPortalRef}
-              role="listbox"
-              className="z-[60] fixed border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 shadow-lg text-gray-900 dark:text-gray-100 overflow-auto"
-              style={careerDropdownStyle}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                onClick={() => {
-                  setCareerFilter('');
-                  setIsCareerOpen(false);
-                  setCurrentPage(1);
-                  setPageHistory([]);
-                  fetchItems(undefined, nameFilter, statsFilter, rarityFilter, '', slotFilter);
-                }}
-              >
-                Any Career
-              </button>
-              {Object.values(Career).map(c => (
-                <button
-                  key={c}
-                  type="button"
-                  className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                  onClick={() => {
-                    setCareerFilter(c);
-                    setIsCareerOpen(false);
-                    setCurrentPage(1);
-                    setPageHistory([]);
-                    fetchItems(undefined, nameFilter, statsFilter, rarityFilter, c, slotFilter);
-                  }}
-                >
-                  <img src={getCareerIconUrl(c as Career)} alt="" className="w-5 h-5" />
-                  <span>{formatCareerName(c as Career)}</span>
-                </button>
-              ))}
-            </div>,
-            document.body
-          )}
+        <div className="w-[10rem] min-w-[10rem] max-w-[10rem] shrink-0">
+          <Dropdown
+            value={careerFilter as Career | ''}
+            onChange={(val) => {
+              setCareerFilter(val as Career | '');
+              setCurrentPage(1);
+              setPageHistory([]);
+              fetchItems(undefined, nameFilter, statsFilter, rarityFilter, val as Career | '', slotFilter);
+            }}
+            options={Object.values(Career).map((c) => ({ value: c as Career, label: formatCareerName(c as Career), iconUrl: getCareerIconUrl(c as Career) }))}
+            placeholder="Any Career"
+            usePortal
+          />
         </div>
-        <div ref={slotSelectRef} className="w-[10rem] min-w-[10rem] max-w-[10rem] shrink-0 relative">
-          {/* ...Slot dropdown button code... */}
-          <button
-            type="button"
-            ref={slotButtonRef}
-            onClick={() => setIsSlotOpen(o => !o)}
-            className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center gap-2 min-w-0"
-            aria-haspopup="listbox"
-            aria-expanded={isSlotOpen}
-          >
-            <span className={`truncate flex-1 min-w-0 text-left ${slotFilter ? '' : 'text-muted'}`}>
-              {slotFilter ? formatSlotName(slotFilter as EquipSlot) : 'Any Slot'}
-            </span>
-            <span className="ml-auto">▾</span>
-          </button>
-          {isSlotOpen && slotDropdownStyle && createPortal(
-            <div
-              ref={slotPortalRef}
-              role="listbox"
-              className="z-[60] fixed border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 shadow-lg text-gray-900 dark:text-gray-100 overflow-auto"
-              style={slotDropdownStyle}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                onClick={() => {
-                  const val = '' as EquipSlot | '';
-                  setSlotFilter(val);
-                  setIsSlotOpen(false);
-                  setCurrentPage(1);
-                  setPageHistory([]);
-                  fetchItems(undefined, nameFilter, statsFilter, rarityFilter, careerFilter, val);
-                }}
-              >
-                Any Slot
-              </button>
-              {EQUIPMENT_SLOTS.map(s => (
-                <button
-                  key={s}
-                  type="button"
-                  className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                  onClick={() => {
-                    const val = s as EquipSlot;
-                    setSlotFilter(val);
-                    setIsSlotOpen(false);
-                    setCurrentPage(1);
-                    setPageHistory([]);
-                    fetchItems(undefined, nameFilter, statsFilter, rarityFilter, careerFilter, val);
-                  }}
-                >
-                  {formatSlotName(s as EquipSlot)}
-                </button>
-              ))}
-            </div>,
-            document.body
-          )}
+        <div className="w-[10rem] min-w-[10rem] max-w-[10rem] shrink-0 relative">
+          <Dropdown
+            value={slotFilter as EquipSlot | ''}
+            onChange={(val) => {
+              const v = (val || '') as EquipSlot | '';
+              setSlotFilter(v);
+              setCurrentPage(1);
+              setPageHistory([]);
+              fetchItems(undefined, nameFilter, statsFilter, rarityFilter, careerFilter, v);
+            }}
+            options={EQUIPMENT_SLOTS.map((s) => ({ value: s as EquipSlot, label: formatSlotName(s as EquipSlot) }))}
+            placeholder="Any Slot"
+            usePortal
+          />
         </div>
-        <span className="italic text-xs text-secondary ml-2 truncate" title={'If items are missing for the selected career select "Any Career" and filter the item by name'}>
-          If items are missing for the selected career select "Any Career" and filter the item by name
+        <span className="italic text-xs text-secondary ml-2 truncate" title={'If items are missing for the selected career select Any Career and filter the item by name'}>
+          If items are missing for the selected career select Any Career and filter the item by name
         </span>
       </div>
     )}
@@ -621,85 +375,43 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
         />
       </div>
       {/* Rarity */}
-      <div ref={raritySelectRef} className={`col-[2/3] w-[10rem] min-w-[10rem] max-w-[10rem] shrink-0`}>
-        {/* ...rarity dropdown button code... */}
-        <button
-          type="button"
-          ref={rarityButtonRef}
-          onClick={() => setIsRarityOpen(o => !o)}
-          className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center gap-2 min-w-0"
-          aria-haspopup="listbox"
-          aria-expanded={isRarityOpen}
-        >
-          <span className={`truncate flex-1 min-w-0 text-left ${rarityFilter.length ? '' : 'text-muted'}`}>
-            {rarityFilter.length ? formatRarityName(rarityFilter[0]) : 'All Rarities'}
-          </span>
-          <span className="ml-auto">▾</span>
-        </button>
-        {isRarityOpen && rarityDropdownStyle && createPortal(
-          <div
-            ref={rarityPortalRef}
-            role="listbox"
-            className="z-[60] fixed border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 shadow-lg text-gray-900 dark:text-gray-100 overflow-auto"
-            style={rarityDropdownStyle}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => {
-                onRarityFilterChange([]);
-                setIsRarityOpen(false);
-                setCurrentPage(1);
-                setPageHistory([]);
-                fetchItems(undefined, nameFilter, statsFilter, []);
-              }}
-            >
-              All Rarities
-            </button>
-            {Object.values(ItemRarity).map(rarity => (
-              <button
-                key={rarity}
-                type="button"
-                className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                onClick={() => {
-                  const newRarityFilter = [rarity as ItemRarity];
-                  onRarityFilterChange(newRarityFilter);
-                  setIsRarityOpen(false);
-                  setCurrentPage(1);
-                  setPageHistory([]);
-                  fetchItems(undefined, nameFilter, statsFilter, newRarityFilter);
-                }}
-              >
-                {formatRarityName(rarity as ItemRarity)}
-              </button>
-            ))}
-          </div>,
-          document.body
-        )}
+      <div className={`col-[2/3] w-[10rem] min-w-[10rem] max-w-[10rem] shrink-0`}>
+        <Dropdown
+          value={(rarityFilter[0] ?? '') as ItemRarity | ''}
+          onChange={(val) => {
+            if (!val) {
+              onRarityFilterChange([]);
+              setCurrentPage(1);
+              setPageHistory([]);
+              fetchItems(undefined, nameFilter, statsFilter, []);
+            } else {
+              const newRarityFilter = [val as ItemRarity];
+              onRarityFilterChange(newRarityFilter);
+              setCurrentPage(1);
+              setPageHistory([]);
+              fetchItems(undefined, nameFilter, statsFilter, newRarityFilter);
+            }
+          }}
+          options={Object.values(ItemRarity).map((r) => ({ value: r as ItemRarity, label: formatRarityName(r as ItemRarity) }))}
+          placeholder="All Rarities"
+          usePortal
+        />
       </div>
       {/* Stat */}
       <div className={`col-[3/4] w-[10rem] min-w-[10rem] max-w-[10rem] shrink-0`}>
-        <select
-              value={statsFilter[0] ?? ''}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                const val = e.target.value as Stat | '';
-                const normalized = val && allowedStatOptions.includes(val as Stat) ? [val as Stat] : [];
-                onStatsFilterChange(normalized);
-                setCurrentPage(1);
-                setPageHistory([]);
-                fetchItems(undefined, nameFilter, normalized, rarityFilter);
-              }}
-              size={1}
-              className={`w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-            >
-              <option value="" className="text-muted">All Stats</option>
-              {allowedStatOptions.map(stat => (
-                <option key={stat} value={stat}>
-                  {formatStatName(stat)}
-                </option>
-              ))}
-            </select>
+        <Dropdown
+          value={(statsFilter[0] ?? '') as Stat | ''}
+          onChange={(val) => {
+            const normalized = val && allowedStatOptions.includes(val as Stat) ? [val as Stat] : [];
+            onStatsFilterChange(normalized);
+            setCurrentPage(1);
+            setPageHistory([]);
+            fetchItems(undefined, nameFilter, normalized, rarityFilter);
+          }}
+          options={allowedStatOptions.map((s) => ({ value: s as Stat, label: formatStatName(s as Stat) }))}
+          placeholder="All Stats"
+          usePortal
+        />
       </div>
       {/* Reset */}
       <div className={`col-[4/5] flex items-center w-[5.5rem] shrink-0`}>
