@@ -1,4 +1,4 @@
-import { loadoutEventEmitter } from '../loadoutEventEmitter';
+import { loadoutEventEmitter } from './loadoutEventEmitter';
 import type { LoadoutEvents, LoadoutEventType } from '../../types/events';
 
 /** Subscribe to a single loadout event type. Returns an unsubscribe function. */
