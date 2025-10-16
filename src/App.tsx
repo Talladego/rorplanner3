@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { loadoutService } from './services/loadoutService';
-import { urlService } from './services/urlService';
+import { urlService } from './services/loadout/urlService';
 import DualToolbar from './components/DualToolbar';
 import DualEquipmentLayout from './components/DualEquipmentLayout';
 import ApolloProviderWrapper from './components/ApolloProviderWrapper';

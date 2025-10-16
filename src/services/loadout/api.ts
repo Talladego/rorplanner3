@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import client from '../../lib/apollo-client';
 import { EquipSlot, Item, Career, Stat, ItemRarity } from '../../types';
-import { SEARCH_CHARACTERS, GET_CHARACTER, GET_POCKET_ITEMS, GET_TALISMANS } from '../queries';
+import { SEARCH_CHARACTERS, GET_CHARACTER, GET_POCKET_ITEMS, GET_TALISMANS } from './queries';
 import { gql } from '@apollo/client';
 import { makeListKey, getFromListCache, setInListCache, warmIconCacheFromConnection } from './cache';
 

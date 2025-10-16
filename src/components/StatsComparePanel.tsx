@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { loadoutService } from '../services/loadoutService';
 import { isPercentSummaryKey } from '../utils/formatters';
 import type { StatsSummary } from '../types';
-import { urlService } from '../services/urlService';
+import { urlService } from '../services/loadout/urlService';
 import StatRow from './stats/StatRow';
 import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide } from '../utils/statsCompareHelpers';
 

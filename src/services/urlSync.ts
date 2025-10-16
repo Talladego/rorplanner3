@@ -1,4 +1,4 @@
-import { urlService } from './urlService';
+import { urlService } from './loadout/urlService';
 
 /**
  * Update the URL to reflect the current loadout if auto-update is enabled
