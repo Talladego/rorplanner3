@@ -1,5 +1,5 @@
 import { Career, Loadout, LoadoutItem, EquipSlot, LoadoutSide } from '../../types';
-import { loadoutStoreAdapter } from '../../store/loadoutStoreAdapter';
+import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 import { loadoutService } from '../loadoutService';
 
 class UrlService {

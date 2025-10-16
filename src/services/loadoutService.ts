@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */ // GraphQL results are untyped at the boundary
 
-import { loadoutStoreAdapter } from '../store/loadoutStoreAdapter';
+import { loadoutStoreAdapter } from '../store/loadout/loadoutStoreAdapter';
 import client from '../lib/apollo-client';
 // Note: GraphQL operations come from centralized documents in ./queries
 import { EquipSlot, Item, Career, LoadoutItem, Stat, ItemRarity, LoadoutSide } from '../types';

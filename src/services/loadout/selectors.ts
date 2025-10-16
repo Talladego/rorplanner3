@@ -1,4 +1,4 @@
-import { loadoutStoreAdapter } from '../../store/loadoutStoreAdapter';
+import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 import type { LoadoutSide } from '../../types';
 
 export function getActiveSide(): LoadoutSide {

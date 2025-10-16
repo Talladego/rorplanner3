@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { StatsSummary } from '../../types';
-import { loadoutStoreAdapter } from '../../store/loadoutStoreAdapter';
+import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 import { isShieldType } from '../../utils/items';
 import { getItemColor } from '../../utils/rarityColors';
 import { STAT_TO_SUMMARY_KEY, SUMMARY_KEY_TO_STAT } from '../../constants/statMaps';

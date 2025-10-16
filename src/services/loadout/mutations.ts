@@ -1,4 +1,4 @@
-import { loadoutStoreAdapter } from '../../store/loadoutStoreAdapter';
+import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 import { loadoutEventEmitter } from '../loadoutEventEmitter';
 import { EquipSlot, Career, Item, LoadoutSide } from '../../types';
 
