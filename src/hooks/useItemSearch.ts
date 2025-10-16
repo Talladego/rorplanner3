@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Career, EquipSlot, Item, ItemRarity, Stat } from '../types';
-import { loadoutService } from '../services/loadoutService';
+import { loadoutService } from '../services/loadout/loadoutService';
 
 const ITEMS_PER_PAGE = 10;
 

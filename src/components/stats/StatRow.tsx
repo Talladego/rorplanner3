@@ -1,5 +1,5 @@
 // React 17+ JSX runtime; no default import required
-import HoverTooltip from '../HoverTooltip';
+import HoverTooltip from '../tooltip/HoverTooltip';
 import { formatCamelCase, formatStatValue, normalizeStatDisplayValue } from '../../utils/formatters';
 
 export type Contribution = {

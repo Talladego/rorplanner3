@@ -1,19 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */ // GraphQL results are untyped at the boundary
 
-import { loadoutStoreAdapter } from '../store/loadout/loadoutStoreAdapter';
-import client from '../lib/apollo-client';
+import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
+import client from '../../lib/apollo-client';
 // Note: GraphQL operations come from centralized documents in ./queries
-import { EquipSlot, Item, Career, LoadoutItem, Stat, ItemRarity, LoadoutSide } from '../types';
-import { loadoutEventEmitter } from './loadout/loadoutEventEmitter';
-import { subscribeToEvents as subscribeToEventsHelper, subscribeToAllEvents as subscribeToAllEventsHelper } from './loadout/events';
-import { urlService } from './loadout/urlService';
-import { updateUrlIfAuto } from './loadout/urlSync';
-import { LoadoutEvents } from '../types/events';
-import { SEARCH_CHARACTERS, GET_CHARACTER } from './loadout/queries';
-import { getItemsForSlotApi, getTalismansForItemLevelApi, getItemWithDetailsApi } from './loadout/api';
-import { computeStatsForLoadout as computeStatsForLoadoutExternal, getStatContributionsForLoadout as getStatContributionsForLoadoutExternal } from './loadout/stats';
-import { sanitizeHasStats, getAllowedFilterStats } from './loadout/filters';
-import * as selectors from './loadout/selectors';
+import { EquipSlot, Item, Career, LoadoutItem, Stat, ItemRarity, LoadoutSide } from '../../types';
+import { loadoutEventEmitter } from './loadoutEventEmitter';
+import { subscribeToEvents as subscribeToEventsHelper, subscribeToAllEvents as subscribeToAllEventsHelper } from './events';
+import { urlService } from './urlService';
+import { updateUrlIfAuto } from './urlSync';
+import { LoadoutEvents } from '../../types/events';
+import { SEARCH_CHARACTERS, GET_CHARACTER } from './queries';
+import { getItemsForSlotApi, getTalismansForItemLevelApi, getItemWithDetailsApi } from './api';
+import { computeStatsForLoadout as computeStatsForLoadoutExternal, getStatContributionsForLoadout as getStatContributionsForLoadoutExternal } from './stats';
+import { sanitizeHasStats, getAllowedFilterStats } from './filters';
+import * as selectors from './selectors';
 import {
   cloneLoadout as cloneLoadoutMutation,
   setCareer as setCareerMutation,
@@ -31,7 +31,7 @@ import {
   // Fix: bring in missing helpers used below
   assignSideLoadout as assignSideLoadoutMutation,
   switchLoadout as switchLoadoutMutation,
-} from './loadout/mutations';
+} from './mutations';
 export const loadoutService = {
   getActiveSide(): LoadoutSide {
     // Filters/selectors/mutations are split into submodules for maintainability
@@ -708,7 +708,7 @@ export const loadoutService = {
     return computeStatsForLoadoutExternal(loadoutId);
   },
 
-  getStatContributionsForLoadout(loadoutId: string, statKey: keyof import('../types').StatsSummary | string) {
+  getStatContributionsForLoadout(loadoutId: string, statKey: keyof import('../../types').StatsSummary | string) {
     return getStatContributionsForLoadoutExternal(loadoutId, statKey as any);
   },
 

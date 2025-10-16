@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
-import { Career, Loadout } from '../types';
-import { loadoutService } from '../services/loadoutService';
-import { urlService } from '../services/loadout/urlService';
+import { Career, Loadout } from '../../types';
+import { loadoutService } from '../../services/loadout/loadoutService';
+import { urlService } from '../../services/loadout/urlService';
 // import { formatCareerName } from '../utils/formatters';
 import CareerSelect from './CareerSelect';
 

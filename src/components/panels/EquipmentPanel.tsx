@@ -1,13 +1,13 @@
 import React, { useState, Suspense } from 'react';
-import { EquipSlot, Item, Stat, Career, ItemRarity } from '../types';
-import { loadoutService } from '../services/loadoutService';
-import { useLoadoutData } from '../hooks/useLoadoutData';
-import { useLoadoutById } from '../hooks/useLoadoutById';
-const EquipmentSelector = React.lazy(() => import('./EquipmentSelector'));
-import { DEFAULT_SLOT_ICONS } from '../constants/slotIcons';
-import Tooltip from './Tooltip';
-import HoverTooltip from './HoverTooltip';
-import { formatSlotName } from '../utils/formatters';
+import { EquipSlot, Item, Stat, Career, ItemRarity } from '../../types';
+import { loadoutService } from '../../services/loadout/loadoutService';
+import { useLoadoutData } from '../../hooks/useLoadoutData';
+import { useLoadoutById } from '../../hooks/useLoadoutById';
+const EquipmentSelector = React.lazy(() => import('../selector/EquipmentSelector'));
+import { DEFAULT_SLOT_ICONS } from '../../constants/slotIcons';
+import Tooltip from '../tooltip/Tooltip';
+import HoverTooltip from '../tooltip/HoverTooltip';
+import { formatSlotName } from '../../utils/formatters';
 
 interface EquipmentPanelProps {
   selectedCareer: Career | '';

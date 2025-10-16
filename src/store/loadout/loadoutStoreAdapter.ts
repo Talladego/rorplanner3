@@ -1,4 +1,4 @@
-import { useLoadoutStore } from '../loadoutStore';
+import { useLoadoutStore } from './loadoutStore';
 import { ILoadoutStore, Loadout, StatsSummary, Career, EquipSlot, Item, LoadoutSide } from '../../types';
 
 class LoadoutStoreAdapter implements ILoadoutStore {

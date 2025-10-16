@@ -1,7 +1,7 @@
 import { memo, type ReactNode } from 'react';
-import Tooltip from '../Tooltip';
+import Tooltip from '../tooltip/Tooltip';
 import { CAREER_RACE_MAPPING, Career, EquipSlot, Item, Stat } from '../../types';
-import { loadoutService } from '../../services/loadoutService';
+import { loadoutService } from '../../services/loadout/loadoutService';
 import { formatItemTypeName, formatSlotName, formatStatName, formatStatValue, isPercentItemStat, normalizeStatDisplayValue } from '../../utils/formatters';
 
 export interface ResultsListProps {

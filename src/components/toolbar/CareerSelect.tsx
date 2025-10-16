@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Career } from '../types';
-import { formatCareerName } from '../utils/formatters';
-import { getCareerIconUrl } from '../constants/careerIcons';
+import { Career } from '../../types';
+import { formatCareerName } from '../../utils/formatters';
+import { getCareerIconUrl } from '../../constants/careerIcons';
 
 type Size = 'sm' | 'md';
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { Loadout, EquipSlot, Career, Item, StatsSummary, LoadoutSide } from '../types';
-import { initialStats } from './loadout/state';
-import { buildActions } from './loadout/actions';
+import { Loadout, EquipSlot, Career, Item, StatsSummary, LoadoutSide } from '../../types';
+import { initialStats } from './state';
+import { buildActions } from './actions';
 // Note: The data layer must not depend on the service layer. Do not import loadoutService here.
 
 interface LoadoutState {

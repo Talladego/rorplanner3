@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { loadoutService } from '../services/loadoutService';
-import { isPercentSummaryKey } from '../utils/formatters';
-import type { StatsSummary } from '../types';
-import { urlService } from '../services/loadout/urlService';
-import StatRow from './stats/StatRow';
-import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide } from '../utils/statsCompareHelpers';
+import { loadoutService } from '../../services/loadout/loadoutService';
+import { isPercentSummaryKey } from '../../utils/formatters';
+import type { StatsSummary } from '../../types';
+import { urlService } from '../../services/loadout/urlService';
+import StatRow from './StatRow';
+import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide } from '../../utils/statsCompareHelpers';
 
 // Per-UI helpers moved to formatters for reuse across components
 

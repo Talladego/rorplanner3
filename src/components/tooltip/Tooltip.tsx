@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Item, Loadout, EquipSlot } from '../types';
-import { formatItemTypeName, formatSlotName } from '../utils/formatters';
-import { loadoutService } from '../services/loadoutService';
-import ItemNameText from './tooltip/ItemNameText';
-import RequirementsBlock from './tooltip/RequirementsBlock';
-import StatLines from './tooltip/StatLines';
-import AbilitiesBuffsBlock from './tooltip/AbilitiesBuffsBlock';
-import TalismanSlotsBlock from './tooltip/TalismanSlotsBlock';
-import SetBonusesBlock from './tooltip/SetBonusesBlock';
+import { Item, Loadout, EquipSlot } from '../../types';
+import { formatItemTypeName, formatSlotName } from '../../utils/formatters';
+import { loadoutService } from '../../services/loadout/loadoutService';
+import ItemNameText from './ItemNameText';
+import RequirementsBlock from './RequirementsBlock';
+import StatLines from './StatLines';
+import AbilitiesBuffsBlock from './AbilitiesBuffsBlock';
+import TalismanSlotsBlock from './TalismanSlotsBlock';
+import SetBonusesBlock from './SetBonusesBlock';
 
 interface TooltipProps {
   children: React.ReactNode;

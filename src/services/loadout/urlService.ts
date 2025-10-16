@@ -1,6 +1,6 @@
 import { Career, Loadout, LoadoutItem, EquipSlot, LoadoutSide } from '../../types';
 import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
-import { loadoutService } from '../loadoutService';
+import { loadoutService } from './loadoutService';
 
 class UrlService {
 	private navigateCb: ((path: string, options?: { replace?: boolean }) => void) | null = null;

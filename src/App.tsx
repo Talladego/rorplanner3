@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { loadoutService } from './services/loadoutService';
+import { loadoutService } from './services/loadout/loadoutService';
 import { urlService } from './services/loadout/urlService';
-import DualToolbar from './components/DualToolbar';
-import DualEquipmentLayout from './components/DualEquipmentLayout';
-import ApolloProviderWrapper from './components/ApolloProviderWrapper';
-import ErrorBoundary from './components/ErrorBoundary';
+import DualToolbar from './components/toolbar/DualToolbar';
+import DualEquipmentLayout from './components/panels/DualEquipmentLayout';
+import ApolloProviderWrapper from './providers/ApolloProvider';
+import ErrorBoundary from './providers/ErrorBoundary';
 import { preloadCareerIcons } from './constants/careerIcons';
 // Presentation layer should subscribe through the service API, not the raw emitter
 

@@ -1,4 +1,4 @@
-import { loadoutService } from '../services/loadoutService';
+import { loadoutService } from '../services/loadout/loadoutService';
 import type { StatsSummary } from '../types';
 import { getCareerBaseStats, withBaseStats, isBaseStatKey, type BaseStatKey } from '../constants/careerBaseStats';
 import {

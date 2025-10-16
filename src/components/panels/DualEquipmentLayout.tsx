@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import EquipmentPanel from './EquipmentPanel';
 import StatsComparePanel from './StatsComparePanel';
-import { loadoutService } from '../services/loadoutService';
-import { Loadout, EquipSlot } from '../types';
+import { loadoutService } from '../../services/loadout/loadoutService';
+import { Loadout, EquipSlot } from '../../types';
 import React, { Suspense } from 'react';
-const LoadoutSummaryModal = React.lazy(() => import('./summary/LoadoutSummaryModal'));
+const LoadoutSummaryModal = React.lazy(() => import('../summary/LoadoutSummaryModal'));
 
 export default function DualEquipmentLayout() {
   const [sideA, setSideA] = useState<Loadout | null>(loadoutService.getLoadoutForSide('A'));

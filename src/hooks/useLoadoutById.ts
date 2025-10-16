@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Loadout } from '../types';
-import { loadoutService } from '../services/loadoutService';
+import { loadoutService } from '../services/loadout/loadoutService';
 
 export function useLoadoutById(loadoutId: string | null) {
   const [loadout, setLoadout] = useState<Loadout | null>(loadoutId ? (loadoutService.getAllLoadouts().find(l => l.id === loadoutId) || null) : null);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Loadout } from '../types';
-import { loadoutService } from '../services/loadoutService';
+import { loadoutService } from '../services/loadout/loadoutService';
 
 /**
  * Custom hook for managing loadout data state.
