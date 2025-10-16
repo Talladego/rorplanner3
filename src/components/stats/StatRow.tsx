@@ -1,6 +1,6 @@
 // React 17+ JSX runtime; no default import required
 import HoverTooltip from '../tooltip/HoverTooltip';
-import { formatCamelCase, formatStatValue, normalizeStatDisplayValue } from '../../utils/formatters';
+import { formatStatValue, normalizeStatDisplayValue, formatSummaryStatKey } from '../../utils/formatters';
 
 export type Contribution = {
   name: string;
@@ -33,7 +33,7 @@ export default function StatRow({
     if (statKey === 'blockStrikethroughMelee') return 'Block Strikethrough (Melee)';
     if (statKey === 'blockStrikethroughRanged') return 'Block Strikethrough (Ranged)';
     if (statKey === 'blockStrikethroughMagic') return 'Block Strikethrough (Magic)';
-    return formatCamelCase(statKey);
+    return formatSummaryStatKey(statKey);
   })();
 
   return (
@@ -47,7 +47,7 @@ export default function StatRow({
             className="cursor-help w-full text-right"
             content={
               <div className="max-w-[26rem] whitespace-nowrap overflow-x-auto">
-                <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatCamelCase(statKey)} — A Contribution</div>
+                <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatSummaryStatKey(statKey)} — A Contribution</div>
                 <ul className="space-y-0.5">
                   {contributionsA.length === 0 ? (
                     <li className="text-[11px] text-gray-400">No contributors</li>
@@ -77,7 +77,7 @@ export default function StatRow({
             className="cursor-help w-full text-right"
             content={
               <div className="max-w-[26rem] whitespace-nowrap overflow-x-auto">
-                <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatCamelCase(statKey)} — B Contribution</div>
+                <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatSummaryStatKey(statKey)} — B Contribution</div>
                 <ul className="space-y-0.5">
                   {contributionsB.length === 0 ? (
                     <li className="text-[11px] text-gray-400">No contributors</li>

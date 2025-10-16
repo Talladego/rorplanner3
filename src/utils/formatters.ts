@@ -1,5 +1,16 @@
 import { EquipSlot, ItemRarity, ItemType, Career, Stat } from '../types';
 
+// Display label overrides for specific stats where game terminology differs from schema
+// Keys support both SCREAMING_SNAKE_CASE enum names and camelCase summary keys
+const STAT_LABEL_OVERRIDES: Record<string, string> = {
+  // Defense
+  EVADE: 'Dodge',
+  EVADE_STRIKETHROUGH: 'Dodge Strikethrough',
+  // Summary keys
+  evade: 'Dodge',
+  evadeStrikethrough: 'Dodge Strikethrough',
+};
+
 /**
  * Converts SCREAMING_SNAKE_CASE strings to Title Case.
  * @param value - The string to format
@@ -47,6 +58,8 @@ export function formatToTitleCase(value: string): string {
  * @returns The formatted title case string
  */
 export function formatEnumValue(value: string): string {
+  // Apply override if present
+  if (value in STAT_LABEL_OVERRIDES) return STAT_LABEL_OVERRIDES[value];
   return formatScreamingSnakeCase(value);
 }
 
@@ -101,7 +114,19 @@ export function formatItemTypeName(type: ItemType): string {
  * @returns The formatted stat name
  */
 export function formatStatName(stat: Stat): string {
+  // Check overrides on enum string name first
+  const key = String(stat);
+  if (key in STAT_LABEL_OVERRIDES) return STAT_LABEL_OVERRIDES[key];
   return formatEnumValue(stat);
+}
+
+/**
+ * Formats StatsSummary camelCase keys for display with label overrides.
+ * Falls back to Title Case of the camelCase key.
+ */
+export function formatSummaryStatKey(key: string): string {
+  if (key in STAT_LABEL_OVERRIDES) return STAT_LABEL_OVERRIDES[key];
+  return formatCamelCase(key);
 }
 
 /**

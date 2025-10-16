@@ -2373,6 +2373,7 @@ enum AbilityType {
   "Pet abilities"
   PET
   GUILD
+  TAUNT_GUARD
 }
 
 "Player Archetypes"
