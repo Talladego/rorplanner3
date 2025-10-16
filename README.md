@@ -18,8 +18,6 @@ A modern React application for planning character equipment loadouts in Warhamme
 - **Build Tool**: Vite
 - **Styling**: Tailwind CSS
 - **State Management**: Zustand
-- **GraphQL**: Apollo Client
-- **Routing**: React Router
 
 ## Getting Started
 
@@ -42,8 +40,6 @@ npm install
 ```
 
 3. Start the development server
-```bash
-npm run dev
 ```
 
 4. Open [http://localhost:3001](http://localhost:3001) in your browser
@@ -56,20 +52,9 @@ Notes:
 
 ```bash
 npm run build
-npm run preview
-```
-
-## Project Structure
 
 ```
 src/
-├── components/                      # React components
-│   ├── ApolloProviderWrapper.tsx    # Apollo provider wiring
-│   ├── DualToolbar.tsx              # Per-side selection and controls (A/B)
-│   ├── DualEquipmentLayout.tsx      # Dual compare layout (A | Stats | B)
-│   ├── EquipmentPanel.tsx           # Equipment slots display per side
-│   ├── EquipmentSelector.tsx        # Item selection modal with filters
-│   └── StatsComparePanel.tsx        # Compare totals and contribution tooltips
 ├── services/                         # Service layer (domain façade + integration + events)
 │   ├── loadoutService.ts             # Main façade (business rules, URL updates, events)
 │   ├── loadoutEventEmitter.ts        # Typed pub/sub (internal)
@@ -77,12 +62,10 @@ src/
 │   ├── urlSync.ts                    # Guarded URL auto-update helper
 │   ├── queries.ts                    # Centralized GraphQL documents (single source; re-export shims removed)
 │   └── loadout/
-│       ├── api.ts                    # Apollo data fetchers (items, talismans, item details)
 │       ├── cache.ts                  # Lightweight in-memory LRU for list queries + icon warmups
 │       ├── stats.ts                  # Compute totals + stat contribution breakdowns
 │       ├── events.ts                 # Event subscription helpers (single/all)
 │       └── filters.ts                # Allowed stat filters + sanitizers for queries
-├── store/                            # Data layer (Zustand state) + adapter
 │   ├── loadoutStore.ts               # Store façade composing state and actions
 │   ├── loadoutStoreAdapter.ts        # Thin adapter used by Service
 │   └── loadout/                      # Store internals (modularized)
@@ -94,12 +77,10 @@ src/
 │   └── apollo-client.ts
 ├── constants/                        # Local constants (e.g., base stats, maps)
 │   ├── careerBaseStats.ts
-│   ├── statMaps.ts                   # Stat enum ↔ summary key mapping
 │   ├── careerIcons.ts
 │   └── slotIcons.ts
 ├── hooks/                            # Presentation hooks (subscribe via service)
 │   ├── useLoadoutById.ts
-│   └── useLoadoutData.ts
 ├── types/                            # TypeScript type definitions and events
 └── App.tsx                           # Main application component
 ```
@@ -113,37 +94,20 @@ src/
 - `npm run probe:jewellery3-talismans` - Optional: inspect talisman data (dev utility)
 
 ## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run linting: `npm run lint`
-5. Verify build locally: `npm run build`
-6. Submit a pull request
-
-Please keep the Architecture rules in mind:
-- Components only call the Service and subscribe via the Service.
-- Service applies business rules, talks to the store through the adapter, and emits typed events.
-- Store manages state and pure calculations—no service imports or side-effects.
-
 ## License
 
 This project is licensed under the MIT License.
-
 ## Deploying to Cloudflare Pages
 
 Cloudflare Pages is a fast, free static hosting platform with a global CDN. This project is preconfigured for it:
-
 - Vite base: `/` (see `vite.config.ts`)
 - Build command: `npm run build`
 - Output directory: `dist`
-- SPA fallback: `public/_redirects` contains `/* /index.html 200`
 
 Setup steps:
 
 1. Push your repository to GitHub.
 2. In Cloudflare Dashboard → Pages → Create a project → Connect to GitHub → select this repo.
-3. Framework preset: None (or Vite)
 4. Build command: `npm run build`
 5. Output directory: `dist`
 6. Save and deploy.
@@ -152,20 +116,16 @@ Custom domain: Add your domain in Pages → Custom domains and follow DNS prompt
 
 ## Architecture
 
-This project follows a simple, enforceable layered architecture with event-driven communication:
 
 - Presentation (React components and hooks)
 	- Location: `src/components`, `src/hooks`
 	- Responsibilities: Render UI, handle user interactions, subscribe to domain events, and call Service methods.
 	- Must not import the store or event emitter directly. Use `loadoutService` as the façade.
-
 - Service (Domain orchestration, integration, events)
-	- Location: `src/services`
 	- Responsibilities: Orchestrate domain operations, apply business rules (eligibility, unique-equipped, set bonuses, stat calc), fetch data via GraphQL, encode/decode URL state, and emit typed events.
 	- Submodules:
 		- `services/queries.ts`: All GraphQL documents.
 		- `services/loadout/api.ts`: Fetchers (items, talismans, details) with caching and prefetch.
-		- `services/loadout/cache.ts`: In-memory LRU for list queries + icon pre-warm.
 		- `services/loadout/stats.ts`: Compute totals and per-stat contribution breakdowns.
 		- `services/loadout/events.ts`: Subscribe to single/all event types.
 		- `services/urlSync.ts`: Guarded URL auto-update helper used throughout the service.
