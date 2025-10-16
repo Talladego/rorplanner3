@@ -9,6 +9,9 @@ const STAT_LABEL_OVERRIDES: Record<string, string> = {
   // Summary keys
   evade: 'Dodge',
   evadeStrikethrough: 'Dodge Strikethrough',
+  // Regeneration: display as per in-game phrasing
+  HEALTH_REGEN: 'Hit Points Every 4 Seconds',
+  healthRegen: 'Hit Points Every 4 Seconds',
 };
 
 /**
@@ -160,6 +163,10 @@ export function normalizeStatDisplayValue(stat: Stat | string, value: number): n
   const key = typeof stat === 'string' ? stat : String(stat);
   if (key === 'range' || key === 'radius' || stat === Stat.RANGE || stat === Stat.RADIUS) {
     return value / 12;
+  }
+  // Health Regen is stored per second; in-game displays per 4 seconds
+  if (key === 'healthRegen' || stat === Stat.HEALTH_REGEN) {
+    return value * 4;
   }
   return value;
 }

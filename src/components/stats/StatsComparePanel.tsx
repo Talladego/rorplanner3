@@ -112,7 +112,7 @@ export default function StatsComparePanel() {
             rows.map(r => {
               const aContribRaw = aId ? loadoutService.getStatContributionsForLoadout(aId, r.key) : [];
               const bContribRaw = bId ? loadoutService.getStatContributionsForLoadout(bId, r.key) : [];
-              const needsUnitNormalization = r.key === 'range' || r.key === 'radius';
+              const needsUnitNormalization = r.key === 'range' || r.key === 'radius' || r.key === 'healthRegen';
               const isPercentRow = isPercentSummaryKey(r.key, [...aContribRaw, ...bContribRaw]);
               const contribA = buildContributionsForKeyForSide('A', aId, r.key, statsA, includeBaseStats, includeDerivedStats);
               const contribB = buildContributionsForKeyForSide('B', bId, r.key, statsB, includeBaseStats, includeDerivedStats);
