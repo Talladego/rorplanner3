@@ -29,12 +29,7 @@ export default function StatRow({
   contributionsA,
   contributionsB,
 }: StatRowProps) {
-  const label = (() => {
-    if (statKey === 'blockStrikethroughMelee') return 'Block Strikethrough (Melee)';
-    if (statKey === 'blockStrikethroughRanged') return 'Block Strikethrough (Ranged)';
-    if (statKey === 'blockStrikethroughMagic') return 'Block Strikethrough (Magic)';
-    return formatSummaryStatKey(statKey);
-  })();
+  const label = formatSummaryStatKey(statKey);
 
   return (
     <div className="stats-row rounded px-1 -mx-1 hover:bg-gray-800/60 hover:ring-1 hover:ring-gray-700 transition-colors">

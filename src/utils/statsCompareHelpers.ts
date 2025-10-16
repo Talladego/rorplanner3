@@ -120,7 +120,6 @@ export const rowDefs = {
     { key: 'meleeCritRate' as const },
     { key: 'parryStrikethrough' as const },
     { key: 'blockStrikethroughMelee' as const },
-    { key: 'outgoingDamagePercent' as const },
   ] satisfies RowDef[],
 
   ranged: [
@@ -139,9 +138,10 @@ export const rowDefs = {
 
   offense: [
     { key: 'armorPenetration' as const },
-    { key: 'criticalDamage' as const },
-    { key: 'autoAttackSpeed' as const },
     { key: 'autoAttackDamage' as const },
+    { key: 'autoAttackSpeed' as const },
+    { key: 'criticalDamage' as const },
+    { key: 'outgoingDamage' as const },
   ] satisfies RowDef[],
 
   healing: [

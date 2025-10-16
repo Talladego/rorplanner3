@@ -5,13 +5,27 @@ import { EquipSlot, ItemRarity, ItemType, Career, Stat } from '../types';
 const STAT_LABEL_OVERRIDES: Record<string, string> = {
   // Defense
   EVADE: 'Dodge',
-  EVADE_STRIKETHROUGH: 'Dodge Strikethrough',
+  EVADE_STRIKETHROUGH: 'Reduced Chance to be Dodged',
   // Summary keys
   evade: 'Dodge',
-  evadeStrikethrough: 'Dodge Strikethrough',
+  evadeStrikethrough: 'Reduced Chance to be Dodged',
   // Regeneration: display as per in-game phrasing
   HEALTH_REGEN: 'Hit Points Every 4 Seconds',
   healthRegen: 'Hit Points Every 4 Seconds',
+  // Strikethrough phrasing for Block/Parry/Disrupt
+  BLOCK_STRIKETHROUGH: 'Reduced Chance to be Blocked',
+  PARRY_STRIKETHROUGH: 'Reduced Chance to be Parried',
+  DISRUPT_STRIKETHROUGH: 'Reduced Chance to be Disrupted',
+  blockStrikethrough: 'Reduced Chance to be Blocked',
+  parryStrikethrough: 'Reduced Chance to be Parried',
+  disruptStrikethrough: 'Reduced Chance to be Disrupted',
+  // Rename reduction phrasing to match in-game wording
+  ARMOR_PENETRATION_REDUCTION: 'Reduced Armor Penetration',
+  armorPenetrationReduction: 'Reduced Armor Penetration',
+  // Block strikethrough variants (summary-only keys)
+  blockStrikethroughMelee: 'Reduced Chance to be Blocked (Melee)',
+  blockStrikethroughRanged: 'Reduced Chance to be Blocked (Ranged)',
+  blockStrikethroughMagic: 'Reduced Chance to be Blocked (Magic)',
 };
 
 /**
