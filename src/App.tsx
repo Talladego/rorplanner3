@@ -6,6 +6,7 @@ import DualToolbar from './components/DualToolbar';
 import DualEquipmentLayout from './components/DualEquipmentLayout';
 import ApolloProviderWrapper from './components/ApolloProviderWrapper';
 import ErrorBoundary from './components/ErrorBoundary';
+import { preloadCareerIcons } from './constants/careerIcons';
 // Presentation layer should subscribe through the service API, not the raw emitter
 
 function App() {
@@ -59,6 +60,9 @@ function App() {
 
   // Handle URL parameters on app initialization
   useEffect(() => {
+    // Warm up external career icon images in the background.
+    preloadCareerIcons();
+
     const keys = Array.from(urlService.getSearchParams().keys());
     const hasCompareParams = keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
 

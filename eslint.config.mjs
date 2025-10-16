@@ -32,6 +32,8 @@ export default [
       ...react.configs.recommended.rules,
       ...react.configs['jsx-runtime'].rules,
       ...reactHooks.configs.recommended.rules,
+  // TypeScript handles prop typing; disable runtime prop-types enforcement
+  'react/prop-types': 'off',
       // Prevent ambiguous ApolloProvider imports; enforce stable subpath
       'no-restricted-imports': [
         'error',

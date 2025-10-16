@@ -3,7 +3,8 @@ import EquipmentPanel from './EquipmentPanel';
 import StatsComparePanel from './StatsComparePanel';
 import { loadoutService } from '../services/loadoutService';
 import { Loadout, EquipSlot } from '../types';
-import LoadoutSummaryModal from './summary/LoadoutSummaryModal';
+import React, { Suspense } from 'react';
+const LoadoutSummaryModal = React.lazy(() => import('./summary/LoadoutSummaryModal'));
 
 export default function DualEquipmentLayout() {
   const [sideA, setSideA] = useState<Loadout | null>(loadoutService.getLoadoutForSide('A'));
@@ -173,12 +174,14 @@ export default function DualEquipmentLayout() {
       </div>
       {/* Summary Modal */}
       {summaryOpenFor && (
-        <LoadoutSummaryModal
+        <Suspense fallback={null}>
+          <LoadoutSummaryModal
           open={true}
           onClose={() => setSummaryOpenFor(null)}
           loadout={summaryOpenFor === 'A' ? sideA : sideB}
           sideLabel={summaryOpenFor}
-        />
+          />
+        </Suspense>
       )}
     </div>
   );

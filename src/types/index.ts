@@ -430,6 +430,9 @@ export interface StatsSummary {
   criticalDamageTakenReduction: number;
   criticalHitRateReduction: number;
   blockStrikethrough: number;
+  blockStrikethroughMelee: number; // Derived from Strength + item Block Strikethrough
+  blockStrikethroughRanged: number; // Derived from Ballistic Skill + item Block Strikethrough
+  blockStrikethroughMagic: number; // Derived from Intelligence + item Block Strikethrough
   parryStrikethrough: number;
   evadeStrikethrough: number;
   disruptStrikethrough: number;

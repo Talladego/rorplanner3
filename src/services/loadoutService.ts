@@ -1,334 +1,50 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */ // GraphQL results are untyped at the boundary
 
 import { loadoutStoreAdapter } from '../store/loadoutStoreAdapter';
 import client from '../lib/apollo-client';
-import { gql } from '@apollo/client';
+// Note: GraphQL operations come from centralized documents in ./queries
 import { EquipSlot, Item, Career, LoadoutItem, Stat, ItemRarity, LoadoutSide } from '../types';
 import { loadoutEventEmitter } from './loadoutEventEmitter';
+import { subscribeToEvents as subscribeToEventsHelper, subscribeToAllEvents as subscribeToAllEventsHelper } from './loadout/events';
 import { urlService } from './urlService';
-import { LoadoutEvents, LoadoutEventType } from '../types/events';
-import { getItemColor } from '../utils/rarityColors';
-
-const SEARCH_CHARACTERS = gql`
-  query GetCharacters($name: String!) {
-    characters(where: { name: { eq: $name } }, first: 10) {
-      edges {
-        node {
-          id
-          name
-          career
-          level
-          renownRank
-        }
-      }
-    }
-  }
-`;
-
-// Allowed stat filters (service-enforced)
-const ALLOWED_FILTER_STATS: Stat[] = [
-  // Base Stats
-  'STRENGTH', 'BALLISTIC_SKILL', 'INTELLIGENCE', 'TOUGHNESS', 'WEAPON_SKILL', 'INITIATIVE', 'WILLPOWER', 'WOUNDS',
-  // Defense
-  'ARMOR', 'SPIRIT_RESISTANCE', 'ELEMENTAL_RESISTANCE', 'CORPOREAL_RESISTANCE', 'BLOCK', 'PARRY', 'EVADE', 'DISRUPT',
-  'CRITICAL_DAMAGE_TAKEN_REDUCTION', 'ARMOR_PENETRATION_REDUCTION', 'CRITICAL_HIT_RATE_REDUCTION', 'FORTITUDE',
-  // Combat
-  'ARMOR_PENETRATION', 'CRITICAL_DAMAGE', 'CRITICAL_HIT_RATE', 'MELEE_POWER', 'MELEE_CRIT_RATE', 'RANGED_POWER', 'RANGED_CRIT_RATE',
-  'AUTO_ATTACK_SPEED', 'AUTO_ATTACK_DAMAGE', 'BLOCK_STRIKETHROUGH', 'PARRY_STRIKETHROUGH', 'EVADE_STRIKETHROUGH',
-  // Magic
-  'MAGIC_POWER', 'MAGIC_CRIT_RATE', 'HEALING_POWER', 'HEAL_CRIT_RATE', 'DISRUPT_STRIKETHROUGH',
-  // Other
-  'RANGE', 'RADIUS', 'ACTION_POINT_REGEN', 'HEALTH_REGEN', 'MORALE_REGEN', 'GOLD_LOOTED', 'XP_RECEIVED', 'RENOWN_RECEIVED', 'INFLUENCE_RECEIVED', 'HATE_CAUSED', 'HATE_RECEIVED',
-] as unknown as Stat[];
-
-function sanitizeHasStats(hasStats?: Stat[]): Stat[] | undefined {
-  if (!hasStats || hasStats.length === 0) return undefined;
-  const filtered = hasStats.filter(s => (ALLOWED_FILTER_STATS as unknown as string[]).includes(s as unknown as string));
-  return filtered.length ? filtered as Stat[] : undefined;
-}
-
-const GET_CHARACTER = gql`
-  query GetCharacter($id: ID!) {
-    character(id: $id) {
-      id
-      name
-      level
-      renownRank
-      career
-      items {
-        equipSlot
-        item {
-          id
-          name
-          description
-          type
-          slot
-          rarity
-          armor
-          dps
-          speed
-          levelRequirement
-          renownRankRequirement
-          itemLevel
-          uniqueEquipped
-          stats {
-            stat
-            value
-            percentage
-          }
-          careerRestriction
-          raceRestriction
-          iconUrl
-          talismanSlots
-          itemSet {
-            id
-            name
-            bonuses {
-              itemsRequired
-              bonus {
-                ... on ItemStat {
-                  stat
-                  value
-                  percentage
-                }
-                ... on Ability {
-                  name
-                  description
-                }
-              }
-            }
-          }
-          abilities {
-            name
-          }
-          buffs {
-            name
-          }
-        }
-        talismans {
-          id
-          name
-          description
-          type
-          slot
-          rarity
-          armor
-          dps
-          speed
-          levelRequirement
-          renownRankRequirement
-          itemLevel
-          uniqueEquipped
-          stats {
-            stat
-            value
-            percentage
-          }
-          careerRestriction
-          raceRestriction
-          iconUrl
-          talismanSlots
-          itemSet {
-            id
-            name
-            bonuses {
-              itemsRequired
-              bonus {
-                ... on ItemStat {
-                  stat
-                  value
-                  percentage
-                }
-                ... on Ability {
-                  name
-                  description
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-`;
-
-
-const GET_POCKET_ITEMS = gql`
-  query GetPocketItems($first: Int, $after: String, $last: Int, $before: String, $hasStats: [Stat!], $usableByCareer: Career, $where: ItemFilterInput) {
-    items(
-      where: $where,
-      hasStats: $hasStats,
-      usableByCareer: $usableByCareer,
-      first: $first,
-      after: $after,
-      last: $last,
-      before: $before,
-      order: [
-        { rarity: DESC },
-        { itemLevel: DESC },
-        { name: ASC }
-      ]
-    ) {
-      pageInfo {
-        hasNextPage
-        hasPreviousPage
-        startCursor
-        endCursor
-      }
-      edges {
-        cursor
-        node {
-          id
-          name
-          type
-          slot
-          rarity
-          armor
-          dps
-          speed
-          levelRequirement
-          renownRankRequirement
-          itemLevel
-          uniqueEquipped
-          stats {
-            stat
-            value
-            percentage
-          }
-          careerRestriction
-          raceRestriction
-          iconUrl
-          talismanSlots
-          itemSet {
-            id
-            name
-          }
-        }
-      }
-      nodes {
-        id
-        name
-        type
-        slot
-        rarity
-        armor
-        dps
-        speed
-        levelRequirement
-        renownRankRequirement
-        itemLevel
-        uniqueEquipped
-        stats {
-          stat
-          value
-          percentage
-        }
-        careerRestriction
-        raceRestriction
-        iconUrl
-        talismanSlots
-        itemSet {
-          id
-          name
-        }
-      }
-      totalCount
-    }
-  }
-`;
-
-const GET_TALISMANS = gql`
-  query GetTalismans($first: Int, $after: String, $last: Int, $before: String, $hasStats: [Stat!], $where: ItemFilterInput) {
-    items(
-      where: $where,
-      hasStats: $hasStats,
-      first: $first,
-      after: $after,
-      last: $last,
-      before: $before,
-      order: [
-        { rarity: DESC },
-        { itemLevel: DESC },
-        { name: ASC }
-      ]
-    ) {
-      pageInfo {
-        hasNextPage
-        hasPreviousPage
-        startCursor
-        endCursor
-      }
-      edges {
-        cursor
-        node {
-          id
-          name
-          type
-          slot
-          rarity
-          armor
-          dps
-          speed
-          levelRequirement
-          renownRankRequirement
-          itemLevel
-          uniqueEquipped
-          stats {
-            stat
-            value
-            percentage
-          }
-          careerRestriction
-          raceRestriction
-          iconUrl
-          talismanSlots
-          itemSet {
-            id
-            name
-          }
-        }
-      }
-      nodes {
-        id
-        name
-        type
-        slot
-        rarity
-        armor
-        dps
-        speed
-        levelRequirement
-        renownRankRequirement
-        itemLevel
-        uniqueEquipped
-        stats {
-          stat
-          value
-          percentage
-        }
-        careerRestriction
-        raceRestriction
-        iconUrl
-        talismanSlots
-        itemSet {
-          id
-          name
-        }
-      }
-      totalCount
-    }
-  }
-`;
-
+import { updateUrlIfAuto } from './urlSync';
+import { LoadoutEvents } from '../types/events';
+import { SEARCH_CHARACTERS, GET_CHARACTER } from './queries';
+import { getItemsForSlotApi, getTalismansForItemLevelApi, getItemWithDetailsApi } from './loadout/api';
+import { computeStatsForLoadout as computeStatsForLoadoutExternal, getStatContributionsForLoadout as getStatContributionsForLoadoutExternal } from './loadout/stats';
+import { sanitizeHasStats, getAllowedFilterStats } from './loadout/filters';
+import * as selectors from './loadout/selectors';
+import {
+  cloneLoadout as cloneLoadoutMutation,
+  setCareer as setCareerMutation,
+  setLevel as setLevelMutation,
+  setRenownRank as setRenownRankMutation,
+  setCareerForLoadout as setCareerForLoadoutMutation,
+  setLevelForLoadout as setLevelForLoadoutMutation,
+  setRenownForLoadout as setRenownForLoadoutMutation,
+  setLoadoutNameForLoadout as setLoadoutNameForLoadoutMutation,
+  setCharacterStatusForLoadout as setCharacterStatusForLoadoutMutation,
+  updateItem as updateItemMutation,
+  updateItemForLoadout as updateItemForLoadoutMutation,
+  updateTalisman as updateTalismanMutation,
+  updateTalismanForLoadout as updateTalismanForLoadoutMutation,
+  // Fix: bring in missing helpers used below
+  assignSideLoadout as assignSideLoadoutMutation,
+  switchLoadout as switchLoadoutMutation,
+} from './loadout/mutations';
 export const loadoutService = {
   getActiveSide(): LoadoutSide {
-    return loadoutStoreAdapter.getActiveSide();
+    // Filters/selectors/mutations are split into submodules for maintainability
+    return selectors.getActiveSide();
   },
+  // Missing setter: update active side in the store and emit an event for UI to react
   setActiveSide(side: LoadoutSide) {
     loadoutStoreAdapter.setActiveSide(side);
-    loadoutEventEmitter.emit({ type: 'ACTIVE_SIDE_CHANGED', payload: { side }, timestamp: Date.now() });
-    // Update URL with new active side
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+    loadoutEventEmitter.emit({
+      type: 'ACTIVE_SIDE_CHANGED',
+      payload: { side },
+      timestamp: Date.now(),
+    });
   },
   assignSideLoadout(side: LoadoutSide, loadoutId: string | null) {
     // Dual-only: ensure A and B don't point to the same loadout id
@@ -341,7 +57,7 @@ export const loadoutService = {
         loadoutId = clonedId;
       }
     }
-    loadoutStoreAdapter.assignSideLoadout(side, loadoutId);
+  assignSideLoadoutMutation(side, loadoutId);
     // If the assigned loadout has a career, bind per-side per-career mapping as well
     if (loadoutId) {
       const lo = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
@@ -351,13 +67,13 @@ export const loadoutService = {
     }
     loadoutEventEmitter.emit({ type: 'SIDE_LOADOUT_ASSIGNED', payload: { side, loadoutId }, timestamp: Date.now() });
     // Update URL to include the newly assigned side
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+    updateUrlIfAuto(this._isCharacterLoading);
   },
   getSideLoadoutId(side: LoadoutSide): string | null {
-    return loadoutStoreAdapter.getSideLoadoutId(side);
+    return selectors.getSideLoadoutId(side);
   },
   getLoadoutForSide(side: LoadoutSide) {
-    return loadoutStoreAdapter.getLoadoutForSide(side);
+    return selectors.getLoadoutForSide(side);
   },
 
   // Ensure a side has a loadout assigned, creating one if necessary
@@ -466,17 +182,7 @@ export const loadoutService = {
   // 2. Add/update specific item/talisman slots
   // Check if a unique-equipped item is already equipped in a specific loadout
   isUniqueItemAlreadyEquippedInLoadout(itemId: string, loadoutId?: string): boolean {
-    const loadout = loadoutId
-      ? loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId)
-      : loadoutStoreAdapter.getCurrentLoadout();
-    if (!loadout) return false;
-    for (const slot of Object.values(EquipSlot)) {
-      const equippedItem = loadout.items[slot]?.item;
-      if (equippedItem && equippedItem.id === itemId && equippedItem.uniqueEquipped) {
-        return true;
-      }
-    }
-    return false;
+    return selectors.isUniqueItemAlreadyEquippedInLoadout(itemId, loadoutId);
   },
 
   // Check if equipping this item would violate unique-equipped rules
@@ -502,12 +208,7 @@ export const loadoutService = {
       }
     }
 
-    loadoutStoreAdapter.setItem(slot, item);
-    loadoutEventEmitter.emit({
-      type: 'ITEM_UPDATED',
-      payload: { slot, item },
-      timestamp: Date.now(),
-    });
+    updateItemMutation(slot, item);
 
     // Mark loadout as no longer from character if it was
     const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
@@ -519,7 +220,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+  updateUrlIfAuto(this._isCharacterLoading);
   },
 
   async updateItemForLoadout(loadoutId: string, slot: EquipSlot, item: Item | null) {
@@ -531,21 +232,16 @@ export const loadoutService = {
       }
     }
 
-    loadoutStoreAdapter.setItemForLoadout(loadoutId, slot, item);
+    updateItemForLoadoutMutation(loadoutId, slot, item);
     // If this loadout came from a character, any change flips to non-character mode
     this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'ITEM_UPDATED', payload: { slot, item }, timestamp: Date.now() });
     this.getStatsSummary();
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+    updateUrlIfAuto(this._isCharacterLoading);
   },
 
   async updateTalisman(slot: EquipSlot, index: number, talisman: Item | null) {
-    loadoutStoreAdapter.setTalisman(slot, index, talisman);
-    loadoutEventEmitter.emit({
-      type: 'TALISMAN_UPDATED',
-      payload: { slot, index, talisman },
-      timestamp: Date.now(),
-    });
+    updateTalismanMutation(slot, index, talisman);
 
     // Mark loadout as no longer from character if it was
     const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
@@ -557,11 +253,11 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+    updateUrlIfAuto(this._isCharacterLoading);
   },
 
   async updateTalismanForLoadout(loadoutId: string, slot: EquipSlot, index: number, talisman: Item | null) {
-    loadoutStoreAdapter.setTalismanForLoadout(loadoutId, slot, index, talisman);
+    updateTalismanForLoadoutMutation(loadoutId, slot, index, talisman);
     // Any change breaks character mode
     this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'TALISMAN_UPDATED', payload: { slot, index, talisman }, timestamp: Date.now() });
@@ -570,17 +266,27 @@ export const loadoutService = {
   },
 
   // 3. Fetch items for equipment selection
+  /**
+   * Fetch a paginated list of items for a specific slot.
+   * Cache-first (Apollo) + in-memory LRU keyed by filters/cursors. Prefetches next page and warms icon cache.
+   */
   async getItemsForSlot(slot: EquipSlot | null, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
     try {
       const allowedStats = sanitizeHasStats(hasStats);
-  // Hand and jewellery compatibility are handled via server-side IN filters in getItemsForSingleSlot
-
-  {
-        // Use the original single-slot query
-  const result = await this.getItemsForSingleSlot(slot, career, limit, after, levelRequirement, renownRankRequirement, nameFilter, allowedStats, hasRarities, before, last);
-        
-        return result;
-      }
+      // Delegate to API module; compatibility filters handled in query builder
+      return await getItemsForSlotApi(
+        slot,
+        career,
+        limit,
+        after,
+        levelRequirement,
+        renownRankRequirement,
+        nameFilter,
+        allowedStats,
+        hasRarities,
+        before,
+        last,
+      );
     } catch (error) {
       console.error('Failed to fetch items for slot:', error);
       throw error;
@@ -589,144 +295,41 @@ export const loadoutService = {
 
   // Helper method for single slot queries
   async getItemsForSingleSlot(slot: EquipSlot | null, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
-    let query;
-    let variables: any = { 
-      first: limit
-    };
-
-    if (after) {
-      variables.after = after;
-    }
-
-    // Backwards pagination support
-    if (before) {
-      variables.before = before;
-      // When using 'before', GraphQL connections expect 'last' to specify the page size from the end
-      variables.last = last ?? limit;
-      // Clear forward args if we go backwards
-      delete variables.first;
-      delete variables.after;
-    }
-
-    if (hasStats && hasStats.length > 0) {
-      variables.hasStats = hasStats;
-    }
-
-    // Build the where clause dynamically
-    const where: any = {
-      levelRequirement: { lte: levelRequirement },
-      renownRankRequirement: { lte: renownRankRequirement },
-      name: { contains: nameFilter || '' }
-    };
-
-    // Exclude NONE type items for non-pocket slots (and when slot is not provided)
-    if (slot !== EquipSlot.POCKET1 && slot !== EquipSlot.POCKET2) {
-      where.type = { neq: 'NONE' };
-    }
-
-    if (slot == null || slot === EquipSlot.NONE) {
-      // When slot is not specified, search across all equipment-capable slots only
-      // to avoid pulling in non-equipment items that may violate enum constraints (e.g., rarity)
-      where.slot = {
-        in: [
-          EquipSlot.MAIN_HAND,
-          EquipSlot.OFF_HAND,
-          EquipSlot.RANGED_WEAPON,
-          EquipSlot.EITHER_HAND,
-          EquipSlot.HELM,
-          EquipSlot.SHOULDER,
-          EquipSlot.BODY,
-          EquipSlot.GLOVES,
-          EquipSlot.BOOTS,
-          EquipSlot.BACK,
-          EquipSlot.BELT,
-          EquipSlot.JEWELLERY1,
-          EquipSlot.JEWELLERY2,
-          EquipSlot.JEWELLERY3,
-          EquipSlot.JEWELLERY4,
-          EquipSlot.POCKET1,
-          EquipSlot.POCKET2,
-        ]
-      };
-    } else if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
-      // For pocket items, allow both POCKET1 and POCKET2 slots
-      where.slot = { in: [EquipSlot.POCKET1, EquipSlot.POCKET2] };
-    } else if (slot === EquipSlot.MAIN_HAND || slot === EquipSlot.OFF_HAND) {
-      // For hand slots, include either-hand items as well
-      where.slot = { in: [slot, EquipSlot.EITHER_HAND] };
-    } else if (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4) {
-      // For secondary jewellery slots, include items compatible with JEWELLERY1 as well
-      where.slot = { in: [slot, EquipSlot.JEWELLERY1] };
-    } else {
-      where.slot = { eq: slot };
-    }
-
-    if (hasRarities && hasRarities.length > 0) {
-      where.rarity = { in: hasRarities };
-    }
-
-    variables.where = where;
-
-    // Use the general query for all items (now supports career filtering)
-    query = GET_POCKET_ITEMS;
-    if (career) {
-      variables.usableByCareer = career;
-    }
-
-    const { data } = await client.query({
-      query,
-      variables,
-    });
-    
-    return (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
+    // Preserve method for compatibility, but delegate to API implementation
+    return await getItemsForSlotApi(
+      slot,
+      career,
+      limit,
+      after,
+      levelRequirement,
+      renownRankRequirement,
+      nameFilter,
+      hasStats,
+      hasRarities,
+      before,
+      last,
+    );
   },
 
   // 3.5. Fetch talismans for holding item's level requirement
   // Rule (from in-game testing): talisman.levelRequirement ≤ holdingItem.levelRequirement
+  /**
+   * Fetch talismans whose level requirement is <= the holding item's level.
+   * Cache-first + LRU; prefetch next page and warm icons.
+   */
   async getTalismansForItemLevel(holdingLevelRequirement: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
     try {
-      const query = GET_TALISMANS;
-      const variables: any = {
-        first: limit
-      };
-
-      if (after) {
-        variables.after = after;
-      }
-
-      if (before) {
-        variables.before = before;
-        variables.last = last ?? limit;
-        delete variables.first;
-        delete variables.after;
-      }
-
       const allowedStats = sanitizeHasStats(hasStats);
-      if (allowedStats && allowedStats.length > 0) {
-        variables.hasStats = allowedStats;
-      }
-
-      // Build the where clause dynamically
-      const where: any = {
-        type: { eq: 'ENHANCEMENT' },
-        // Apply the correct matching rule against the holding item's level requirement
-        levelRequirement: { lte: holdingLevelRequirement },
-        name: { contains: nameFilter || '' }
-      };
-
-      // Apply rarity filtering only when specified by the user; otherwise include all rarities by default
-      if (hasRarities && hasRarities.length > 0) {
-        where.rarity = { in: hasRarities };
-      }
-
-      variables.where = where;
-
-      const { data } = await client.query({
-        query,
-        variables,
-      });
-      
-      return (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
+      return await getTalismansForItemLevelApi(
+        holdingLevelRequirement,
+        limit,
+        after,
+        nameFilter,
+        allowedStats,
+        hasRarities,
+        before,
+        last,
+      );
     } catch (error) {
       console.error('Failed to fetch talismans for level req:', error);
       throw error;
@@ -734,11 +337,13 @@ export const loadoutService = {
   },
 
   // Expose allowed filter stats for UI consumption
+  /** Return the allowlist of stats permitted in filters. */
   getAllowedFilterStats(): Stat[] {
-    return ALLOWED_FILTER_STATS as unknown as Stat[];
+    return getAllowedFilterStats();
   },
 
   // 3.7. Get talismans for a specific slot (no special cases)
+  /** Alias to getTalismansForItemLevel; slot param is unused (compat). */
   async getTalismansForSlot(_slot: EquipSlot, holdingLevelRequirement: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
     return await this.getTalismansForItemLevel(holdingLevelRequirement, limit, after, nameFilter, hasStats, hasRarities, before, last);
   },
@@ -746,6 +351,7 @@ export const loadoutService = {
   // Removed legendary talisman special-case as the required info cannot be reliably extracted from the schema
 
   // 3. Retrieve stats summary
+  /** Recompute and emit the aggregate stats summary for the current loadout. */
   getStatsSummary() {
     loadoutStoreAdapter.calculateStats();
     const stats = loadoutStoreAdapter.getStatsSummary();
@@ -759,66 +365,29 @@ export const loadoutService = {
 
   // Additional utilities
   getCurrentLoadout() {
-    return loadoutStoreAdapter.getCurrentLoadout();
+    return selectors.getCurrentLoadout();
   },
 
   getAllLoadouts() {
-    return loadoutStoreAdapter.getLoadouts();
+    return selectors.getAllLoadouts();
   },
 
   getCurrentLoadoutId() {
-    return loadoutStoreAdapter.getCurrentLoadoutId();
+    return selectors.getCurrentLoadoutId();
   },
 
   // Event subscription methods
-  subscribeToEvents<T extends LoadoutEvents>(
-    eventType: T['type'],
-    callback: (event: T) => void
-  ) {
-    return loadoutEventEmitter.subscribe(eventType, callback);
+  subscribeToEvents<T extends LoadoutEvents>(eventType: T['type'], callback: (event: T) => void) {
+    return subscribeToEventsHelper(eventType, callback);
   },
 
   subscribeToAllEvents(callback: (event: LoadoutEvents) => void) {
-    const unsubscribeFunctions: (() => void)[] = [];
-
-    // Subscribe to all event types
-    const eventTypes: LoadoutEventType[] = [
-      'ITEM_UPDATED',
-      'TALISMAN_UPDATED',
-      'CAREER_CHANGED',
-      'LEVEL_CHANGED',
-      'RENOWN_RANK_CHANGED',
-      'STATS_UPDATED',
-      'LOADOUT_CREATED',
-      'LOADOUT_SWITCHED',
-      'LOADOUT_RESET',
-      'CHARACTER_LOADED_FROM_URL',
-      'LOADOUT_LOADED_FROM_URL',
-      'CHARACTER_LOADED',
-      'ACTIVE_SIDE_CHANGED',
-      'SIDE_LOADOUT_ASSIGNED',
-    ];
-
-    eventTypes.forEach(eventType => {
-      unsubscribeFunctions.push(
-        loadoutEventEmitter.subscribe(eventType, callback)
-      );
-    });
-
-    // Return a function that unsubscribes from all events
-    return () => {
-      unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
-    };
+    return subscribeToAllEventsHelper(callback);
   },
 
   async setCareer(career: Career | null) {
     // Always set on current loadout
-    loadoutStoreAdapter.setCareer(career);
-    loadoutEventEmitter.emit({
-      type: 'CAREER_CHANGED',
-      payload: { career },
-      timestamp: Date.now(),
-    });
+    setCareerMutation(career);
 
     // Mark loadout as no longer from character if it was
     const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
@@ -833,17 +402,12 @@ export const loadoutService = {
     }
 
     // Update URL with current loadout state
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+  updateUrlIfAuto(this._isCharacterLoading);
   },
 
   async setLevel(level: number) {
     // Always set on current loadout
-    loadoutStoreAdapter.setLevel(level);
-    loadoutEventEmitter.emit({
-      type: 'LEVEL_CHANGED',
-      payload: { level },
-      timestamp: Date.now(),
-    });
+    setLevelMutation(level);
 
     // Mark loadout as no longer from character if it was
     const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
@@ -855,17 +419,12 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+  updateUrlIfAuto(this._isCharacterLoading);
   },
 
   async setRenownRank(renownRank: number) {
     // Always set on current loadout
-    loadoutStoreAdapter.setRenownRank(renownRank);
-    loadoutEventEmitter.emit({
-      type: 'RENOWN_RANK_CHANGED',
-      payload: { renownRank },
-      timestamp: Date.now(),
-    });
+    setRenownRankMutation(renownRank);
 
     // Mark loadout as no longer from character if it was
     const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
@@ -877,7 +436,7 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with current loadout state
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+  updateUrlIfAuto(this._isCharacterLoading);
   },
 
   createLoadout(name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string) {
@@ -893,7 +452,7 @@ export const loadoutService = {
   },
 
   async switchLoadout(id: string) {
-    await loadoutStoreAdapter.switchLoadout(id);
+    await switchLoadoutMutation(id);
     loadoutEventEmitter.emit({
       type: 'LOADOUT_SWITCHED',
       payload: { loadoutId: id },
@@ -1106,213 +665,55 @@ export const loadoutService = {
 
   // Per-loadout setters used by compare flows
   setCareerForLoadout(loadoutId: string, career: Career | null) {
-    loadoutStoreAdapter.setCareerForLoadout(loadoutId, career);
+    setCareerForLoadoutMutation(loadoutId, career);
     this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'CAREER_CHANGED', payload: { career }, timestamp: Date.now() });
     this.getStatsSummary();
   if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
   setLevelForLoadout(loadoutId: string, level: number) {
-    loadoutStoreAdapter.setLevelForLoadout(loadoutId, level);
+    setLevelForLoadoutMutation(loadoutId, level);
     this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'LEVEL_CHANGED', payload: { level }, timestamp: Date.now() });
     this.getStatsSummary();
   if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
   setRenownForLoadout(loadoutId: string, renownRank: number) {
-    loadoutStoreAdapter.setRenownForLoadout(loadoutId, renownRank);
+    setRenownForLoadoutMutation(loadoutId, renownRank);
     this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'RENOWN_RANK_CHANGED', payload: { renownRank }, timestamp: Date.now() });
     this.getStatsSummary();
   if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
   setLoadoutNameForLoadout(loadoutId: string, name: string) {
-    loadoutStoreAdapter.setLoadoutNameForLoadout(loadoutId, name);
+    setLoadoutNameForLoadoutMutation(loadoutId, name);
     // Renaming should also exit character mode
     this._maybeMarkLoadoutAsModified(loadoutId);
     loadoutEventEmitter.emit({ type: 'LOADOUT_SWITCHED', payload: { loadoutId }, timestamp: Date.now() });
   if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
   setCharacterStatusForLoadout(loadoutId: string, isFromCharacter: boolean, characterName?: string) {
-    loadoutStoreAdapter.updateLoadoutCharacterStatus(loadoutId, isFromCharacter, characterName);
+    setCharacterStatusForLoadoutMutation(loadoutId, isFromCharacter, characterName);
     loadoutEventEmitter.emit({ type: 'LOADOUT_SWITCHED', payload: { loadoutId }, timestamp: Date.now() });
   if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
   },
 
   // Clone an existing loadout to a new id
   cloneLoadout(sourceId: string, name?: string): string {
-    const src = loadoutStoreAdapter.getLoadouts().find(l => l.id === sourceId);
-    if (!src) throw new Error('Source loadout not found');
-    const newId = loadoutStoreAdapter.createLoadout(name || `${src.name} (Copy)`, src.level, src.renownRank, src.isFromCharacter, src.characterName);
-    if (src.career) loadoutStoreAdapter.setCareerForLoadout(newId, src.career);
-    Object.entries(src.items).forEach(([slot, data]) => {
-      loadoutStoreAdapter.setItemForLoadout(newId, slot as EquipSlot, data.item);
-      if (data.talismans) {
-        data.talismans.forEach((t, idx) => {
-          loadoutStoreAdapter.setTalismanForLoadout(newId, slot as EquipSlot, idx, t);
-        });
-      }
-    });
-    loadoutEventEmitter.emit({ type: 'LOADOUT_CREATED', payload: { loadoutId: newId, name: name || `${src.name} (Copy)` }, timestamp: Date.now() });
-    return newId;
+    return cloneLoadoutMutation(sourceId, name);
   },
 
-  // Detailed stats computation for an arbitrary loadout id
-  computeStatsForLoadout(loadoutId: string): import('../types').StatsSummary {
-    const loadout = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
-    const zero: import('../types').StatsSummary = {
-      strength: 0, agility: 0, willpower: 0, toughness: 0, wounds: 0, initiative: 0,
-      weaponSkill: 0, ballisticSkill: 0, intelligence: 0, spiritResistance: 0, elementalResistance: 0, corporealResistance: 0,
-      incomingDamage: 0, incomingDamagePercent: 0, outgoingDamage: 0, outgoingDamagePercent: 0,
-      armor: 0, velocity: 0, block: 0, parry: 0, evade: 0, disrupt: 0, actionPointRegen: 0, moraleRegen: 0,
-  cooldown: 0, buildTime: 0, criticalDamage: 0, range: 0, radius: 0, autoAttackSpeed: 0, autoAttackDamage: 0, meleePower: 0, rangedPower: 0, magicPower: 0,
-      criticalHitRate: 0, meleeCritRate: 0, rangedCritRate: 0, magicCritRate: 0, armorPenetration: 0, healingPower: 0, healthRegen: 0, maxActionPoints: 0, fortitude: 0,
-      armorPenetrationReduction: 0, criticalDamageTakenReduction: 0, criticalHitRateReduction: 0, blockStrikethrough: 0, parryStrikethrough: 0, evadeStrikethrough: 0, disruptStrikethrough: 0,
-      healCritRate: 0, mastery1Bonus: 0, mastery2Bonus: 0, mastery3Bonus: 0, outgoingHealPercent: 0, incomingHealPercent: 0,
-      goldLooted: 0, xpReceived: 0, renownReceived: 0, influenceReceived: 0, hateCaused: 0, hateReceived: 0,
-    };
-    if (!loadout) return zero;
-    const statToKey: Record<string, keyof import('../types').StatsSummary> = {
-      STRENGTH: 'strength', AGILITY: 'agility', WILLPOWER: 'willpower', TOUGHNESS: 'toughness', WOUNDS: 'wounds', INITIATIVE: 'initiative',
-      WEAPON_SKILL: 'weaponSkill', BALLISTIC_SKILL: 'ballisticSkill', INTELLIGENCE: 'intelligence', ARMOR: 'armor',
-      SPIRIT_RESISTANCE: 'spiritResistance', ELEMENTAL_RESISTANCE: 'elementalResistance', CORPOREAL_RESISTANCE: 'corporealResistance',
-      INCOMING_DAMAGE: 'incomingDamage', INCOMING_DAMAGE_PERCENT: 'incomingDamagePercent', OUTGOING_DAMAGE: 'outgoingDamage', OUTGOING_DAMAGE_PERCENT: 'outgoingDamagePercent',
-  VELOCITY: 'velocity', BLOCK: 'block', PARRY: 'parry', EVADE: 'evade', DISRUPT: 'disrupt', ACTION_POINT_REGEN: 'actionPointRegen', MORALE_REGEN: 'moraleRegen', COOLDOWN: 'cooldown', BUILD_TIME: 'buildTime', CRITICAL_DAMAGE: 'criticalDamage', RANGE: 'range', RADIUS: 'radius', AUTO_ATTACK_SPEED: 'autoAttackSpeed', AUTO_ATTACK_DAMAGE: 'autoAttackDamage',
-      MELEE_POWER: 'meleePower', RANGED_POWER: 'rangedPower', MAGIC_POWER: 'magicPower', CRITICAL_HIT_RATE: 'criticalHitRate', MELEE_CRIT_RATE: 'meleeCritRate', RANGED_CRIT_RATE: 'rangedCritRate', MAGIC_CRIT_RATE: 'magicCritRate', ARMOR_PENETRATION: 'armorPenetration', HEALING_POWER: 'healingPower', HEALTH_REGEN: 'healthRegen', MAX_ACTION_POINTS: 'maxActionPoints', FORTITUDE: 'fortitude',
-      ARMOR_PENETRATION_REDUCTION: 'armorPenetrationReduction', CRITICAL_DAMAGE_TAKEN_REDUCTION: 'criticalDamageTakenReduction', CRITICAL_HIT_RATE_REDUCTION: 'criticalHitRateReduction', BLOCK_STRIKETHROUGH: 'blockStrikethrough', PARRY_STRIKETHROUGH: 'parryStrikethrough', EVADE_STRIKETHROUGH: 'evadeStrikethrough', DISRUPT_STRIKETHROUGH: 'disruptStrikethrough', HEAL_CRIT_RATE: 'healCritRate',
-      MASTERY_1_BONUS: 'mastery1Bonus', MASTERY_2_BONUS: 'mastery2Bonus', MASTERY_3_BONUS: 'mastery3Bonus', OUTGOING_HEAL_PERCENT: 'outgoingHealPercent', INCOMING_HEAL_PERCENT: 'incomingHealPercent', GOLD_LOOTED: 'goldLooted', XP_RECEIVED: 'xpReceived', RENOWN_RECEIVED: 'renownReceived', INFLUENCE_RECEIVED: 'influenceReceived', HATE_CAUSED: 'hateCaused', HATE_RECEIVED: 'hateReceived',
-    };
-    const result = { ...zero };
-    const isEligible = (it: any | null): boolean => {
-      if (!it) return false;
-      const levelOk = !it.levelRequirement || it.levelRequirement <= loadout.level;
-      const rrOk = !it.renownRankRequirement || it.renownRankRequirement <= loadout.renownRank;
-      return levelOk && rrOk;
-    };
-    const addStat = (statsArr?: any[]) => {
-      (statsArr || []).forEach(s => {
-        const key = statToKey[s.stat as string];
-        if (key && key in result) {
-          (result as any)[key] += Number(s.value) || 0;
-        }
-      });
-    };
-    Object.values(loadout.items).forEach(({ item, talismans }) => {
-      const itemEligible = isEligible(item);
-      if (item && itemEligible) {
-        if (item.armor) (result.armor as number) += Number(item.armor) || 0;
-        addStat(item.stats);
-      }
-      (talismans || []).forEach(t => {
-        const talismanEligible = isEligible(t);
-        if (t && itemEligible && talismanEligible) {
-          if (t.armor) (result.armor as number) += Number(t.armor) || 0;
-          addStat(t.stats);
-        }
-      });
-    });
-    // Basic set bonus handling (stat bonuses only)
-    const setCounts: Record<string, { count: number; bonuses: any[] } > = {};
-    Object.values(loadout.items).forEach(({ item }) => {
-      if (item && item.itemSet && isEligible(item)) {
-        const name = item.itemSet.name;
-        if (!setCounts[name]) setCounts[name] = { count: 0, bonuses: item.itemSet.bonuses || [] };
-        setCounts[name].count += 1;
-      }
-    });
-    Object.values(setCounts).forEach(({ count, bonuses }) => {
-      (bonuses || []).forEach((b: any) => {
-        if (count >= b.itemsRequired && b.bonus && 'stat' in b.bonus) {
-          const key = statToKey[b.bonus.stat];
-          if (key) (result as any)[key] += Number(b.bonus.value) || 0;
-        }
-      });
-    });
-    return result;
+  // Detailed stats computation for an arbitrary loadout id (delegated)
+  computeStatsForLoadout(loadoutId: string) {
+    return computeStatsForLoadoutExternal(loadoutId);
   },
 
-  getStatContributionsForLoadout(loadoutId: string, statKey: keyof import('../types').StatsSummary | string): Array<{ name: string; count: number; totalValue: number; percentage: boolean; color?: string }> {
-    const loadout = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
-    if (!loadout) return [];
-    const enumMap: Record<string, string> = {
-      strength: 'STRENGTH', agility: 'AGILITY', willpower: 'WILLPOWER', toughness: 'TOUGHNESS', wounds: 'WOUNDS', initiative: 'INITIATIVE',
-      weaponSkill: 'WEAPON_SKILL', ballisticSkill: 'BALLISTIC_SKILL', intelligence: 'INTELLIGENCE', armor: 'ARMOR',
-      spiritResistance: 'SPIRIT_RESISTANCE', elementalResistance: 'ELEMENTAL_RESISTANCE', corporealResistance: 'CORPOREAL_RESISTANCE',
-      incomingDamage: 'INCOMING_DAMAGE', incomingDamagePercent: 'INCOMING_DAMAGE_PERCENT', outgoingDamage: 'OUTGOING_DAMAGE', outgoingDamagePercent: 'OUTGOING_DAMAGE_PERCENT',
-  velocity: 'VELOCITY', block: 'BLOCK', parry: 'PARRY', evade: 'EVADE', disrupt: 'DISRUPT', actionPointRegen: 'ACTION_POINT_REGEN', moraleRegen: 'MORALE_REGEN', cooldown: 'COOLDOWN', buildTime: 'BUILD_TIME', criticalDamage: 'CRITICAL_DAMAGE', range: 'RANGE', radius: 'RADIUS', autoAttackSpeed: 'AUTO_ATTACK_SPEED', autoAttackDamage: 'AUTO_ATTACK_DAMAGE',
-      meleePower: 'MELEE_POWER', rangedPower: 'RANGED_POWER', magicPower: 'MAGIC_POWER', criticalHitRate: 'CRITICAL_HIT_RATE', meleeCritRate: 'MELEE_CRIT_RATE', rangedCritRate: 'RANGED_CRIT_RATE', magicCritRate: 'MAGIC_CRIT_RATE', armorPenetration: 'ARMOR_PENETRATION', healingPower: 'HEALING_POWER', healthRegen: 'HEALTH_REGEN', maxActionPoints: 'MAX_ACTION_POINTS', fortitude: 'FORTITUDE',
-      armorPenetrationReduction: 'ARMOR_PENETRATION_REDUCTION', criticalDamageTakenReduction: 'CRITICAL_DAMAGE_TAKEN_REDUCTION', criticalHitRateReduction: 'CRITICAL_HIT_RATE_REDUCTION', blockStrikethrough: 'BLOCK_STRIKETHROUGH', parryStrikethrough: 'PARRY_STRIKETHROUGH', evadeStrikethrough: 'EVADE_STRIKETHROUGH', disruptStrikethrough: 'DISRUPT_STRIKETHROUGH', healCritRate: 'HEAL_CRIT_RATE',
-      mastery1Bonus: 'MASTERY_1_BONUS', mastery2Bonus: 'MASTERY_2_BONUS', mastery3Bonus: 'MASTERY_3_BONUS', outgoingHealPercent: 'OUTGOING_HEAL_PERCENT', incomingHealPercent: 'INCOMING_HEAL_PERCENT', goldLooted: 'GOLD_LOOTED', xpReceived: 'XP_RECEIVED', renownReceived: 'RENOWN_RECEIVED', influenceReceived: 'INFLUENCE_RECEIVED', hateCaused: 'HATE_CAUSED', hateReceived: 'HATE_RECEIVED',
-    };
-    const target = enumMap[String(statKey)] || '';
-    const res = new Map<string, { name: string; count: number; totalValue: number; percentage: boolean; color?: string }>();
-    const isEligible = (it: any | null): boolean => {
-      if (!it) return false;
-      const levelOk = !it.levelRequirement || it.levelRequirement <= loadout.level;
-      const rrOk = !it.renownRankRequirement || it.renownRankRequirement <= loadout.renownRank;
-      return levelOk && rrOk;
-    };
-    Object.values(loadout.items).forEach(({ item, talismans }) => {
-      const itemEligible = isEligible(item);
-      if (item && itemEligible) {
-        if (target === 'ARMOR' && item.armor) {
-          const key = item.name + '|armor';
-          const prev = res.get(key) || { name: item.name, count: 0, totalValue: 0, percentage: false, color: getItemColor(item) };
-          prev.count += 1; prev.totalValue += Number(item.armor) || 0; res.set(key, prev);
-        }
-        (item.stats || []).forEach((s: any) => {
-          if (s.stat === target) {
-            const key = item.name + '|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
-            const prev = res.get(key) || { name: item.name, count: 0, totalValue: 0, percentage: !!s.percentage, color: getItemColor(item) };
-            prev.count += 1; prev.totalValue += Number(s.value) || 0; prev.percentage = !!s.percentage; res.set(key, prev);
-          }
-        });
-      }
-      (talismans || []).forEach(t => {
-        const talismanEligible = isEligible(t);
-        if (t && itemEligible && talismanEligible) {
-          if (target === 'ARMOR' && t.armor) {
-            const key = t.name + '|armor';
-            const prev = res.get(key) || { name: t.name, count: 0, totalValue: 0, percentage: false, color: getItemColor(t) };
-            prev.count += 1; prev.totalValue += Number(t.armor) || 0; res.set(key, prev);
-          }
-          (t.stats || []).forEach((s: any) => {
-            if (s.stat === target) {
-              const key = t.name + '|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
-              const prev = res.get(key) || { name: t.name, count: 0, totalValue: 0, percentage: !!s.percentage, color: getItemColor(t) };
-              prev.count += 1; prev.totalValue += Number(s.value) || 0; prev.percentage = !!s.percentage; res.set(key, prev);
-            }
-          });
-        }
-      });
-    });
-    // Set bonuses
-    const counts: Record<string, number> = {};
-    const bonusesMap: Record<string, any[]> = {};
-    Object.values(loadout.items).forEach(({ item }) => {
-      if (item && item.itemSet && isEligible(item)) {
-        const name = item.itemSet.name;
-        counts[name] = (counts[name] || 0) + 1;
-        if (!bonusesMap[name]) bonusesMap[name] = item.itemSet.bonuses || [];
-      }
-    });
-    Object.entries(bonusesMap).forEach(([setName, bonuses]) => {
-      const pieces = counts[setName] || 0;
-      bonuses.forEach((b: any) => {
-        if (pieces >= b.itemsRequired && b.bonus && 'stat' in b.bonus) {
-          const s = b.bonus;
-          if (s.stat === target) {
-            const key = setName + '|set|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
-            const prev = res.get(key) || { name: setName, count: 1, totalValue: 0, percentage: !!s.percentage, color: '#4ade80' };
-            prev.count = 1; prev.totalValue += Number(s.value) || 0; prev.percentage = !!s.percentage; res.set(key, prev);
-          }
-        }
-      });
-    });
-    return Array.from(res.values()).filter(r => r.totalValue !== 0).sort((a, b) => b.totalValue - a.totalValue || a.name.localeCompare(b.name));
+  getStatContributionsForLoadout(loadoutId: string, statKey: keyof import('../types').StatsSummary | string) {
+    return getStatContributionsForLoadoutExternal(loadoutId, statKey as any);
   },
 
   // Item details fetcher with caching
+  /** Fetch a single item with full details, with LRU + in-flight dedupe. */
   async getItemWithDetails(itemId: string): Promise<Item | null> {
     try {
       if (this._itemDetailsCache.has(itemId)) {
@@ -1324,35 +725,7 @@ export const loadoutService = {
       const inflight = this._itemDetailsInflight.get(itemId);
       if (inflight) return inflight;
       const promise = (async () => {
-        const query = gql`
-          query GetItem($id: ID!) {
-            item(id: $id) {
-              id
-              name
-              description
-              type
-              slot
-              rarity
-              armor
-              dps
-              speed
-              levelRequirement
-              renownRankRequirement
-              itemLevel
-              uniqueEquipped
-              stats { stat value percentage }
-              careerRestriction
-              raceRestriction
-              iconUrl
-              talismanSlots
-              itemSet { id name bonuses { itemsRequired bonus { ... on ItemStat { stat value percentage } ... on Ability { name description } } } }
-              abilities { name description }
-              buffs { name description }
-            }
-          }
-        `;
-        const { data } = await client.query({ query, variables: { id: itemId }, fetchPolicy: 'cache-first' });
-        const item = (data as any).item || null;
+        const item = await getItemWithDetailsApi(itemId);
         this._itemDetailsCache.set(itemId, item);
         if (this._itemDetailsCache.size > this._itemDetailsCacheLimit) {
           const firstKey = this._itemDetailsCache.keys().next().value as string | undefined;
@@ -1369,16 +742,10 @@ export const loadoutService = {
   },
 
   isTalismanAlreadySlottedInItem(talismanId: string, slot: EquipSlot, excludeIndex?: number): boolean {
-    const currentLoadout = loadoutStoreAdapter.getCurrentLoadout();
-    if (!currentLoadout) return false;
-    const itemTalismans = currentLoadout.items[slot].talismans;
-    return itemTalismans.some((t, idx) => t && t.id === talismanId && idx !== excludeIndex);
+    return selectors.isTalismanAlreadySlottedInItem(talismanId, slot, excludeIndex);
   },
   isTalismanAlreadySlottedInItemForLoadout(loadoutId: string, talismanId: string, slot: EquipSlot, excludeIndex?: number): boolean {
-    const loadout = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
-    if (!loadout) return false;
-    const itemTalismans = loadout.items[slot].talismans;
-    return itemTalismans.some((t, idx) => t && t.id === talismanId && idx !== excludeIndex);
+    return selectors.isTalismanAlreadySlottedInItemForLoadout(loadoutId, talismanId, slot, excludeIndex);
   },
 
 };

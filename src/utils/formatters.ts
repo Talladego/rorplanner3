@@ -106,10 +106,24 @@ export function formatStatName(stat: Stat): string {
 
 /**
  * Formats a numeric stat value with optional percent sign and leading '+' for positives.
+ * If `decimals` is provided, decimals are only shown when the value is non-integer.
  */
-export function formatStatValue(value: number, asPercent = false): string {
-  if (asPercent) return `${value > 0 ? '+' : ''}${value}%`;
-  return value > 0 ? `+${value}` : String(value);
+export function formatStatValue(value: number, asPercent = false, decimals: number = 0): string {
+  const EPS = 1e-9;
+  const showDecimals = decimals > 0 && Math.abs(value - Math.trunc(value)) > EPS;
+  const display = showDecimals ? Number(value.toFixed(decimals)) : Math.trunc(value);
+  if (asPercent) return `${display > 0 ? '+' : ''}${display}%`;
+  return display > 0 ? `+${display}` : String(display);
+}
+
+/**
+ * Format a plain number without a leading plus. Shows decimals only when value is non-integer.
+ */
+export function formatNumber(value: number, decimals: number = 0): string {
+  const EPS = 1e-9;
+  const showDecimals = decimals > 0 && Math.abs(value - Math.trunc(value)) > EPS;
+  const display = showDecimals ? Number(value.toFixed(decimals)) : Math.trunc(value);
+  return String(display);
 }
 
 /**
@@ -135,10 +149,13 @@ export const PERCENT_SUMMARY_KEYS = new Set<string>([
   'incomingDamagePercent', 'outgoingDamagePercent',
   'outgoingHealPercent', 'incomingHealPercent',
   'blockStrikethrough', 'parryStrikethrough', 'evadeStrikethrough', 'disruptStrikethrough',
+  'blockStrikethroughMelee', 'blockStrikethroughRanged', 'blockStrikethroughMagic',
   'armorPenetrationReduction', 'criticalDamageTakenReduction', 'criticalHitRateReduction',
   'autoAttackSpeed', 'autoAttackDamage',
   // Treat Armor Penetration as a percentage stat in summaries
   'armorPenetration',
+  // Treat Critical Damage as a percent modifier
+  'criticalDamage',
   // Economic/utility modifiers are percentage-based
   'goldLooted', 'xpReceived', 'renownReceived', 'influenceReceived',
   'hateCaused', 'hateReceived',
