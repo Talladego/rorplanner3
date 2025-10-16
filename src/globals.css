@@ -178,8 +178,8 @@
 }
 
 .modal-title {
-  font-size: 1.5rem;
-  line-height: 2rem;
+  font-size: 1rem; /* further reduce to avoid scrollbars */
+  line-height: 1.5rem;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -366,6 +366,21 @@
 }
 
 .dark .stats-section-title {
+  color: rgb(96 165 250);
+}
+
+/* Subsection title: same color, slightly smaller */
+.stats-subsection-title {
+  font-size: 0.6rem; /* even smaller than section */
+  line-height: 0.85rem;
+  font-weight: 600;
+  color: rgb(59 130 246);
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dark .stats-subsection-title {
   color: rgb(96 165 250);
 }
 

@@ -235,7 +235,6 @@ export interface ILoadoutStore {
   switchLoadout(id: string): Promise<void>;
   markLoadoutAsModified(id: string): void;
   updateLoadoutCharacterStatus(id: string, isFromCharacter: boolean, characterName?: string): void;
-  importFromCharacter(characterId: string, side?: LoadoutSide): Promise<void>;
 }
 
 // Loadout planner sides for compare functionality (dual-only)
@@ -431,6 +430,9 @@ export interface StatsSummary {
   criticalDamageTakenReduction: number;
   criticalHitRateReduction: number;
   blockStrikethrough: number;
+  blockStrikethroughMelee: number; // Derived from Strength + item Block Strikethrough
+  blockStrikethroughRanged: number; // Derived from Ballistic Skill + item Block Strikethrough
+  blockStrikethroughMagic: number; // Derived from Intelligence + item Block Strikethrough
   parryStrikethrough: number;
   evadeStrikethrough: number;
   disruptStrikethrough: number;

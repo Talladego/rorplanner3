@@ -1,0 +1,244 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { Career, EquipSlot, Item, Loadout, LoadoutSide, StatsSummary } from '../../types';
+import { createInitialLoadout, initialStats } from './state';
+import { mapStatToKey } from './utils';
+import * as sel from './selectors';
+
+export function buildActions(set: any, get: any) {
+  return {
+    // Getters
+    getCurrentLoadout: (): Loadout | null => sel.getCurrentLoadout(get()),
+
+  getActiveSide: (): LoadoutSide => sel.getActiveSide(get()),
+
+  getSideLoadoutId: (side: LoadoutSide): string | null => sel.getSideLoadoutId(get(), side),
+
+    getLoadoutForSide: (side: LoadoutSide): Loadout | null => sel.getLoadoutForSide(get(), side),
+
+    getSideCareerLoadoutId: (side: LoadoutSide, career: Career): string | null => sel.getSideCareerLoadoutId(get(), side, career),
+
+    // Mappers
+    setSideCareerLoadoutId: (side: LoadoutSide, career: Career, loadoutId: string | null) => set((state: any) => {
+      const next = { ...state.sideCareerLoadoutIds } as Record<LoadoutSide, Partial<Record<Career, string>>>;
+      const inner = { ...(next[side] || {}) } as Partial<Record<Career, string>>;
+      if (loadoutId == null) delete inner[career];
+      else inner[career] = loadoutId;
+      next[side] = inner;
+      return { sideCareerLoadoutIds: next };
+    }),
+
+    // Mode setters
+    setActiveSide: (side: LoadoutSide) => set(() => ({ activeSide: side })),
+
+    assignSideLoadout: (side: LoadoutSide, loadoutId: string | null) => set((state: any) => {
+      const next = { ...state.sideLoadoutIds } as Record<LoadoutSide, string | null>;
+      next[side] = loadoutId;
+      return { sideLoadoutIds: next };
+    }),
+
+    // Per-loadout setters
+    setCareerForLoadout: (loadoutId: string, career: Career | null) => set((state: any) => ({
+      loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? { ...l, career } : l)),
+    })),
+
+    setLevelForLoadout: (loadoutId: string, level: number) => set((state: any) => ({
+      loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? { ...l, level } : l)),
+    })),
+
+    setRenownForLoadout: (loadoutId: string, renownRank: number) => set((state: any) => ({
+      loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? { ...l, renownRank } : l)),
+    })),
+
+    setLoadoutNameForLoadout: (loadoutId: string, name: string) => set((state: any) => ({
+      loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? { ...l, name } : l)),
+    })),
+
+    resetLoadoutById: (loadoutId: string) => set((state: any) => {
+      const side = (Object.entries(state.sideLoadoutIds) as Array<[LoadoutSide, string | null]>).find(([, id]) => id === loadoutId)?.[0];
+      const defaultName = side === 'A' ? 'Side A' : side === 'B' ? 'Side B' : 'Default Loadout';
+      const reset = createInitialLoadout(loadoutId, defaultName);
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? reset : l)) };
+    }),
+
+    // Current loadout setters
+    setCareer: (career: Career | null) => set((state: any) => {
+      const current = state.getCurrentLoadout();
+      if (!current) return state;
+      const updated = { ...current, career } as Loadout;
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === current.id ? updated : l)) };
+    }),
+
+    setLevel: (level: number) => set((state: any) => {
+      const current = state.getCurrentLoadout();
+      if (!current) return state;
+      const updated = { ...current, level } as Loadout;
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === current.id ? updated : l)) };
+    }),
+
+    setRenownRank: (renownRank: number) => set((state: any) => {
+      const current = state.getCurrentLoadout();
+      if (!current) return state;
+      const updated = { ...current, renownRank } as Loadout;
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === current.id ? updated : l)) };
+    }),
+
+    setItem: (slot: EquipSlot, item: Item | null) => set((state: any) => {
+      const current = state.getCurrentLoadout();
+      if (!current) return state;
+      const newItems = { ...current.items } as Loadout['items'];
+      newItems[slot] = { ...newItems[slot], item };
+      newItems[slot].talismans = item ? new Array(item.talismanSlots).fill(null) : [];
+      const updated = { ...current, items: newItems } as Loadout;
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === current.id ? updated : l)) };
+    }),
+
+    setTalisman: (slot: EquipSlot, index: number, talisman: Item | null) => set((state: any) => {
+      const current = state.getCurrentLoadout();
+      if (!current) return state;
+      const newItems = { ...current.items } as Loadout['items'];
+      const talismans = [...newItems[slot].talismans];
+      talismans[index] = talisman;
+      newItems[slot] = { ...newItems[slot], talismans };
+      const updated = { ...current, items: newItems } as Loadout;
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === current.id ? updated : l)) };
+    }),
+
+    setItemForLoadout: (loadoutId: string, slot: EquipSlot, item: Item | null) => set((state: any) => {
+      const target = state.loadouts.find((l: Loadout) => l.id === loadoutId) as Loadout | undefined;
+      if (!target) return state;
+      const newItems = { ...target.items } as Loadout['items'];
+      newItems[slot] = { ...newItems[slot], item };
+      newItems[slot].talismans = item ? new Array(item.talismanSlots).fill(null) : [];
+      const updated = { ...target, items: newItems } as Loadout;
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? updated : l)) };
+    }),
+
+    setTalismanForLoadout: (loadoutId: string, slot: EquipSlot, index: number, talisman: Item | null) => set((state: any) => {
+      const target = state.loadouts.find((l: Loadout) => l.id === loadoutId) as Loadout | undefined;
+      if (!target) return state;
+      const newItems = { ...target.items } as Loadout['items'];
+      const talismans = [...newItems[slot].talismans];
+      talismans[index] = talisman;
+      newItems[slot] = { ...newItems[slot], talismans };
+      const updated = { ...target, items: newItems } as Loadout;
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? updated : l)) };
+    }),
+
+    resetCurrentLoadout: () => set((state: any) => {
+      const current = state.getCurrentLoadout() as Loadout | null;
+      if (!current) return state;
+      let defaultName = 'Default Loadout';
+      if (state.sideLoadoutIds.A === current.id) defaultName = 'Side A';
+      else if (state.sideLoadoutIds.B === current.id) defaultName = 'Side B';
+      const reset = createInitialLoadout(current.id, defaultName);
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === current.id ? reset : l)) };
+    }),
+
+    calculateStats: () => set((state: any) => {
+      const current = state.getCurrentLoadout() as Loadout | null;
+      if (!current) return { statsSummary: initialStats };
+      const stats: StatsSummary = { ...initialStats };
+
+      const isItemEligible = (item: Item | null): boolean => {
+        if (!item) return true;
+        const levelEligible = !item.levelRequirement || item.levelRequirement <= current.level;
+        const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= current.renownRank;
+        return levelEligible && renownEligible;
+      };
+
+      const addStatsFromArray = (arr?: Array<{ stat: string; value: number | string }>) => {
+        (arr || []).forEach(({ stat, value }) => {
+          const key = mapStatToKey(stat);
+          if (key && stats[key] !== undefined) {
+            stats[key] += Number(value);
+          }
+        });
+      };
+
+      const setItems: Record<string, { item: Item; set: NonNullable<Item['itemSet']> }[]> = {};
+
+      Object.values(current.items).forEach(({ item, talismans }) => {
+        if (item && isItemEligible(item)) {
+          if (item.armor && item.armor > 0) stats.armor += Number(item.armor);
+          addStatsFromArray(item.stats);
+          if (item.itemSet) {
+            const setName = item.itemSet.name;
+            if (!setItems[setName]) setItems[setName] = [];
+            setItems[setName].push({ item, set: item.itemSet });
+          }
+          (talismans || []).forEach((talisman) => {
+            if (talisman && isItemEligible(talisman)) {
+              if (talisman.armor && talisman.armor > 0) stats.armor += Number(talisman.armor);
+              addStatsFromArray(talisman.stats);
+            }
+          });
+        }
+      });
+
+      Object.values(setItems).forEach((items) => {
+        if (items.length > 0 && items[0].set.bonuses) {
+          const setBonuses = items[0].set.bonuses;
+          setBonuses.forEach((setBonus: any) => {
+            if (items.length >= setBonus.itemsRequired) {
+              if ('stat' in setBonus.bonus) {
+                const key = mapStatToKey(setBonus.bonus.stat);
+                if (key && stats[key] !== undefined) {
+                  const bonusValue = Number(setBonus.bonus.value);
+                  if (!isNaN(bonusValue)) stats[key] += bonusValue;
+                }
+              }
+            }
+          });
+        }
+      });
+
+      return { statsSummary: stats };
+    }),
+
+    // Multi-loadout management
+    createLoadout: (name: string, level: number = 40, renownRank: number = 80, isFromCharacter: boolean = false, characterName?: string): string => {
+      const id = `loadout-${Date.now()}`;
+      set((state: any) => ({
+        loadouts: [...state.loadouts, createInitialLoadout(id, name, level, renownRank, isFromCharacter, characterName)],
+        currentLoadoutId: state.currentLoadoutId || id,
+        sideLoadoutIds: state.sideLoadoutIds[state.activeSide] == null
+          ? { ...state.sideLoadoutIds, [state.activeSide]: id }
+          : state.sideLoadoutIds,
+      }));
+      return id;
+    },
+
+    deleteLoadout: (id: string) => set((state: any) => {
+      const newLoadouts: Loadout[] = state.loadouts.filter((l: Loadout) => l.id !== id);
+      let newCurrent: string | null = state.currentLoadoutId;
+      if (state.currentLoadoutId === id) newCurrent = newLoadouts.length > 0 ? newLoadouts[0].id : null;
+      const nextSideMap = { ...state.sideLoadoutIds } as Record<LoadoutSide, string | null>;
+      (['A', 'B'] as LoadoutSide[]).forEach((s) => { if (nextSideMap[s] === id) nextSideMap[s] = null; });
+      const nextCareerMap = { ...state.sideCareerLoadoutIds } as Record<LoadoutSide, Partial<Record<Career, string>>>;
+      (['A', 'B'] as LoadoutSide[]).forEach((s) => {
+        const inner = { ...(nextCareerMap[s] || {}) } as Partial<Record<Career, string>>;
+        Object.entries(inner).forEach(([career, lid]) => {
+          if (lid === id) delete inner[career as Career];
+        });
+        nextCareerMap[s] = inner;
+      });
+      return { loadouts: newLoadouts, currentLoadoutId: newCurrent, sideLoadoutIds: nextSideMap, sideCareerLoadoutIds: nextCareerMap };
+    }),
+
+    switchLoadout: (id: string) => Promise.resolve(set(() => ({ currentLoadoutId: id }))),
+
+    markLoadoutAsModified: (id: string) => set((state: any) => ({
+      loadouts: state.loadouts.map((l: Loadout) => {
+        if (l.id !== id) return l;
+        const newName = l.name.startsWith('Imported from ')
+          ? l.name.replace(/^Imported from\s+/, '').trim()
+          : l.name;
+        return { ...l, isFromCharacter: false, characterName: undefined, name: newName } as Loadout;
+      }),
+    })),
+
+    updateLoadoutCharacterStatus: (id: string, isFromCharacter: boolean, characterName?: string) => set((state: any) => ({
+      loadouts: state.loadouts.map((l: Loadout) => (l.id === id ? { ...l, isFromCharacter, characterName } as Loadout : l)),
+    })),
+  };
+}

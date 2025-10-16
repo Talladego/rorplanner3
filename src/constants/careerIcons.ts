@@ -33,3 +33,22 @@ export const CAREER_ICON_URL: Record<Career, string> = {
 export function getCareerIconUrl(career: Career): string {
   return CAREER_ICON_URL[career];
 }
+
+// Preload all career icons to reduce first-open latency in CareerSelect.
+// Creates Image objects and sets src to warm the HTTP cache and connection.
+let careerIconsPreloaded = false;
+export function preloadCareerIcons(): void {
+  if (careerIconsPreloaded) return;
+  careerIconsPreloaded = true;
+  try {
+    const urls = Object.values(CAREER_ICON_URL);
+    urls.forEach((url) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.loading = 'eager';
+      img.src = url;
+    });
+  } catch {
+    // no-op: best-effort warmup
+  }
+}

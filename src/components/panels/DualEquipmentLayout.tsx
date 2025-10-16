@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import EquipmentPanel from './EquipmentPanel';
 import StatsComparePanel from './StatsComparePanel';
-import { loadoutService } from '../services/loadoutService';
-import { Loadout, EquipSlot } from '../types';
-import LoadoutSummaryModal from './summary/LoadoutSummaryModal';
+import { loadoutService } from '../../services/loadout/loadoutService';
+import { Loadout, EquipSlot } from '../../types';
+import React, { Suspense } from 'react';
+const LoadoutSummaryModal = React.lazy(() => import('../summary/LoadoutSummaryModal'));
 
 export default function DualEquipmentLayout() {
   const [sideA, setSideA] = useState<Loadout | null>(loadoutService.getLoadoutForSide('A'));
@@ -46,9 +47,18 @@ export default function DualEquipmentLayout() {
   }, []);
 
   const clearSide = async (side: 'A' | 'B') => {
-    // Select side to edit, then reset its current loadout state only
+    // Select side to edit, then clear items/talismans only (keep career/level/renown)
     await loadoutService.selectSideForEdit(side);
-    await loadoutService.resetCurrentLoadout();
+    const targetId = loadoutService.getSideLoadoutId(side);
+    if (!targetId) return;
+    loadoutService.beginBulkApply();
+    try {
+      for (const slot of Object.values(EquipSlot)) {
+        await loadoutService.updateItemForLoadout(targetId, slot, null);
+      }
+    } finally {
+      loadoutService.endBulkApply();
+    }
   };
 
   const copySide = async (from: 'A' | 'B', to: 'A' | 'B') => {
@@ -59,21 +69,32 @@ export default function DualEquipmentLayout() {
 
     await loadoutService.selectSideForEdit(to);
 
-  // Copy basic fields
-    loadoutService.setCareerForLoadout(targetId, source.career);
-    loadoutService.setLevelForLoadout(targetId, source.level);
-    loadoutService.setRenownForLoadout(targetId, source.renownRank);
-  // Copy character metadata (toolbar load field)
-  loadoutService.setCharacterStatusForLoadout(targetId, !!source.isFromCharacter, source.characterName);
-
-    // Copy items and talismans across all slots
-    for (const [slotKey, data] of Object.entries(source.items)) {
-      const slot = slotKey as unknown as EquipSlot;
-      await loadoutService.updateItemForLoadout(targetId, slot, data.item);
-      const talismans = data.talismans || [];
-      for (let idx = 0; idx < talismans.length; idx++) {
-        await loadoutService.updateTalismanForLoadout(targetId, slot, idx, talismans[idx]);
+    // Suppress URL churn and unique-equipment conflicts by clearing target first
+    loadoutService.beginBulkApply();
+    try {
+      // 1) Clear all target slots to avoid unique-equipped and compatibility conflicts
+      for (const slot of Object.values(EquipSlot)) {
+        await loadoutService.updateItemForLoadout(targetId, slot, null);
       }
+
+      // 2) Copy basic fields
+      loadoutService.setCareerForLoadout(targetId, source.career);
+      loadoutService.setLevelForLoadout(targetId, source.level);
+      loadoutService.setRenownForLoadout(targetId, source.renownRank);
+      // Copy character metadata (toolbar load field)
+      loadoutService.setCharacterStatusForLoadout(targetId, !!source.isFromCharacter, source.characterName);
+
+      // 3) Copy items and talismans across all slots
+      for (const [slotKey, data] of Object.entries(source.items)) {
+        const slot = slotKey as unknown as EquipSlot;
+        await loadoutService.updateItemForLoadout(targetId, slot, data.item);
+        const talismans = data.talismans || [];
+        for (let idx = 0; idx < talismans.length; idx++) {
+          await loadoutService.updateTalismanForLoadout(targetId, slot, idx, talismans[idx]);
+        }
+      }
+    } finally {
+      loadoutService.endBulkApply();
     }
   };
 
@@ -153,12 +174,14 @@ export default function DualEquipmentLayout() {
       </div>
       {/* Summary Modal */}
       {summaryOpenFor && (
-        <LoadoutSummaryModal
+        <Suspense fallback={null}>
+          <LoadoutSummaryModal
           open={true}
           onClose={() => setSummaryOpenFor(null)}
           loadout={summaryOpenFor === 'A' ? sideA : sideB}
           sideLabel={summaryOpenFor}
-        />
+          />
+        </Suspense>
       )}
     </div>
   );

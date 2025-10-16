@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { EquipSlot, Item, Stat, Career, ItemRarity } from '../types';
-import { loadoutService } from '../services/loadoutService';
-import { useLoadoutData } from '../hooks/useLoadoutData';
-import { useLoadoutById } from '../hooks/useLoadoutById';
-import EquipmentSelector from './EquipmentSelector';
-import { DEFAULT_SLOT_ICONS } from '../constants/slotIcons';
-import Tooltip from './Tooltip';
-import HoverTooltip from './HoverTooltip';
-import { formatSlotName } from '../utils/formatters';
+import React, { useState, Suspense } from 'react';
+import { EquipSlot, Item, Stat, Career, ItemRarity } from '../../types';
+import { loadoutService } from '../../services/loadout/loadoutService';
+import { useLoadoutData } from '../../hooks/useLoadoutData';
+import { useLoadoutById } from '../../hooks/useLoadoutById';
+const EquipmentSelector = React.lazy(() => import('../selector/EquipmentSelector'));
+import { DEFAULT_SLOT_ICONS } from '../../constants/slotIcons';
+import Tooltip from '../tooltip/Tooltip';
+import HoverTooltip from '../tooltip/HoverTooltip';
+import { formatSlotName } from '../../utils/formatters';
 
 interface EquipmentPanelProps {
   selectedCareer: Career | '';
@@ -30,10 +30,15 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   const [talismanSlot, setTalismanSlot] = useState<{ slot: EquipSlot; index: number } | null>(null);
   const hasCareer = !!selectedCareer;
 
-  // Persistent filter state shared across all equipment selections
-  const [nameFilter, setNameFilter] = useState('');
-  const [statsFilter, setStatsFilter] = useState<Stat[]>([]);
-  const [rarityFilter, setRarityFilter] = useState<ItemRarity[]>([]);
+  // Persistent filter state for items (carry across equipment slots within this panel)
+  const [itemNameFilter, setItemNameFilter] = useState('');
+  const [itemStatsFilter, setItemStatsFilter] = useState<Stat[]>([]);
+  const [itemRarityFilter, setItemRarityFilter] = useState<ItemRarity[]>([]);
+
+  // Persistent filter state for talismans (carry across talisman slots within this panel)
+  const [talismanNameFilter, setTalismanNameFilter] = useState('');
+  const [talismanStatsFilter, setTalismanStatsFilter] = useState<Stat[]>([]);
+  const [talismanRarityFilter, setTalismanRarityFilter] = useState<ItemRarity[]>([]);
 
   // Helper function to check if an item is eligible based on level/renown requirements
   const isItemEligible = (item: Item | null): boolean => {
@@ -156,16 +161,16 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                         onContextMenu={(e) => handleSlotRightClick(e, slot)}
                         data-anchor-key={side ? `${side}:${slot}` : undefined}
                       >
-                        <div className={`icon-frame ${isItemEligible(slotData.item) ? (slotData.item.itemSet ? 'item-color-set' :
+                        <div className={`icon-frame ${!isItemEligible(slotData.item) ? 'grayscale' : ''} ${slotData.item.itemSet ? 'item-color-set' :
                           slotData.item.rarity === 'MYTHIC' ? 'item-color-mythic' :
                           slotData.item.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
                           slotData.item.rarity === 'RARE' ? 'item-color-rare' :
                           slotData.item.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
-                          slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : ''}`}>
+                          slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common'}`}>
                           <img 
                             src={slotData.item.iconUrl} 
                             alt={slotData.item.name} 
-                            className={`w-full h-full object-contain rounded ${!isItemEligible(slotData.item) ? 'opacity-50 grayscale' : ''}`} 
+                            className={`w-full h-full object-contain rounded ${!isItemEligible(slotData.item) ? 'grayscale' : ''}`} 
                           />
                         </div>
                       </div>
@@ -190,12 +195,12 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                         const isTalismanEligible = slotData.talismans[i] ? isItemEligible(slotData.talismans[i]) : true;
                         const isSlotGreyedOut = !isParentItemEligible || (slotData.talismans[i] && !isTalismanEligible);
                         return (
-                          <div key={i} data-talisman-index={i} className={`talisman-slot ${compact ? 'w-5 h-5' : ''} ${isSlotGreyedOut ? 'opacity-50' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? (isTalismanEligible ? (slotData.talismans[i]!.itemSet ? 'item-color-set' :
+                          <div key={i} data-talisman-index={i} className={`talisman-slot ${compact ? 'w-5 h-5' : ''} ${isSlotGreyedOut ? '' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? ((slotData.talismans[i]!.itemSet ? 'item-color-set' :
                             slotData.talismans[i]!.rarity === 'MYTHIC' ? 'item-color-mythic' :
                             slotData.talismans[i]!.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
                             slotData.talismans[i]!.rarity === 'RARE' ? 'item-color-rare' :
                             slotData.talismans[i]!.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
-                            slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : '') : ''}`}> 
+                            slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')) : ''}`}> 
                             {slotData.talismans[i] ? (
                               <Tooltip item={slotData.talismans[i]} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i}>
                                 <img
@@ -227,12 +232,12 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                     <div className="equipment-text">
                       {!compact && slotData.item && (
                         <p 
-                          className={`equipment-item-name ${!isItemEligible(slotData.item) ? 'text-gray-500 opacity-60' : ''} ${isItemEligible(slotData.item) ? (slotData.item.itemSet ? 'item-color-set' :
+                          className={`equipment-item-name ${(slotData.item.itemSet ? 'item-color-set' :
                             slotData.item.rarity === 'MYTHIC' ? 'item-color-mythic' :
                             slotData.item.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
                             slotData.item.rarity === 'RARE' ? 'item-color-rare' :
                             slotData.item.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
-                            slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : ''}`}
+                            slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')}`}
                         >
                           {slotData.item.name}
                         </p>
@@ -246,12 +251,12 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                             const isSlotGreyedOut = !isParentItemEligible || (slotData.talismans[i] && !isTalismanEligible);
                             
                             return (
-                              <div key={i} data-talisman-index={i} className={`talisman-slot ${compact ? 'w-5 h-5' : ''} ${isSlotGreyedOut ? 'opacity-50' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? (isTalismanEligible ? (slotData.talismans[i]!.itemSet ? 'item-color-set' :
+                              <div key={i} data-talisman-index={i} className={`talisman-slot ${compact ? 'w-5 h-5' : ''} ${isSlotGreyedOut ? '' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? ((slotData.talismans[i]!.itemSet ? 'item-color-set' :
                                 slotData.talismans[i]!.rarity === 'MYTHIC' ? 'item-color-mythic' :
                                 slotData.talismans[i]!.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
                                 slotData.talismans[i]!.rarity === 'RARE' ? 'item-color-rare' :
                                 slotData.talismans[i]!.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
-                                slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common') : '') : ''}`}> 
+                                slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')) : ''}`}> 
                                 {slotData.talismans[i] ? (
                                   <Tooltip item={slotData.talismans[i]} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i}>
                                     <img
@@ -288,7 +293,8 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
         })}
       </div>
       
-      <EquipmentSelector
+      <Suspense fallback={null}>
+        <EquipmentSelector
         slot={selectedSlot || talismanSlot?.slot || EquipSlot.HELM}
         isOpen={isModalOpen && !!(selectedSlot || talismanSlot)}
         onClose={() => {
@@ -302,14 +308,15 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   holdingItemLevelReq={talismanSlot ? effectiveLoadout?.items[talismanSlot.slot].item?.levelRequirement : undefined}
         talismanSlotIndex={talismanSlot?.index}
         loadoutId={loadoutId || null}
-        nameFilter={nameFilter}
-        statsFilter={statsFilter}
-        rarityFilter={rarityFilter}
-        onNameFilterChange={setNameFilter}
-        onStatsFilterChange={setStatsFilter}
-        onRarityFilterChange={setRarityFilter}
+        nameFilter={talismanSlot ? talismanNameFilter : itemNameFilter}
+        statsFilter={talismanSlot ? talismanStatsFilter : itemStatsFilter}
+        rarityFilter={talismanSlot ? talismanRarityFilter : itemRarityFilter}
+        onNameFilterChange={talismanSlot ? setTalismanNameFilter : setItemNameFilter}
+        onStatsFilterChange={talismanSlot ? setTalismanStatsFilter : setItemStatsFilter}
+        onRarityFilterChange={talismanSlot ? setTalismanRarityFilter : setItemRarityFilter}
         selectedCareer={selectedCareer}
-      />
+        />
+      </Suspense>
     </div>
   );
 }

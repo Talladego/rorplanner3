@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { loadoutService } from './services/loadoutService';
-import { urlService } from './services/urlService';
-import DualToolbar from './components/DualToolbar';
-import DualEquipmentLayout from './components/DualEquipmentLayout';
-import ApolloProviderWrapper from './components/ApolloProviderWrapper';
-import ErrorBoundary from './components/ErrorBoundary';
-import { loadoutEventEmitter } from './services/loadoutEventEmitter';
+import { loadoutService } from './services/loadout/loadoutService';
+import { urlService } from './services/loadout/urlService';
+import DualToolbar from './components/toolbar/DualToolbar';
+import DualEquipmentLayout from './components/panels/DualEquipmentLayout';
+import ApolloProviderWrapper from './providers/ApolloProvider';
+import ErrorBoundary from './providers/ErrorBoundary';
+import { preloadCareerIcons } from './constants/careerIcons';
+// Presentation layer should subscribe through the service API, not the raw emitter
 
 function App() {
   const navigate = useNavigate();
@@ -27,19 +28,15 @@ function App() {
 
   // Subscribe to URL-related events
   useEffect(() => {
-    const unsubscribe = loadoutEventEmitter.subscribe('CHARACTER_LOADED_FROM_URL', () => {
-      // Handle any UI updates needed when character is loaded from URL
+    const unsub1 = loadoutService.subscribeToEvents('CHARACTER_LOADED_FROM_URL', () => {
       setCharacterLoaded(true);
     });
-
-    const unsubscribe2 = loadoutEventEmitter.subscribe('CHARACTER_LOADED', () => {
-      // Handle any UI updates needed when character is loaded from button
+    const unsub2 = loadoutService.subscribeToEvents('CHARACTER_LOADED', () => {
       setCharacterLoaded(true);
     });
-
     return () => {
-      unsubscribe();
-      unsubscribe2();
+      unsub1();
+      unsub2();
     };
   }, []);
 
@@ -63,6 +60,9 @@ function App() {
 
   // Handle URL parameters on app initialization
   useEffect(() => {
+    // Warm up external career icon images in the background.
+    preloadCareerIcons();
+
     const keys = Array.from(urlService.getSearchParams().keys());
     const hasCompareParams = keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
 
