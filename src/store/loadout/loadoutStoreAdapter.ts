@@ -21,6 +21,10 @@ class LoadoutStoreAdapter implements ILoadoutStore {
   setCareerForLoadout(loadoutId: string, career: Career | null): void { useLoadoutStore.getState().setCareerForLoadout(loadoutId, career); }
   setLevelForLoadout(loadoutId: string, level: number): void { useLoadoutStore.getState().setLevelForLoadout(loadoutId, level); }
   setRenownForLoadout(loadoutId: string, renownRank: number): void { useLoadoutStore.getState().setRenownForLoadout(loadoutId, renownRank); }
+  setRenownAbilityLevel(ability: keyof NonNullable<Loadout['renownAbilities']>, level: number): void { useLoadoutStore.getState().setRenownAbilityLevel(ability, level); }
+  setRenownAbilityLevelForLoadout(loadoutId: string, ability: keyof NonNullable<Loadout['renownAbilities']>, level: number): void { useLoadoutStore.getState().setRenownAbilityLevelForLoadout(loadoutId, ability, level); }
+  resetRenownAbilities(): void { useLoadoutStore.getState().resetRenownAbilities(); }
+  resetRenownAbilitiesForLoadout(loadoutId: string): void { useLoadoutStore.getState().resetRenownAbilitiesForLoadout(loadoutId); }
   setLoadoutNameForLoadout(loadoutId: string, name: string): void { useLoadoutStore.getState().setLoadoutNameForLoadout(loadoutId, name); }
   resetLoadoutById(loadoutId: string): void { useLoadoutStore.getState().resetLoadoutById(loadoutId); }
   resetCurrentLoadout(): void { useLoadoutStore.getState().resetCurrentLoadout(); }

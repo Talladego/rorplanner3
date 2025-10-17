@@ -7,7 +7,13 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint",
-    "probe:jewellery3-talismans": "npx tsx scripts/probe-jewellery3-talismans.ts"
+    "probe:jewellery3-talismans": "npx tsx scripts/probe-jewellery3-talismans.ts",
+    "probe:item": "npx tsx scripts/probe-item.ts",
+    "probe:item-buffs": "npx tsx scripts/probe-item-buffs.ts",
+    "probe:ability": "npx tsx scripts/probe-ability.ts",
+    "probe:items-outgoing-damage": "npx tsx scripts/probe-items-outgoing-damage.ts",
+    "probe:items-outgoing-damage-any": "npx tsx scripts/probe-items-outgoing-damage-any.ts",
+    "probe:items-by-name": "npx tsx scripts/probe-items-by-name.ts"
   },
   "dependencies": {
     "@apollo/client": "^4.0.3",

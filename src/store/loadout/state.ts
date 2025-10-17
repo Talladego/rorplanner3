@@ -13,6 +13,25 @@ export const createInitialLoadout = (
   career: null,
   level,
   renownRank,
+  renownAbilities: {
+    might: 0,
+    bladeMaster: 0,
+    marksman: 0,
+    impetus: 0,
+    acumen: 0,
+    resolve: 0,
+    fortitude: 0,
+    vigor: 0,
+    opportunist: 0,
+    spiritualRefinement: 0,
+    regeneration: 0,
+    reflexes: 0,
+    defender: 0,
+    deftDefender: 0,
+    hardyConcession: 0,
+    futileStrikes: 0,
+    trivialBlows: 0,
+  },
   items: Object.values(EquipSlot).reduce((acc, slot) => {
     acc[slot] = { item: null, talismans: [] };
     return acc;

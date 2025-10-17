@@ -37,6 +37,8 @@
   border-radius: 0.5rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   border: 1px solid var(--border);
+  /* Default text color inside panels to ensure readability on dark backgrounds */
+  color: var(--text-primary);
 }
 
 /* Optional helper to lock panel sizes if applied */

@@ -22,6 +22,9 @@ const STAT_LABEL_OVERRIDES: Record<string, string> = {
   // Rename reduction phrasing to match in-game wording
   ARMOR_PENETRATION_REDUCTION: 'Reduced Armor Penetration',
   armorPenetrationReduction: 'Reduced Armor Penetration',
+  // Healing naming
+  OUTGOING_HEAL_PERCENT: 'Outgoing Healing',
+  outgoingHealPercent: 'Outgoing Healing',
   // Block strikethrough variants (summary-only keys)
   blockStrikethroughMelee: 'Reduced Chance to be Blocked (Melee)',
   blockStrikethroughRanged: 'Reduced Chance to be Blocked (Ranged)',
@@ -193,6 +196,10 @@ export const PERCENT_SUMMARY_KEYS = new Set<string>([
   'block', 'parry', 'evade', 'disrupt',
   'criticalHitRate', 'meleeCritRate', 'rangedCritRate', 'magicCritRate', 'healCritRate',
   'incomingDamagePercent', 'outgoingDamagePercent',
+  // Always display Outgoing Damage as a percentage in summaries since UI computes an effective %
+  'outgoingDamage',
+  // Display Incoming Damage as a percentage in summaries
+  'incomingDamage',
   'outgoingHealPercent', 'incomingHealPercent',
   'blockStrikethrough', 'parryStrikethrough', 'evadeStrikethrough', 'disruptStrikethrough',
   'blockStrikethroughMelee', 'blockStrikethroughRanged', 'blockStrikethroughMagic',

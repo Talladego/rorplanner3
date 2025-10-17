@@ -17,6 +17,13 @@ export function cloneLoadout(sourceId: string, name?: string): string {
     src.characterName,
   );
   if (src.career) loadoutStoreAdapter.setCareerForLoadout(newId, src.career);
+  // Copy renown abilities
+  if (src.renownAbilities) {
+    (Object.keys(src.renownAbilities) as Array<keyof NonNullable<typeof src.renownAbilities>>).forEach((ab) => {
+      const lvl = src.renownAbilities?.[ab] ?? 0;
+      loadoutStoreAdapter.setRenownAbilityLevelForLoadout(newId, ab as keyof NonNullable<typeof src.renownAbilities>, lvl);
+    });
+  }
   Object.entries(src.items).forEach(([slot, data]) => {
     loadoutStoreAdapter.setItemForLoadout(newId, slot as EquipSlot, data.item);
     if (data.talismans) {

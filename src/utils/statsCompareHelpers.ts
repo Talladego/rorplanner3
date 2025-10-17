@@ -108,7 +108,7 @@ export const rowDefs = {
     { key: 'parry' as const },
     { key: 'evade' as const },
     { key: 'disrupt' as const },
-    { key: 'incomingDamagePercent' as const },
+    { key: 'incomingDamage' as const },
     { key: 'criticalDamageTakenReduction' as const },
     { key: 'armorPenetrationReduction' as const },
     { key: 'criticalHitRateReduction' as const },
@@ -172,9 +172,10 @@ export function computeTotalStatsForSide(
   empty: StatsSummary,
   includeBaseStats: boolean,
   includeDerivedStats: boolean,
+  includeRenownStats?: boolean,
 ): StatsSummary {
   const base = id ? loadoutService.getLoadoutForSide(side) : null;
-  let total = id ? { ...empty, ...loadoutService.computeStatsForLoadout(id) } : empty;
+  let total = id ? { ...empty, ...loadoutService.computeStatsForLoadout(id, { includeRenown: includeRenownStats !== false }) } : empty;
   if (!base) return total;
 
   if (includeBaseStats) {
@@ -236,10 +237,10 @@ export function computeTotalStatsForSide(
 }
 
 const derivedLabel = (key: string): string => {
-  if (key === 'block') return 'From Toughness';
-  if (key === 'parry' || key === 'evade') return 'From Initiative';
-  if (key === 'disrupt') return 'From Willpower';
-  return 'From Stats';
+  if (key === 'block') return 'From Toughness (Derived)';
+  if (key === 'parry' || key === 'evade') return 'From Initiative (Derived)';
+  if (key === 'disrupt') return 'From Willpower (Derived)';
+  return 'From Stats (Derived)';
 };
 
 export function buildContributionsForKeyForSide(
@@ -249,8 +250,9 @@ export function buildContributionsForKeyForSide(
   stats: StatsSummary,
   includeBaseStats: boolean,
   includeDerivedStats: boolean,
+  includeRenownStats?: boolean,
 ): Contribution[] {
-  const raw: Contribution[] = id ? loadoutService.getStatContributionsForLoadout(id, key as keyof StatsSummary) : [];
+  const raw: Contribution[] = id ? loadoutService.getStatContributionsForLoadout(id, key as keyof StatsSummary, { includeRenown: includeRenownStats !== false }) : [];
   const base = id ? loadoutService.getLoadoutForSide(side) : null;
   let contrib: Contribution[] = (key === 'blockStrikethroughMelee' || key === 'blockStrikethroughRanged' || key === 'blockStrikethroughMagic')
     ? [
@@ -258,6 +260,32 @@ export function buildContributionsForKeyForSide(
         ...(id ? loadoutService.getStatContributionsForLoadout(id, 'blockStrikethrough') : []),
       ]
     : raw;
+
+  // For the Outgoing Damage row, also surface Renown Hardy Concession contributions
+  // which are modeled under the 'outgoingDamagePercent' summary key.
+  if (id && key === 'outgoingDamage') {
+    const renownOutPct = loadoutService.getStatContributionsForLoadout(
+      id,
+      'outgoingDamagePercent',
+      { includeRenown: includeRenownStats !== false }
+    );
+    // Merge only the renown-sourced entries to avoid accidentally pulling item-side OUTGOING_DAMAGE_PERCENT (if ever present)
+    const renownOnly = renownOutPct.filter(c => c.name.startsWith('From Renown'));
+    if (renownOnly.length) contrib = [...contrib, ...renownOnly];
+  }
+
+  // For Incoming Damage display, also attach renown HC contributions which live under incomingDamagePercent
+  if (id && key === 'incomingDamage') {
+    const renownInPct = loadoutService.getStatContributionsForLoadout(
+      id,
+      'incomingDamagePercent',
+      { includeRenown: includeRenownStats !== false }
+    );
+    const renownOnly = renownInPct.filter(c => c.name.startsWith('From Renown'));
+    if (renownOnly.length) contrib = [...contrib, ...renownOnly];
+  }
+
+  // (Deduped) Incoming Damage renown additions handled above
 
   const extra: Contribution[] = [];
 
@@ -272,13 +300,13 @@ export function buildContributionsForKeyForSide(
   if (includeDerivedStats && base && (key === 'blockStrikethroughMelee' || key === 'blockStrikethroughRanged' || key === 'blockStrikethroughMagic')) {
     if (key === 'blockStrikethroughMelee') {
       const v = computeDerivedBlockStrikethroughFromStrength(stats, base.level, { applyDR: APPLY_DR });
-      if (v !== 0) extra.push({ name: 'From Strength', count: 1, totalValue: v, percentage: true });
+      if (v !== 0) extra.push({ name: 'From Strength (Derived)', count: 1, totalValue: v, percentage: true });
     } else if (key === 'blockStrikethroughRanged') {
       const v = computeDerivedBlockStrikethroughFromBallisticSkill(stats, base.level, { applyDR: APPLY_DR });
-      if (v !== 0) extra.push({ name: 'From Ballistic Skill', count: 1, totalValue: v, percentage: true });
+      if (v !== 0) extra.push({ name: 'From Ballistic Skill (Derived)', count: 1, totalValue: v, percentage: true });
     } else if (key === 'blockStrikethroughMagic') {
       const v = computeDerivedBlockStrikethroughFromIntelligence(stats, base.level, { applyDR: APPLY_DR });
-      if (v !== 0) extra.push({ name: 'From Intelligence', count: 1, totalValue: v, percentage: true });
+      if (v !== 0) extra.push({ name: 'From Intelligence (Derived)', count: 1, totalValue: v, percentage: true });
     }
   }
 
@@ -290,23 +318,23 @@ export function buildContributionsForKeyForSide(
 
   if (key === 'evadeStrikethrough' && base && includeDerivedStats) {
     const es = computeDerivedEvadeStrikethroughFromBallisticSkill(stats, base.level, { applyDR: APPLY_DR });
-    if (es !== 0) extra.push({ name: 'From Ballistic Skill', count: 1, totalValue: es, percentage: true });
+    if (es !== 0) extra.push({ name: 'From Ballistic Skill (Derived)', count: 1, totalValue: es, percentage: true });
   }
   if (key === 'criticalHitRateReduction' && base && includeDerivedStats) {
     const fromInit = computeDerivedCritReductionFromInitiative(stats, base.level, { applyDR: APPLY_DR });
-    if (fromInit !== 0) extra.push({ name: 'From Initiative', count: 1, totalValue: fromInit, percentage: true });
+    if (fromInit !== 0) extra.push({ name: 'From Initiative (Derived)', count: 1, totalValue: fromInit, percentage: true });
   }
   if (key === 'armorPenetration' && base && includeDerivedStats) {
     const ap = computeDerivedArmorPenetrationFromWeaponSkill(stats, base.level, { applyDR: APPLY_DR });
-    if (ap !== 0) extra.push({ name: 'From Weapon Skill', count: 1, totalValue: ap, percentage: true });
+    if (ap !== 0) extra.push({ name: 'From Weapon Skill (Derived)', count: 1, totalValue: ap, percentage: true });
   }
   if (key === 'parryStrikethrough' && base && includeDerivedStats) {
     const ps = computeDerivedParryStrikethroughFromStrength(stats, base.level, { applyDR: APPLY_DR });
-    if (ps !== 0) extra.push({ name: 'From Strength', count: 1, totalValue: ps, percentage: true });
+    if (ps !== 0) extra.push({ name: 'From Strength (Derived)', count: 1, totalValue: ps, percentage: true });
   }
   if (key === 'disruptStrikethrough' && base && includeDerivedStats) {
     const ds = computeDerivedDisruptStrikethroughFromIntelligence(stats, base.level, { applyDR: APPLY_DR });
-    if (ds !== 0) extra.push({ name: 'From Intelligence', count: 1, totalValue: ds, percentage: true });
+    if (ds !== 0) extra.push({ name: 'From Intelligence (Derived)', count: 1, totalValue: ds, percentage: true });
   }
 
   if (key === 'meleeCritRate' || key === 'rangedCritRate' || key === 'magicCritRate' || key === 'healCritRate') {

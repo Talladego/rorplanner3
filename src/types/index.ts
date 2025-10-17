@@ -377,6 +377,26 @@ export interface Loadout {
   career: Career | null;
   level: number;
   renownRank: number;
+  // Renown ability selections (levels 0-5 per ability)
+  renownAbilities?: {
+    might: number;
+    bladeMaster: number;
+    marksman: number;
+    impetus: number;
+    acumen: number;
+    resolve: number;
+    fortitude: number;
+    vigor: number;
+    opportunist: number;
+    spiritualRefinement: number;
+    regeneration: number;
+    reflexes: number;
+    defender: number;
+    deftDefender: number;
+    hardyConcession: number;
+    futileStrikes: number;
+    trivialBlows: number;
+  };
   items: Record<EquipSlot, LoadoutItem>;
   isFromCharacter?: boolean; // Whether this loadout was loaded from a character
   characterName?: string; // The character name if loaded from character

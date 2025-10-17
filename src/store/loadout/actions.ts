@@ -49,6 +49,41 @@ export function buildActions(set: any, get: any) {
       loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? { ...l, renownRank } : l)),
     })),
 
+    // Renown ability levels (0-5) per ability
+    setRenownAbilityLevel: (ability: keyof NonNullable<Loadout['renownAbilities']>, level: number) => set((state: any) => {
+      const current = state.getCurrentLoadout();
+      if (!current) return state;
+      const next = { ...(current.renownAbilities || {}) } as NonNullable<Loadout['renownAbilities']>;
+      next[ability] = Math.max(0, Math.min(5, Number(level) || 0));
+      const updated = { ...current, renownAbilities: next } as Loadout;
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === current.id ? updated : l)) };
+    }),
+
+    setRenownAbilityLevelForLoadout: (loadoutId: string, ability: keyof NonNullable<Loadout['renownAbilities']>, level: number) => set((state: any) => {
+      const target = state.loadouts.find((l: Loadout) => l.id === loadoutId) as Loadout | undefined;
+      if (!target) return state;
+      const next = { ...(target.renownAbilities || {}) } as NonNullable<Loadout['renownAbilities']>;
+      next[ability] = Math.max(0, Math.min(5, Number(level) || 0));
+      const updated = { ...target, renownAbilities: next } as Loadout;
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? updated : l)) };
+    }),
+
+    resetRenownAbilities: () => set((state: any) => {
+      const current = state.getCurrentLoadout();
+      if (!current) return state;
+  const zeros = { might: 0, bladeMaster: 0, marksman: 0, impetus: 0, acumen: 0, resolve: 0, fortitude: 0, vigor: 0, opportunist: 0, spiritualRefinement: 0, regeneration: 0, reflexes: 0, defender: 0, deftDefender: 0, hardyConcession: 0, futileStrikes: 0, trivialBlows: 0 } as NonNullable<Loadout['renownAbilities']>;
+      const updated = { ...current, renownAbilities: zeros } as Loadout;
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === current.id ? updated : l)) };
+    }),
+
+    resetRenownAbilitiesForLoadout: (loadoutId: string) => set((state: any) => {
+      const target = state.loadouts.find((l: Loadout) => l.id === loadoutId) as Loadout | undefined;
+      if (!target) return state;
+  const zeros = { might: 0, bladeMaster: 0, marksman: 0, impetus: 0, acumen: 0, resolve: 0, fortitude: 0, vigor: 0, opportunist: 0, spiritualRefinement: 0, regeneration: 0, reflexes: 0, defender: 0, deftDefender: 0, hardyConcession: 0, futileStrikes: 0, trivialBlows: 0 } as NonNullable<Loadout['renownAbilities']>;
+      const updated = { ...target, renownAbilities: zeros } as Loadout;
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? updated : l)) };
+    }),
+
     setLoadoutNameForLoadout: (loadoutId: string, name: string) => set((state: any) => ({
       loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? { ...l, name } : l)),
     })),

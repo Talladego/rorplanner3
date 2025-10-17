@@ -37,6 +37,27 @@ export const loadoutService = {
     // Filters/selectors/mutations are split into submodules for maintainability
     return selectors.getActiveSide();
   },
+  // Renown ability updates
+  setRenownAbilityLevel(ability: keyof NonNullable<import('../../types').Loadout['renownAbilities']>, level: number) {
+    loadoutStoreAdapter.setRenownAbilityLevel(ability as any, level);
+    const stats = this.getStatsSummary();
+    loadoutEventEmitter.emit({ type: 'STATS_UPDATED', payload: { stats }, timestamp: Date.now() });
+  },
+  setRenownAbilityLevelForLoadout(loadoutId: string, ability: keyof NonNullable<import('../../types').Loadout['renownAbilities']>, level: number) {
+    loadoutStoreAdapter.setRenownAbilityLevelForLoadout(loadoutId, ability as any, level);
+    const stats = this.getStatsSummary();
+    loadoutEventEmitter.emit({ type: 'STATS_UPDATED', payload: { stats }, timestamp: Date.now() });
+  },
+  resetRenownAbilities() {
+    loadoutStoreAdapter.resetRenownAbilities();
+    const stats = this.getStatsSummary();
+    loadoutEventEmitter.emit({ type: 'STATS_UPDATED', payload: { stats }, timestamp: Date.now() });
+  },
+  resetRenownAbilitiesForLoadout(loadoutId: string) {
+    loadoutStoreAdapter.resetRenownAbilitiesForLoadout(loadoutId);
+    const stats = this.getStatsSummary();
+    loadoutEventEmitter.emit({ type: 'STATS_UPDATED', payload: { stats }, timestamp: Date.now() });
+  },
   // Missing setter: update active side in the store and emit an event for UI to react
   setActiveSide(side: LoadoutSide) {
     loadoutStoreAdapter.setActiveSide(side);
@@ -704,12 +725,12 @@ export const loadoutService = {
   },
 
   // Detailed stats computation for an arbitrary loadout id (delegated)
-  computeStatsForLoadout(loadoutId: string) {
-    return computeStatsForLoadoutExternal(loadoutId);
+  computeStatsForLoadout(loadoutId: string, opts?: { includeRenown?: boolean }) {
+    return computeStatsForLoadoutExternal(loadoutId, opts);
   },
 
-  getStatContributionsForLoadout(loadoutId: string, statKey: keyof import('../../types').StatsSummary | string) {
-    return getStatContributionsForLoadoutExternal(loadoutId, statKey as any);
+  getStatContributionsForLoadout(loadoutId: string, statKey: keyof import('../../types').StatsSummary | string, opts?: { includeRenown?: boolean }) {
+    return getStatContributionsForLoadoutExternal(loadoutId, statKey as any, opts as any);
   },
 
   // Item details fetcher with caching

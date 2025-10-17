@@ -18,6 +18,7 @@ export function useLoadoutById(loadoutId: string | null) {
         case 'CAREER_CHANGED':
         case 'LEVEL_CHANGED':
         case 'RENOWN_RANK_CHANGED':
+        case 'STATS_UPDATED':
         case 'LOADOUT_RESET':
         case 'LOADOUT_CREATED':
         case 'LOADOUT_SWITCHED':

@@ -23,6 +23,11 @@ interface LoadoutState {
   setCareerForLoadout: (loadoutId: string, career: Career | null) => void;
   setLevelForLoadout: (loadoutId: string, level: number) => void;
   setRenownForLoadout: (loadoutId: string, renownRank: number) => void;
+  // Renown ability setters
+  setRenownAbilityLevel: (ability: keyof NonNullable<Loadout['renownAbilities']>, level: number) => void;
+  setRenownAbilityLevelForLoadout: (loadoutId: string, ability: keyof NonNullable<Loadout['renownAbilities']>, level: number) => void;
+  resetRenownAbilities: () => void;
+  resetRenownAbilitiesForLoadout: (loadoutId: string) => void;
   setLoadoutNameForLoadout: (loadoutId: string, name: string) => void;
   resetLoadoutById: (loadoutId: string) => void;
   resetCurrentLoadout: () => void;
