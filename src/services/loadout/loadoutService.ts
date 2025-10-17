@@ -2,7 +2,7 @@
 
 import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 import client from '../../lib/apollo-client';
-// Note: GraphQL operations come from centralized documents in ./queries
+// GraphQL operations come from centralized documents in ./queries
 import { EquipSlot, Item, Career, LoadoutItem, Stat, ItemRarity, LoadoutSide } from '../../types';
 import { loadoutEventEmitter } from './loadoutEventEmitter';
 import { subscribeToEvents as subscribeToEventsHelper, subscribeToAllEvents as subscribeToAllEventsHelper } from './events';

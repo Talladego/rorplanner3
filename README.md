@@ -1,14 +1,15 @@
 # RorPlanner
 
-A modern React application for planning character equipment loadouts in Warhammer Online: Return of Reckoning, built with Vite, TypeScript, and Tailwind CSS.
+A modern React application for planning character equipment and renown loadouts in Warhammer Online: Return of Reckoning, built with Vite, TypeScript, and Tailwind CSS.
 
 ## Features
 
 - ⚔️ Equipment planning for all character classes
-- 🔁 Dual A/B loadout compare with side assignment
+- �️ Renown planner with icons, tooltips, capped levels, and point budget
+- �🔁 Dual A/B loadout compare with side assignment
 - 🎨 Dark/Light theme support
 - 🔍 Interactive equipment selection
-- 📊 Real-time stat calculations
+- 📊 Real-time stat calculations (items, talismans, set bonuses, renown, derived)
 - 🎯 Responsive design
 - 🚀 Fast development with Vite
 
@@ -40,50 +41,53 @@ npm install
 ```
 
 3. Start the development server
+```bash
+npm run dev -- --host
 ```
 
 4. Open [http://localhost:3001](http://localhost:3001) in your browser
 
 Notes:
 - The app uses a hash router. Deep-link parameters appear after the `#`.
-- URL auto-update and navigation parsing are feature-flagged and off by default (see `urlService` usage in `App.tsx`).
+- URL auto-update and navigation parsing are feature-flagged and off by default (see `urlService` in `App.tsx`).
 
 ### Build for Production
 
 ```bash
 npm run build
+```
 
-```
+Project layout (key paths):
+
 src/
-├── services/                         # Service layer (domain façade + integration + events)
-│   ├── loadoutService.ts             # Main façade (business rules, URL updates, events)
-│   ├── loadoutEventEmitter.ts        # Typed pub/sub (internal)
-│   ├── urlService.ts                 # URL encode/decode for dual compare
-│   ├── urlSync.ts                    # Guarded URL auto-update helper
-│   ├── queries.ts                    # Centralized GraphQL documents (single source; re-export shims removed)
-│   └── loadout/
-│       ├── cache.ts                  # Lightweight in-memory LRU for list queries + icon warmups
-│       ├── stats.ts                  # Compute totals + stat contribution breakdowns
-│       ├── events.ts                 # Event subscription helpers (single/all)
-│       └── filters.ts                # Allowed stat filters + sanitizers for queries
-│   ├── loadoutStore.ts               # Store façade composing state and actions
-│   ├── loadoutStoreAdapter.ts        # Thin adapter used by Service
-│   └── loadout/                      # Store internals (modularized)
-│       ├── state.ts                  # Initial state and factories
-│       ├── actions.ts                # Mutators and calculations
-│       ├── selectors.ts              # Pure selectors for reads
-│       └── utils.ts                  # Helpers (e.g., stat mapping)
-├── lib/                              # Apollo Client configuration
-│   └── apollo-client.ts
-├── constants/                        # Local constants (e.g., base stats, maps)
-│   ├── careerBaseStats.ts
-│   ├── careerIcons.ts
-│   └── slotIcons.ts
-├── hooks/                            # Presentation hooks (subscribe via service)
-│   ├── useLoadoutById.ts
-├── types/                            # TypeScript type definitions and events
-└── App.tsx                           # Main application component
-```
+├── components/                      # React UI (panels, selectors, stats, summary, toolbar, tooltip)
+├── constants/                       # Local constants (base stats, icons, stat maps)
+├── hooks/                           # Presentation hooks
+├── lib/                             # Apollo Client configuration
+├── providers/                       # ApolloProvider, ErrorBoundary, etc.
+├── services/
+│   └── loadout/                     # Service layer (domain façade + integration + events)
+│       ├── loadoutService.ts        # Main façade (business rules, URL updates, events)
+│       ├── loadoutEventEmitter.ts   # Typed pub/sub (internal)
+│       ├── urlService.ts            # URL encode/decode for dual compare (includes renown)
+│       ├── urlSync.ts               # Guarded URL auto-update helper
+│       ├── queries.ts               # Centralized GraphQL documents
+│       ├── mutations.ts             # Store mutations used by the façade
+│       ├── api.ts                   # Data fetchers (items, talismans, details)
+│       ├── cache.ts                 # Lightweight LRU/in-flight cache
+│       ├── stats.ts                 # Compute totals + contribution breakdowns
+│       ├── selectors.ts             # Service-level selectors
+│       ├── filters.ts               # Allowed stat filters + sanitizers for queries
+│       └── renownConfig.ts          # Renown ability metadata (labels, caps, icons, totals)
+├── store/
+│   └── loadout/                     # Zustand store and adapter
+│       ├── state.ts                 # Initial state and factories
+│       ├── actions.ts               # Mutators and calculations
+│       ├── selectors.ts             # Pure selectors
+│       ├── loadoutStore.ts          # Store composition
+│       └── loadoutStoreAdapter.ts   # Thin adapter used by Service
+├── types/                           # TypeScript types and events
+└── App.tsx                          # Main application component
 
 ## Available Scripts
 
@@ -91,7 +95,14 @@ src/
 - `npm run build` - Build for production
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
-- `npm run probe:jewellery3-talismans` - Optional: inspect talisman data (dev utility)
+- Dev probes (optional):
+	- `npm run probe:jewellery3-talismans`
+	- `npm run probe:item`
+	- `npm run probe:item-buffs`
+	- `npm run probe:ability`
+	- `npm run probe:items-by-name`
+	- `npm run probe:items-outgoing-damage`
+	- `npm run probe:items-outgoing-damage-any`
 
 ## Contributing
 ## License
@@ -123,16 +134,19 @@ Custom domain: Add your domain in Pages → Custom domains and follow DNS prompt
 	- Must not import the store or event emitter directly. Use `loadoutService` as the façade.
 - Service (Domain orchestration, integration, events)
 	- Responsibilities: Orchestrate domain operations, apply business rules (eligibility, unique-equipped, set bonuses, stat calc), fetch data via GraphQL, encode/decode URL state, and emit typed events.
+	- Location: `src/services/loadout/*`
 	- Submodules:
-		- `services/queries.ts`: All GraphQL documents.
-		- `services/loadout/api.ts`: Fetchers (items, talismans, details) with caching and prefetch.
-		- `services/loadout/stats.ts`: Compute totals and per-stat contribution breakdowns.
-		- `services/loadout/events.ts`: Subscribe to single/all event types.
-		- `services/urlSync.ts`: Guarded URL auto-update helper used throughout the service.
+		- `queries.ts`: All GraphQL documents.
+		- `api.ts`: Fetchers (items, talismans, details) with caching and prefetch.
+		- `stats.ts`: Compute totals and per-stat contribution breakdowns.
+		- `events.ts`: Subscribe to single/all event types.
+		- `urlService.ts`: URL encode/decode, including renown ability levels in share links.
+		- `urlSync.ts`: Guarded URL auto-update helper.
+		- `renownConfig.ts`: Renown metadata and caps used by UI and stats.
 	- Talks to Data via `loadoutStoreAdapter` (no React imports here) and emits events using `loadoutEventEmitter`.
 
 - Data (State and pure data transforms)
-	- Location: `src/store`
+	- Location: `src/store/loadout`
 	- Responsibilities: Hold and mutate state using Zustand; expose a thin adapter `loadoutStoreAdapter` to decouple the store from the Service/Presentation layers.
 	- Must not import from Service. The adapter is called by the Service; components must not call the store directly.
 
@@ -150,18 +164,19 @@ This keeps UI reactive without coupling components to the store internals.
 
 ### Key files
 
-- `src/services/loadoutService.ts`: Main façade for all domain operations and event emissions.
-- `src/services/loadoutEventEmitter.ts`: Minimal pub/sub used internally by the Service.
-- `src/services/queries.ts`: Centralized GraphQL documents.
+- `src/services/loadout/loadoutService.ts`: Main façade for domain ops and event emissions.
+- `src/services/loadout/loadoutEventEmitter.ts`: Minimal pub/sub used internally by the Service.
+- `src/services/loadout/queries.ts`: Centralized GraphQL documents.
 - `src/services/loadout/api.ts`: Data fetchers for items/talismans/item details.
 - `src/services/loadout/cache.ts`: LRU list cache and icon pre-warm.
 - `src/services/loadout/stats.ts`: Stats aggregation and contribution logic.
 - `src/services/loadout/events.ts`: Event subscription helpers for components.
-- `src/services/urlService.ts`: URL encode/decode for dual-compare state, feature flags for auto-update and navigation parsing.
-- `src/services/urlSync.ts`: Guarded URL auto-update helper.
+- `src/services/loadout/urlService.ts`: URL encode/decode for dual-compare, including renown; feature flags for auto-update and navigation parsing.
+- `src/services/loadout/urlSync.ts`: Guarded URL auto-update helper.
+- `src/services/loadout/renownConfig.ts`: Renown ability metadata used by UI and stats.
 - `src/constants/statMaps.ts`: Mapping between GraphQL stat enums and summary keys.
-- `src/store/loadoutStore.ts`: Zustand store with state and pure calculations.
-- `src/store/loadoutStoreAdapter.ts`: Adapter that the Service uses to read/write store state.
+- `src/store/loadout/loadoutStore.ts`: Zustand store composition.
+- `src/store/loadout/loadoutStoreAdapter.ts`: Adapter the Service uses to read/write store state.
 - `src/lib/apollo-client.ts`: Apollo client setup for GraphQL.
 
 ### Boundary rules (do/don't)
@@ -189,19 +204,14 @@ This keeps UI reactive without coupling components to the store internals.
 
 ## Housekeeping
 
-- Removed unused re-export shims:
-	- `src/services/url/urlService.ts`
-	- `src/services/url/urlSync.ts`
-	- `src/services/graphql/queries.ts`
-	These were thin pass-throughs that caused duplicate paths and import ambiguity. All imports should reference the canonical files under `src/services` directly.
-
-- Prefer `services/queries.ts` as the single source for GraphQL documents. Avoid scattering `gql` in other modules unless local to a tightly scoped API call (e.g., `getItemWithDetailsApi`).
+- Prefer `src/services/loadout/queries.ts` as the single source for GraphQL documents. Avoid scattering `gql` outside this module unless strictly scoped to a local API call.
 
 - URL feature flags (in `urlService`):
 	- `setAutoUpdateEnabled(boolean)`: Enable/disable mutation of the URL in response to state changes.
 	- `setNavigationHandlingEnabled(boolean)`: Enable/disable parsing the URL on navigation changes after initial load.
 	- `setNavigateCallback(fn)`: Injected from React Router to perform updates.
 
+- Share links include renown ability levels: `a.renown.<ability>=<level>` and `b.renown.<ability>=<level>`. These are applied when loading from the URL.
 
 - When adding a feature:
 	- Put domain logic in the Service (and its submodules).
