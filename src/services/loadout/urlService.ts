@@ -59,6 +59,12 @@ class UrlService {
 		if (loadout.career) params.career = loadout.career;
 		if (loadout.level !== 40) params.level = String(loadout.level);
 		if (loadout.renownRank !== 80) params.renownRank = String(loadout.renownRank);
+		// Include renown abilities (only non-zero levels)
+		const ra = loadout.renownAbilities || {} as NonNullable<Loadout['renownAbilities']>;
+		Object.entries(ra).forEach(([key, lvl]) => {
+			const n = Math.max(0, Math.min(5, Math.trunc(Number(lvl) || 0)));
+			if (n > 0) params[`renown.${key}`] = String(n);
+		});
 		Object.entries(loadout.items).forEach(([slot, slotData]: [string, LoadoutItem]) => {
 			if (slotData?.item?.id) params[`item.${slot}`] = slotData.item.id;
 			if (slotData?.talismans) {
@@ -81,12 +87,17 @@ class UrlService {
 		career: Career | null;
 		level: number;
 		renownRank: number;
+		renownAbilities: NonNullable<Loadout['renownAbilities']>;
 		items: Record<string, { item: { id: string } | null; talismans: ({ id: string } | null)[] }>;
 	} | null {
 		const params = this.getSearchParams();
 		const hasAny = Array.from(params.keys()).some((k) => k.startsWith(`${prefix}.`));
 		if (!hasAny) return null;
-		const loadout = { career: null as Career | null, level: 40, renownRank: 80, items: {} as Record<string, { item: { id: string } | null; talismans: ({ id: string } | null)[] }> };
+		const loadout = { career: null as Career | null, level: 40, renownRank: 80, renownAbilities: {
+			might: 0, bladeMaster: 0, marksman: 0, impetus: 0, acumen: 0, resolve: 0, fortitude: 0, vigor: 0,
+			opportunist: 0, spiritualRefinement: 0, regeneration: 0,
+			reflexes: 0, defender: 0, deftDefender: 0, hardyConcession: 0, futileStrikes: 0, trivialBlows: 0,
+		} as NonNullable<Loadout['renownAbilities']>, items: {} as Record<string, { item: { id: string } | null; talismans: ({ id: string } | null)[] }> };
 		const careerParam = params.get(`${prefix}.career`);
 		if (careerParam) loadout.career = careerParam as Career;
 		const levelParam = params.get(`${prefix}.level`);
@@ -107,6 +118,11 @@ class UrlService {
 					if (!loadout.items[slot]) loadout.items[slot] = { item: null, talismans: [] };
 					loadout.items[slot].talismans[index] = { id: value };
 				}
+			} else if (key.startsWith(`${prefix}.renown.`)) {
+				const rKey = key.substring(`${prefix}.renown.`.length) as keyof NonNullable<Loadout['renownAbilities']>;
+				const n = Math.max(0, Math.min(5, Math.trunc(parseInt(value, 10) || 0)));
+				// Only set if value is > 0 to keep distinction; remaining will be zeroed during apply
+				if (n > 0) (loadout.renownAbilities as any)[rKey] = n;
 			}
 		}
 		return loadout;
@@ -153,6 +169,12 @@ class UrlService {
 				loadoutService.setLevelForLoadout(aId, a.level);
 				loadoutService.setRenownForLoadout(aId, a.renownRank);
 				loadoutService.setCareerForLoadout(aId, a.career);
+				// Apply renown abilities from URL (reset first to avoid residue)
+				loadoutService.resetRenownAbilitiesForLoadout(aId);
+				Object.entries(a.renownAbilities || {}).forEach(([rk, lvl]) => {
+					const n = Math.max(0, Math.min(5, Math.trunc(Number(lvl) || 0)));
+					if (n > 0) loadoutService.setRenownAbilityLevelForLoadout(aId, rk as keyof NonNullable<Loadout['renownAbilities']>, n);
+				});
 				const charAFlag = params.get('loadCharacterA');
 				if (charAFlag) loadoutService.setCharacterStatusForLoadout(aId, true, charAFlag);
 				const perSlotA = Object.entries(a.items).map(([slotKey, data]) => (async () => {
@@ -181,6 +203,12 @@ class UrlService {
 				loadoutService.setLevelForLoadout(bId, b.level);
 				loadoutService.setRenownForLoadout(bId, b.renownRank);
 				loadoutService.setCareerForLoadout(bId, b.career);
+				// Apply renown abilities from URL (reset first to avoid residue)
+				loadoutService.resetRenownAbilitiesForLoadout(bId);
+				Object.entries(b.renownAbilities || {}).forEach(([rk, lvl]) => {
+					const n = Math.max(0, Math.min(5, Math.trunc(Number(lvl) || 0)));
+					if (n > 0) loadoutService.setRenownAbilityLevelForLoadout(bId, rk as keyof NonNullable<Loadout['renownAbilities']>, n);
+				});
 				const charBFlag = params.get('loadCharacterB');
 				if (charBFlag) loadoutService.setCharacterStatusForLoadout(bId, true, charBFlag);
 				const perSlotB = Object.entries(b.items).map(([slotKey, data]) => (async () => {
