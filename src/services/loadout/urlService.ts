@@ -122,7 +122,7 @@ class UrlService {
 				const rKey = key.substring(`${prefix}.renown.`.length) as keyof NonNullable<Loadout['renownAbilities']>;
 				const n = Math.max(0, Math.min(5, Math.trunc(parseInt(value, 10) || 0)));
 				// Only set if value is > 0 to keep distinction; remaining will be zeroed during apply
-				if (n > 0) (loadout.renownAbilities as any)[rKey] = n;
+				if (n > 0) (loadout.renownAbilities as Record<string, number>)[rKey as string] = n;
 			}
 		}
 		return loadout;

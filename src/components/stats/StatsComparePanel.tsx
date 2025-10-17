@@ -171,8 +171,8 @@ export default function StatsComparePanel() {
                   const mult = (1 + itemPct / 100) * (1 + renownPct / 100);
                   return (mult - 1) * 100;
                 };
-                displayA = eff(statsA, contribA as any);
-                displayB = eff(statsB, contribB as any);
+                displayA = eff(statsA, contribA as { name: string; totalValue: number }[]);
+                displayB = eff(statsB, contribB as { name: string; totalValue: number }[]);
               }
 
               return (

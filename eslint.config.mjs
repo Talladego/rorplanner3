@@ -8,8 +8,26 @@ import tsparser from '@typescript-eslint/parser'
 
 export default [
   { ignores: ['dist'] },
+  // Node scripts (probes and tooling)
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ['scripts/**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.node,
+      parser: tsparser,
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      ...tseslint.configs.recommended.rules,
+      // Allow "any" in ad-hoc scripts to keep them flexible
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,

@@ -39,10 +39,10 @@ export default memo(function RenownPanel({ loadoutId }: { loadoutId: string | nu
   const ra = loadout?.renownAbilities || {};
   const rr = loadout?.renownRank || 0;
   const spent = useMemo(() => {
-    const ra = loadout?.renownAbilities || {} as NonNullable<typeof loadout>['renownAbilities'];
+    const ra = (loadout?.renownAbilities || {}) as NonNullable<typeof loadout>['renownAbilities'];
     let sum = 0;
     ABILITIES.forEach((ab) => {
-      const lvl = Math.max(0, Math.min(5, Math.trunc((ra as any)?.[ab.key] || 0)));
+      const lvl = Math.max(0, Math.min(5, Math.trunc((ra as Record<string, number>)[ab.key] || 0)));
       const table = ab.costTotals && ab.costTotals.length ? ab.costTotals : DEFAULT_COST_TOTALS;
       sum += table[Math.max(0, Math.min(table.length - 1, lvl))] || 0;
     });

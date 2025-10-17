@@ -26,7 +26,7 @@ function buildSummary(loadout: Loadout | null) {
   const roman = (lvl: number) => ['', 'I', 'II', 'III', 'IV', 'V'][Math.max(0, Math.min(5, Math.trunc(lvl)))] || '';
   const statTotalsDefault = [0, 4, 16, 38, 72, 120];
   const getTotal = (key: string, lvl: number): { text: string } | null => {
-    const def = RENOWN_ABILITIES.find(d => d.key === (key as any));
+    const def = RENOWN_ABILITIES.find(d => d.key === (key as string));
     if (!def) return null;
     const cap = def.capLevel ?? 5;
     const clamped = Math.max(0, Math.min(cap, Math.trunc(lvl)));
