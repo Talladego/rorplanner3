@@ -31,6 +31,18 @@ export default function StatRow({
 }: StatRowProps) {
   const label = formatSummaryStatKey(statKey);
 
+  // Use the same normalization logic as display for consistent sorting
+  const sortValue = (c: Contribution) => {
+    const raw = needsUnitNormalization && !c.percentage
+      ? normalizeStatDisplayValue(statKey, c.totalValue)
+      : c.totalValue;
+    const n = Number(raw);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const sortedA = [...contributionsA].sort((a, b) => sortValue(b) - sortValue(a));
+  const sortedB = [...contributionsB].sort((a, b) => sortValue(b) - sortValue(a));
+
   return (
     <div className="stats-row rounded px-1 -mx-1 hover:bg-gray-800/60 hover:ring-1 hover:ring-gray-700 transition-colors">
       <span className="text-xs">{label}:</span>
@@ -44,10 +56,10 @@ export default function StatRow({
               <div className="max-w-[26rem] whitespace-nowrap overflow-x-auto">
                 <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatSummaryStatKey(statKey)} — A Contribution</div>
                 <ul className="space-y-0.5">
-                  {contributionsA.length === 0 ? (
+                  {sortedA.length === 0 ? (
                     <li className="text-[11px] text-gray-400">No contributors</li>
                   ) : (
-                    contributionsA.map((c, idx) => (
+                    sortedA.map((c, idx) => (
                       <li key={idx} className="text-[11px] flex items-center justify-between gap-3">
                         <span>
                           <span style={{ color: c.color || undefined }}>{c.name}</span>
@@ -74,10 +86,10 @@ export default function StatRow({
               <div className="max-w-[26rem] whitespace-nowrap overflow-x-auto">
                 <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatSummaryStatKey(statKey)} — B Contribution</div>
                 <ul className="space-y-0.5">
-                  {contributionsB.length === 0 ? (
+                  {sortedB.length === 0 ? (
                     <li className="text-[11px] text-gray-400">No contributors</li>
                   ) : (
-                    contributionsB.map((c, idx) => (
+                    sortedB.map((c, idx) => (
                       <li key={idx} className="text-[11px] flex items-center justify-between gap-3">
                         <span>
                           <span style={{ color: c.color || undefined }}>{c.name}</span>

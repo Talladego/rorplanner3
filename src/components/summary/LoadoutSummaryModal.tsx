@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loadout, EquipSlot } from '../../types';
+import { RENOWN_ABILITIES } from '../../services/loadout/renownConfig';
 import { formatCareerName, formatSlotName } from '../../utils/formatters';
 
 interface LoadoutSummaryModalProps {
@@ -20,6 +21,70 @@ function buildSummary(loadout: Loadout | null) {
   out += line(`Career: ${loadout.career ? formatCareerName(loadout.career) : '—'}`);
   out += line(`Level: ${loadout.level}  RR: ${loadout.renownRank}`);
   out += line('');
+  // Renown (only show if anything allocated)
+  const ra = loadout.renownAbilities || {} as NonNullable<Loadout['renownAbilities']>;
+  const roman = (lvl: number) => ['', 'I', 'II', 'III', 'IV', 'V'][Math.max(0, Math.min(5, Math.trunc(lvl)))] || '';
+  const statTotalsDefault = [0, 4, 16, 38, 72, 120];
+  const getTotal = (key: string, lvl: number): { text: string } | null => {
+    const def = RENOWN_ABILITIES.find(d => d.key === (key as any));
+    if (!def) return null;
+    const cap = def.capLevel ?? 5;
+    const clamped = Math.max(0, Math.min(cap, Math.trunc(lvl)));
+    const totals = def.customTotals ?? (def.percent ? undefined : statTotalsDefault);
+    // Special rendering per ability where needed
+    if (def.key === 'deftDefender') {
+      const val = (totals || [0, 3, 7, 12, 18, 18])[clamped];
+      return { text: `${def.label} ${roman(clamped)} — Dodge +${val}%, Disrupt +${val}%` };
+    }
+    if (def.key === 'hardyConcession') {
+      const table = totals || [0, -1, -3, -6, -10, -15];
+      const v = table[clamped];
+      // v is negative; show with minus sign
+      return { text: `${def.label} ${roman(clamped)} — Incoming Damage ${v}%  |  Outgoing Damage ${v}%  |  Outgoing Healing ${v}%` };
+    }
+    const value = (totals || [0, 0, 0, 0, 0, 0])[clamped];
+    const unit = def.percent ? '%' : '';
+    if (def.key === 'opportunist') {
+      return { text: `${def.label} ${roman(clamped)} — Melee/Ranged/Magic Crit +${value}${unit}` };
+    }
+    if (def.key === 'spiritualRefinement') {
+      return { text: `${def.label} ${roman(clamped)} — Healing Crit +${value}${unit}` };
+    }
+    if (def.key === 'reflexes') {
+      return { text: `${def.label} ${roman(clamped)} — Parry +${value}${unit}` };
+    }
+    if (def.key === 'defender') {
+      return { text: `${def.label} ${roman(clamped)} — Block +${value}${unit}` };
+    }
+    if (def.key === 'regeneration') {
+      return { text: `${def.label} ${roman(clamped)} — Health Regen +${value}` };
+    }
+    if (def.key === 'futileStrikes') {
+      return { text: `${def.label} ${roman(clamped)} — Crit Hit Rate Reduction +${value}${unit}` };
+    }
+    if (def.key === 'trivialBlows') {
+      return { text: `${def.label} ${roman(clamped)} — Crit Damage Taken Reduction +${value}${unit}` };
+    }
+    // Default: basic stats
+    if (!def.percent) {
+      return { text: `${def.label} ${roman(clamped)} — ${def.stat} +${value}` };
+    }
+    return { text: `${def.label} ${roman(clamped)} — ${def.stat} +${value}${unit}` };
+  };
+
+  const renownLines: string[] = [];
+  Object.entries(ra).forEach(([key, lvl]) => {
+    const n = Number(lvl) || 0;
+    if (n > 0) {
+      const row = getTotal(key, n);
+      if (row) renownLines.push(`- ${row.text}`);
+    }
+  });
+  if (renownLines.length > 0) {
+    out += line('Renown:');
+    renownLines.forEach(l => { out += line(l); });
+    out += line('');
+  }
   out += line('Items:');
   // Requested order: Helm, Shoulders, Back, Chest, Gloves, Belt, Boots,
   // Main Hand, Off Hand, Ranged, Jewels, Pockets, Event

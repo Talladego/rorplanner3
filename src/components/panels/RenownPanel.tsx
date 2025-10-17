@@ -4,6 +4,7 @@ import { RENOWN_ABILITIES, DEFAULT_COST_TOTALS } from '../../services/loadout/re
 import { useLoadoutById } from '../../hooks/useLoadoutById';
 import { ItemRarity } from '../../types';
 import { getRarityColor } from '../../utils/rarityColors';
+import HoverTooltip from '../tooltip/HoverTooltip';
 
 const ABILITIES = RENOWN_ABILITIES;
 
@@ -13,7 +14,7 @@ const roman = ['', 'I', 'II', 'III', 'IV', 'V']; // map: 0->'', 1->I, 2->II, 3->
 function LevelSelect({ value, onChange, maxLevel, statName, percent, totalsOverride, visibleMaxLevel = 5 }: { value: number; onChange: (v: number) => void; maxLevel: number; statName: string; percent?: boolean; totalsOverride?: number[]; visibleMaxLevel?: number }) {
   return (
     <select
-      className="w-24 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      className="w-28 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       value={value}
       onChange={(e) => onChange(Number(e.currentTarget.value))}
     >
@@ -21,7 +22,8 @@ function LevelSelect({ value, onChange, maxLevel, statName, percent, totalsOverr
         const table = totalsOverride && totalsOverride.length ? totalsOverride : LEVEL_TOTALS;
         const total = table[Math.max(0, Math.min(5, lvl))];
         // Drop roman numerals in dropdown; keep concise value text
-        const label = lvl === 0 ? 'None' : `+${total}${percent ? '%' : ''} ${statName}`;
+        const sign = total > 0 ? '+' : '';
+        const label = lvl === 0 ? 'None' : `${sign}${total}${percent ? '%' : ''} ${statName}`;
         return (
           <option key={lvl} value={lvl} disabled={lvl > maxLevel}>
             {label}
@@ -49,6 +51,65 @@ export default memo(function RenownPanel({ loadoutId }: { loadoutId: string | nu
   const cap = Math.min(rr || 0, 80);
   const remaining = Math.max(0, cap - spent);
 
+  const renderAbilityTooltip = (ab: (typeof ABILITIES)[number], level: number) => {
+    const totals = (ab.customTotals && ab.customTotals.length ? ab.customTotals : LEVEL_TOTALS);
+    const lvl = Math.max(0, Math.min(5, Math.trunc(level)));
+    let total = totals[Math.max(0, Math.min(5, lvl))] ?? 0;
+    // Regeneration should match compare stats panel: display as Hit Points Every 4 Seconds
+    const isRegen = ab.key === 'regeneration';
+    if (isRegen) total = total * 4;
+    const unit = ab.percent ? '%' : '';
+    const titleColor = (lvl: number) => {
+      const rarityLevels: ItemRarity[] = [ItemRarity.UTILITY, ItemRarity.COMMON, ItemRarity.UNCOMMON, ItemRarity.RARE, ItemRarity.VERY_RARE, ItemRarity.MYTHIC];
+      const rarity = rarityLevels[Math.max(0, Math.min(5, lvl))] || ItemRarity.UTILITY;
+      return getRarityColor(rarity);
+    };
+    const lines: string[] = (() => {
+      if (lvl === 0) {
+        // Base line without numbers
+        switch (ab.key) {
+          case 'deftDefender': return ['Increases Dodge and Disrupt'];
+          case 'hardyConcession': return ['Reduces Incoming Damage', 'Reduces Outgoing Damage', 'Reduces Outgoing Healing'];
+          case 'futileStrikes': return ['Reduces chance to be critically hit'];
+          case 'trivialBlows': return ['Reduces Critical Damage Taken'];
+          default: {
+            if (isRegen) return ['Increases Hit Points Every 4 Seconds'];
+            return [`Increases ${ab.stat}`];
+          }
+        }
+      }
+      // Level-specific with numbers
+      switch (ab.key) {
+        case 'deftDefender':
+          return [`Increases Dodge by ${Math.abs(total)}${unit}`, `Increases Disrupt by ${Math.abs(total)}${unit}`];
+        case 'hardyConcession':
+          return [`Reduces Incoming Damage by ${Math.abs(total)}${unit}`, `Reduces Outgoing Damage by ${Math.abs(total)}${unit}`, `Reduces Outgoing Healing by ${Math.abs(total)}${unit}`];
+        case 'futileStrikes':
+          return [`Reduces chance to be critically hit by ${Math.abs(total)}${unit}`];
+        case 'trivialBlows':
+          return [`Reduces Critical Damage Taken by ${Math.abs(total)}${unit}`];
+        default:
+          return [isRegen
+            ? `Increases Hit Points Every 4 Seconds by ${Math.abs(total)}`
+            : `Increases ${ab.stat} by ${Math.abs(total)}${unit}`
+          ];
+      }
+    })();
+
+    return (
+      <div className="max-w-[360px]">
+        <div className="text-xs font-semibold" style={{ color: titleColor(lvl) }}>
+          {ab.label}{lvl > 0 ? ` ${roman[lvl]}` : ''}
+        </div>
+        <div className="mt-0.5 text-xs space-y-0.5">
+          {lines.map((ln, idx) => (
+            <div key={idx}>{ln}</div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="lg:col-span-2 panel-container relative">
       <div className="text-[11px] text-muted mb-1">Renown points: {spent}/{cap} (Remaining: {remaining})</div>
@@ -70,25 +131,27 @@ export default memo(function RenownPanel({ loadoutId }: { loadoutId: string | nu
           const color = getRarityColor(rarity);
           return (
           <div key={ab.key} className="flex items-center justify-between gap-1 p-0.5 rounded bg-gray-800/60">
-            <div className="flex items-center gap-1 min-w-0">
-              {/* Icon placeholder; will use ab.iconUrl when provided */}
-              <div className="w-5 h-5 rounded-sm bg-gray-700/70 overflow-hidden flex items-center justify-center flex-none">
-                {ab.iconUrl ? (
-                  <img src={ab.iconUrl} alt="" className="w-5 h-5 object-cover" draggable={false} />
-                ) : (
-                  <div className="w-4 h-4 bg-gray-600 rounded-sm" />
-                )}
+            <HoverTooltip content={renderAbilityTooltip(ab, clamped)}>
+              <div className="flex items-center gap-1 min-w-0">
+                {/* Icon placeholder; will use ab.iconUrl when provided */}
+                <div className="w-5 h-5 rounded-sm bg-gray-700/70 overflow-hidden flex items-center justify-center flex-none">
+                  {ab.iconUrl ? (
+                    <img src={ab.iconUrl} alt="" className="w-5 h-5 object-cover" draggable={false} />
+                  ) : (
+                    <div className="w-4 h-4 bg-gray-600 rounded-sm" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-medium leading-tight truncate" style={{ color }}>{name}</div>
+                </div>
               </div>
-              <div className="min-w-0">
-                <div className="text-xs font-medium leading-tight truncate" style={{ color }}>{name}</div>
-              </div>
-            </div>
+            </HoverTooltip>
             <LevelSelect
               value={currentLevel}
               maxLevel={maxLevel}
-              statName={ab.stat}
+              statName={ab.key === 'hardyConcession' ? 'Damage & Healing' : (ab.key === 'regeneration' ? 'Hit Points Every 4 Seconds' : ab.stat)}
               percent={!!ab.percent}
-              totalsOverride={ab.customTotals}
+              totalsOverride={ab.key === 'regeneration' && ab.customTotals ? ab.customTotals.map(v => v * 4) : ab.customTotals}
               visibleMaxLevel={ab.capLevel ?? 5}
               onChange={(lvl) => {
                 if (loadoutId) loadoutService.setRenownAbilityLevelForLoadout(loadoutId, ab.key, lvl);

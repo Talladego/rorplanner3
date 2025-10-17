@@ -95,9 +95,9 @@ export default function HoverTooltip({ content, children, placement = 'right', c
         <span
           ref={tooltipRef}
           className={
-            'fixed z-50 rounded-lg bg-gray-900 dark:bg-gray-800 p-2 text-xs leading-snug text-white shadow-lg border border-gray-700 dark:border-gray-600 pointer-events-none whitespace-nowrap'
+            'fixed z-50 rounded-lg bg-gray-900 dark:bg-gray-800 p-2 text-xs leading-snug text-white shadow-lg border border-gray-700 dark:border-gray-600 pointer-events-none whitespace-normal'
           }
-          style={{ left: pos.x, top: pos.y }}
+          style={{ left: pos.x, top: pos.y, maxWidth: 360 }}
           role="tooltip"
         >
           {content}

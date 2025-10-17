@@ -656,6 +656,10 @@ export const loadoutService = {
       await this.setCareer(character.career);
       // Level and renown already set in createLoadout
 
+  // Clear any existing renown allocation explicitly for imported characters
+  // (defensive: new loadouts start at 0, but keep this to satisfy UX expectations)
+  this.resetRenownAbilitiesForLoadout(loadoutId);
+
       // Set all the items
       for (const [slot, loadoutItem] of Object.entries(items)) {
         // Apply item first

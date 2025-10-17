@@ -119,6 +119,8 @@ export default function DualEquipmentLayout() {
     }
   };
 
+  // Renown-only copy removed; copy buttons now always perform full copy (equipment + renown)
+
   const isLoadoutEmpty = (lo: Loadout | null): boolean => {
     if (!lo) return true;
     // Consider empty if no items are equipped (all items null) and no talismans present
@@ -135,8 +137,11 @@ export default function DualEquipmentLayout() {
     const otherEmpty = isLoadoutEmpty(other);
     const selfEmpty = isLoadoutEmpty(self);
     const renownVisible = label === 'A' ? showRenownA : showRenownB;
-    const hasCareer = !!self?.career;
-    const renownEmpty = !self?.renownAbilities || Object.values(self.renownAbilities).every((lvl) => !lvl);
+  const hasCareer = !!self?.career;
+  const renownEmpty = !self?.renownAbilities || Object.values(self.renownAbilities).every((lvl) => !lvl);
+  const nothingToSummarize = selfEmpty && renownEmpty;
+  const otherRenownEmpty = !other?.renownAbilities || Object.values(other.renownAbilities).every((lvl) => !lvl);
+  const nothingToCopy = otherEmpty && otherRenownEmpty;
     return (
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
@@ -152,30 +157,28 @@ export default function DualEquipmentLayout() {
           >
             {label === 'A' ? (showRenownA ? 'Equipment' : 'Renown') : (showRenownB ? 'Equipment' : 'Renown')}
           </button>
-          {/* Summary next; disabled on Renown panel or empty loadout */}
+          {/* Summary next; disabled only if neither equipment nor renown present */}
           <button
             onClick={() => setSummaryOpenFor(label)}
-            className={`btn btn-primary btn-sm whitespace-nowrap ${(renownVisible || selfEmpty) ? 'opacity-50 cursor-not-allowed' : ''}`}
-            disabled={renownVisible || selfEmpty}
-            title={renownVisible ? 'Summary unavailable while editing Renown' : (selfEmpty ? 'Summary unavailable for empty loadout' : undefined)}
+            className={`btn btn-primary btn-sm whitespace-nowrap ${nothingToSummarize ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={nothingToSummarize}
+            title={nothingToSummarize ? 'Nothing to summarize' : undefined}
           >
             Summary
           </button>
           {label === 'A' ? (
             <button
               onClick={() => copySide('B','A')}
-              className={`btn btn-primary btn-sm whitespace-nowrap ${(renownVisible || otherEmpty) ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={renownVisible || otherEmpty}
-              title={renownVisible ? 'Copy unavailable while editing Renown' : undefined}
+              className={`btn btn-primary btn-sm whitespace-nowrap ${nothingToCopy ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={nothingToCopy}
             >
               Copy from B
             </button>
           ) : (
             <button
               onClick={() => copySide('A','B')}
-              className={`btn btn-primary btn-sm whitespace-nowrap ${(renownVisible || otherEmpty) ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={renownVisible || otherEmpty}
-              title={renownVisible ? 'Copy unavailable while editing Renown' : undefined}
+              className={`btn btn-primary btn-sm whitespace-nowrap ${nothingToCopy ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={nothingToCopy}
             >
               Copy from A
             </button>
