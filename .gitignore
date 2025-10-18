@@ -103,3 +103,6 @@ temp/
 
 # TypeScript
 *.tsbuildinfo
+
+# Local scripts and probes (not part of app code)
+/scripts/
