@@ -45,6 +45,18 @@ export default function DualEquipmentLayout() {
       ) {
         setSideA(loadoutService.getLoadoutForSide('A'));
         setSideB(loadoutService.getLoadoutForSide('B'));
+        // If a side was reset while showing Renown, return to Equipment view for that side
+        if (ev.type === 'LOADOUT_RESET') {
+          try {
+            const aId = loadoutService.getSideLoadoutId('A');
+            const bId = loadoutService.getSideLoadoutId('B');
+            const resetId = ev.payload && typeof ev.payload === 'object' ? (ev.payload as { loadoutId?: string }).loadoutId : undefined;
+            if (resetId && aId === resetId) setShowRenownA(false);
+            if (resetId && bId === resetId) setShowRenownB(false);
+          } catch {
+            // noop: best-effort UI reset
+          }
+        }
       }
     });
     return unsub;
@@ -143,11 +155,11 @@ export default function DualEquipmentLayout() {
   const otherRenownEmpty = !other?.renownAbilities || Object.values(other.renownAbilities).every((lvl) => !lvl);
   const nothingToCopy = otherEmpty && otherRenownEmpty;
     return (
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${label === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{label}</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap min-w-0">
           {/* Renown toggler first; disabled if no career selected */}
           <button
             onClick={() => (label === 'A' ? setShowRenownA(v => !v) : setShowRenownB(v => !v))}
@@ -211,10 +223,10 @@ export default function DualEquipmentLayout() {
   };
 
   return (
-    <div className="grid grid-cols-3 gap-8">
-      {/* Left column: Equipment A or Renown */}
-      <div className="xl:col-span-1">
-  <div className="panel-container panel-border-green-600">
+    <div className="grid grid-cols-3 gap-4">
+      {/* Left panel: Equipment A or Renown */}
+      <div className="col-span-1">
+        <div className="panel-container panel-border-green-600 h-full">
           {sideHeader('A')}
           {showRenownA ? (
             <RenownPanel loadoutId={sideA?.id || null} />
@@ -224,14 +236,16 @@ export default function DualEquipmentLayout() {
         </div>
       </div>
 
-      {/* Middle column: Stats compare */}
-      <div className="xl:col-span-1">
-        <StatsComparePanel />
+      {/* Middle panel: Stats compare */}
+      <div className="col-span-1">
+        <div className="panel-container panel-border-blue-500 h-full">
+          <StatsComparePanel />
+        </div>
       </div>
 
-      {/* Right column: Equipment B or Renown */}
-      <div className="xl:col-span-1">
-  <div className="panel-container panel-border-red-600">
+      {/* Right panel: Equipment B or Renown */}
+      <div className="col-span-1">
+        <div className="panel-container panel-border-red-600 h-full">
           {sideHeader('B')}
           {showRenownB ? (
             <RenownPanel loadoutId={sideB?.id || null} />

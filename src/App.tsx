@@ -4,6 +4,7 @@ import { loadoutService } from './services/loadout/loadoutService';
 import { urlService } from './services/loadout/urlService';
 import DualToolbar from './components/toolbar/DualToolbar';
 import DualEquipmentLayout from './components/panels/DualEquipmentLayout';
+import ScaleToFit from './components/layout/ScaleToFit';
 import ApolloProviderWrapper from './providers/ApolloProvider';
 import ErrorBoundary from './providers/ErrorBoundary';
 import { preloadCareerIcons } from './constants/careerIcons';
@@ -14,6 +15,8 @@ function App() {
   const location = useLocation();
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [characterLoaded, setCharacterLoaded] = useState<boolean>(false);
+  // Feature flag: allow downscaling on narrow windows
+  const enableScaleToFit = true;
 
   // Set up URL service navigation callback
   useEffect(() => {
@@ -104,9 +107,19 @@ function App() {
           <header className="text-center mb-8">
             <h1 className="text-4xl font-bold text-primary">RorPlanner</h1>
           </header>
-          <div className="max-w-6xl mx-auto">
-            <DualToolbar />
-            <DualEquipmentLayout />
+          <div className="mx-auto w-full">
+            {/* Feature flag: set enableScaleToFit to true to allow downscaling on narrow windows */}
+            {enableScaleToFit ? (
+              <ScaleToFit designWidth={1408} minScale={0.886}>
+                <DualToolbar />
+                <DualEquipmentLayout />
+              </ScaleToFit>
+            ) : (
+              <>
+                <DualToolbar />
+                <DualEquipmentLayout />
+              </>
+            )}
           </div>
         </div>
       </ApolloProviderWrapper>

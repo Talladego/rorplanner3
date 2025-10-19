@@ -105,8 +105,9 @@ export default function StatsComparePanel() {
   const magicRows = makeRows(rowDefs.magic);
   const healingRows = makeRows(rowDefs.healing);
   const otherRows = makeRows(rowDefs.other);
-  // Flattened offense rows in desired order: common, then melee, ranged, magic
-  const offenseFlatRows = [...offenseRows, ...meleeRows, ...rangedRows, ...magicRows];
+  // Offense groups: common, then melee, ranged, magic
+  const offenseGroups: Row[][] = [offenseRows, meleeRows, rangedRows, magicRows];
+  const offenseAny = offenseGroups.some(g => g.length > 0);
   // Determine if any side has a selected career
   const loadoutA = aId ? loadoutService.getLoadoutForSide('A') : null;
   const loadoutB = bId ? loadoutService.getLoadoutForSide('B') : null;
@@ -128,6 +129,9 @@ export default function StatsComparePanel() {
           ) : (
             <h4 className="stats-subsection-title">{title}</h4>
           )
+        )}
+        {showHeader && (
+          <div className="my-1 h-px bg-gray-700 opacity-60" />
         )}
         <div className="space-y-0.5">
           {rows.length > 0 ? (
@@ -171,8 +175,8 @@ export default function StatsComparePanel() {
                   const mult = (1 + itemPct / 100) * (1 + renownPct / 100);
                   return (mult - 1) * 100;
                 };
-                displayA = eff(statsA, contribA as any);
-                displayB = eff(statsB, contribB as any);
+                displayA = eff(statsA, contribA as { name: string; totalValue: number }[]);
+                displayB = eff(statsB, contribB as { name: string; totalValue: number }[]);
               }
 
               return (
@@ -274,12 +278,20 @@ export default function StatsComparePanel() {
         </div>
       )}
 
-      {/* Offense (flat list, no subsections) */}
-      {offenseFlatRows.length > 0 && (
+      {/* Offense with thin separators between groups (common, melee, ranged, magic) */}
+      {offenseAny && (
         <div className="stats-section">
           <h3 className="stats-section-title">Offense</h3>
+          <div className="my-1 h-px bg-gray-700 opacity-60" />
           <div className="mt-1">
-            {renderSection('', offenseFlatRows, false, 'subsection', false)}
+            {offenseGroups.filter(g => g.length > 0).map((group, idx, arr) => (
+              <div key={idx}>
+                {renderSection('', group, false, 'subsection', false)}
+                {idx < arr.length - 1 && (
+                  <div className="my-1 h-px bg-gray-700 opacity-60" />
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Career } from '../../types';
 import { formatCareerName } from '../../utils/formatters';
 import { getCareerIconUrl } from '../../constants/careerIcons';
@@ -17,6 +18,7 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number; width: number } | null>(null);
 
   const careers = useMemo(() => Object.values(Career), []);
 
@@ -41,6 +43,12 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
     // set activeIndex to selected item
     const idx = value ? careers.indexOf(value as Career) : -1;
     setActiveIndex(idx);
+    // compute initial menu position relative to viewport
+    const btn = buttonRef.current;
+    if (btn) {
+      const r = btn.getBoundingClientRect();
+      setMenuPos({ left: r.left, top: r.bottom, width: r.width });
+    }
   };
 
   const selectIndex = (idx: number) => {
@@ -72,8 +80,26 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
     }
   };
 
+  // Keep menu position in sync on scroll/resize while open
+  useEffect(() => {
+    if (!open) return;
+    const updatePos = () => {
+      const btn = buttonRef.current;
+      if (btn) {
+        const r = btn.getBoundingClientRect();
+        setMenuPos({ left: r.left, top: r.bottom, width: r.width });
+      }
+    };
+    window.addEventListener('scroll', updatePos, true);
+    window.addEventListener('resize', updatePos);
+    return () => {
+      window.removeEventListener('scroll', updatePos, true);
+      window.removeEventListener('resize', updatePos);
+    };
+  }, [open]);
+
   return (
-    <div className="relative">
+    <div className="relative isolate">
       <button
         ref={buttonRef}
         type="button"
@@ -96,8 +122,13 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
         </svg>
       </button>
 
-      {open && (
-        <div ref={listRef} className="absolute z-50 mt-1 w-full rounded-md border border-gray-600 bg-gray-800 text-white shadow-lg max-h-60 overflow-auto" role="listbox">
+      {open && menuPos && createPortal(
+        <div
+          ref={listRef}
+          role="listbox"
+          className="z-[10000] rounded-md border border-gray-600 bg-gray-800 text-white shadow-lg max-h-60 overflow-auto"
+          style={{ position: 'fixed', left: menuPos.left, top: menuPos.top, width: menuPos.width, marginTop: 4 }}
+        >
           {careers.map((career, idx) => {
             const label = formatCareerName(career);
             const selected = value === career;
@@ -120,7 +151,8 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
           {!careers.length && (
             <div className={`${itemPadding} text-secondary`}>No careers</div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

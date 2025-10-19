@@ -141,23 +141,31 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
           </h2>
           <div className="flex items-center gap-3">
             {!isTalismanMode && (
-              <label className="inline-flex items-center gap-2 text-xs select-none text-gray-900 dark:text-gray-100">
-                <input
-                  type="checkbox"
-                  className="form-checkbox h-3 w-3"
-                  checked={enableCareerFilter}
-                  onChange={(e) => {
-                    const val = e.currentTarget.checked;
-                    setEnableCareerFilter(val);
-                    setCurrentPage(1);
-                    setPageHistory([]);
-                    setHookCurrentPage(1);
-                    setHookPageHistory([]);
-                    refetch(nameFilter, statsFilter, rarityFilter, val);
-                  }}
-                />
-                Enable Career Filter
-              </label>
+              <div className="inline-flex items-center gap-2 text-xs select-none text-gray-900 dark:text-gray-100">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="form-checkbox h-3 w-3"
+                    checked={enableCareerFilter}
+                    onChange={(e) => {
+                      const val = e.currentTarget.checked;
+                      setEnableCareerFilter(val);
+                      setCurrentPage(1);
+                      setPageHistory([]);
+                      setHookCurrentPage(1);
+                      setHookPageHistory([]);
+                      refetch(nameFilter, statsFilter, rarityFilter, val);
+                    }}
+                  />
+                  Enable Career Filter
+                </label>
+                <span
+                  className="cursor-help text-muted"
+                  title={`Filters results to items usable by the selected career. Turn OFF to find server-side anomalies or items that should be usable but are hidden by the API. Tip: Use OFF when searching by exact name to verify availability.`}
+                >
+                  ⓘ
+                </span>
+              </div>
             )}
             <button 
               onClick={onClose} 

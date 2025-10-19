@@ -2,7 +2,7 @@
 
 import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 import client from '../../lib/apollo-client';
-// Note: GraphQL operations come from centralized documents in ./queries
+// GraphQL operations come from centralized documents in ./queries
 import { EquipSlot, Item, Career, LoadoutItem, Stat, ItemRarity, LoadoutSide } from '../../types';
 import { loadoutEventEmitter } from './loadoutEventEmitter';
 import { subscribeToEvents as subscribeToEventsHelper, subscribeToAllEvents as subscribeToAllEventsHelper } from './events';
@@ -12,6 +12,8 @@ import { LoadoutEvents } from '../../types/events';
 import { SEARCH_CHARACTERS, GET_CHARACTER } from './queries';
 import { getItemsForSlotApi, getTalismansForItemLevelApi, getItemWithDetailsApi } from './api';
 import { computeStatsForLoadout as computeStatsForLoadoutExternal, getStatContributionsForLoadout as getStatContributionsForLoadoutExternal } from './stats';
+import { isTwoHandedWeapon } from '../../utils/items';
+import { getOffhandBlockReason, STAFF_ONLY_CAREERS, TWO_H_ONLY_CAREERS } from '../../constants/careerWeaponRules';
 import { sanitizeHasStats, getAllowedFilterStats } from './filters';
 import * as selectors from './selectors';
 import {
@@ -229,6 +231,37 @@ export const loadoutService = {
       }
     }
 
+    // Enforce two-handed vs off-hand exclusivity on current loadout
+    const beforeLoadout = loadoutStoreAdapter.getCurrentLoadout();
+    if (beforeLoadout) {
+      const main = beforeLoadout.items[EquipSlot.MAIN_HAND]?.item || null;
+      const off = beforeLoadout.items[EquipSlot.OFF_HAND]?.item || null;
+      const career = beforeLoadout.career || null;
+      if (slot === EquipSlot.MAIN_HAND && item && isTwoHandedWeapon(item) && off) {
+        throw new Error('Cannot equip a two-handed weapon while an off-hand is equipped');
+      }
+      if (slot === EquipSlot.OFF_HAND && item && main && isTwoHandedWeapon(main)) {
+        throw new Error('Cannot equip an off-hand while a two-handed weapon is equipped in the main hand');
+      }
+      if (slot === EquipSlot.OFF_HAND && item && career) {
+        const reason = getOffhandBlockReason(career, item);
+        if (reason) throw new Error(reason);
+      }
+      if (slot === EquipSlot.MAIN_HAND && item && career) {
+        // Staff-only careers: must equip STAFF in main hand; no off-hand permitted
+        if (STAFF_ONLY_CAREERS.has(career as any)) {
+          if (item.type !== 'STAFF') {
+            throw new Error('This career must equip a two-handed staff in the main hand');
+          }
+        }
+        if (TWO_H_ONLY_CAREERS.has(career as any)) {
+          if (!isTwoHandedWeapon(item)) {
+            throw new Error('This career must equip a two-handed weapon in the main hand');
+          }
+        }
+      }
+    }
+
     updateItemMutation(slot, item);
 
     // Mark loadout as no longer from character if it was
@@ -250,6 +283,36 @@ export const loadoutService = {
       const validation = this.canEquipUniqueItem(item, loadoutId);
       if (!validation.canEquip) {
         throw new Error(validation.reason || 'Cannot equip this unique item');
+      }
+    }
+
+    // Enforce two-handed vs off-hand exclusivity on the specified loadout
+    const target = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
+    if (target) {
+      const main = target.items[EquipSlot.MAIN_HAND]?.item || null;
+      const off = target.items[EquipSlot.OFF_HAND]?.item || null;
+      const career = target.career || null;
+      if (slot === EquipSlot.MAIN_HAND && item && isTwoHandedWeapon(item) && off) {
+        throw new Error('Cannot equip a two-handed weapon while an off-hand is equipped');
+      }
+      if (slot === EquipSlot.OFF_HAND && item && main && isTwoHandedWeapon(main)) {
+        throw new Error('Cannot equip an off-hand while a two-handed weapon is equipped in the main hand');
+      }
+      if (slot === EquipSlot.OFF_HAND && item && career) {
+        const reason = getOffhandBlockReason(career, item);
+        if (reason) throw new Error(reason);
+      }
+      if (slot === EquipSlot.MAIN_HAND && item && career) {
+        if (STAFF_ONLY_CAREERS.has(career as any)) {
+          if (item.type !== 'STAFF') {
+            throw new Error('This career must equip a two-handed staff in the main hand');
+          }
+        }
+        if (TWO_H_ONLY_CAREERS.has(career as any)) {
+          if (!isTwoHandedWeapon(item)) {
+            throw new Error('This career must equip a two-handed weapon in the main hand');
+          }
+        }
       }
     }
 
@@ -594,6 +657,8 @@ export const loadoutService = {
       // Safely iterate over character items if they exist
       if (character.items && Array.isArray(character.items)) {
         character.items.forEach(({ equipSlot, item, talismans }: any) => {
+          // Skip any trophy slots entirely
+          if (typeof equipSlot === 'string' && equipSlot.startsWith('TROPHY')) return;
           if (item) {
             items[equipSlot as EquipSlot] = {
               item: {
@@ -660,8 +725,9 @@ export const loadoutService = {
   // (defensive: new loadouts start at 0, but keep this to satisfy UX expectations)
   this.resetRenownAbilitiesForLoadout(loadoutId);
 
-      // Set all the items
+      // Set all the items (skip trophy slots)
       for (const [slot, loadoutItem] of Object.entries(items)) {
+        if (slot.startsWith('TROPHY')) continue;
         // Apply item first
         await this.updateItem(slot as EquipSlot, loadoutItem.item);
         // Then talismans for that slot (if any)

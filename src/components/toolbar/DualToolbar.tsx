@@ -124,7 +124,7 @@ function SideToolbar({ side }: SideToolbarProps) {
         {/* Group 1: Career + Lvl + RR + Reset */}
         <div className="col-span-7 h-full">
           <div className="field-group h-full">
-            <div className="grid grid-cols-12 gap-x-1 items-end">
+            <div className="grid grid-cols-12 gap-x-1 gap-y-1 items-end">
               <div className="col-span-6">
                 <label className="form-label text-xs">Career</label>
                 <div className="mt-0.5">
@@ -169,7 +169,7 @@ function SideToolbar({ side }: SideToolbarProps) {
         {/* Group 2: Character + Load (slightly narrower) */}
         <div className="col-span-5 h-full">
           <div className="field-group h-full">
-            <div className="grid grid-cols-12 gap-x-1 items-end">
+            <div className="grid grid-cols-12 gap-x-1 gap-y-1 items-end">
               <div className="col-span-7">
                 <label className="form-label text-xs">Character</label>
                 <input

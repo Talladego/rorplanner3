@@ -134,6 +134,7 @@ export const GET_POCKET_ITEMS = gql`
       order: [
         { rarity: DESC },
         { itemLevel: DESC },
+        { dps: DESC },
         { name: ASC }
       ]
     ) {
@@ -217,6 +218,7 @@ export const GET_TALISMANS = gql`
       order: [
         { rarity: DESC },
         { itemLevel: DESC },
+        { dps: DESC },
         { name: ASC }
       ]
     ) {
