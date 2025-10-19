@@ -139,10 +139,12 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
     EquipSlot.BOOTS, EquipSlot.POCKET2, null,
   ];
 
+  const wrapperClass = hideHeading ? 'relative' : 'lg:col-span-2 panel-container relative';
+
   return (
-    <div className="lg:col-span-2 panel-container relative">
+    <div className={wrapperClass}>
       {!hideHeading && <h2 className="panel-heading">Equipment</h2>}
-  <div className={`grid grid-cols-3 ${compact ? 'gap-2' : 'gap-3'}`}>
+  <div className={`grid grid-cols-3 ${compact ? 'gap-1' : 'gap-2'}`}>
         {slotOrder.map((slot, index) => {
           if (slot === null) {
             return <div key={`empty-${index}`} className="invisible"></div>;
@@ -152,7 +154,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
           return (
             <div key={slot} className="relative" data-side={side || ''} data-slot={slot}>
               <div className={`equipment-slot ${compact ? 'p-1' : ''}`}>
-                <div className={iconOnly ? 'flex items-start gap-1' : 'flex items-start gap-2'}>
+                <div className={(iconOnly ? 'flex items-start gap-1' : 'flex items-start gap-2')}>
                   {slotData.item ? (
                     <Tooltip item={{ ...slotData.item, talismans: slotData.talismans }} loadoutId={effectiveLoadout.id} side={side} slot={slot}>
                       <div
@@ -167,10 +169,10 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                           slotData.item.rarity === 'RARE' ? 'item-color-rare' :
                           slotData.item.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
                           slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common'}`}>
-                          <img 
-                            src={slotData.item.iconUrl} 
-                            alt={slotData.item.name} 
-                            className={`w-full h-full object-contain rounded ${!isItemEligible(slotData.item) ? 'grayscale' : ''}`} 
+                          <img
+                            src={slotData.item.iconUrl}
+                            alt={slotData.item.name}
+                            className={`w-full h-full object-contain rounded ${!isItemEligible(slotData.item) ? 'grayscale' : ''}`}
                           />
                         </div>
                       </div>
@@ -195,7 +197,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                         const isTalismanEligible = slotData.talismans[i] ? isItemEligible(slotData.talismans[i]) : true;
                         const isSlotGreyedOut = !isParentItemEligible || (slotData.talismans[i] && !isTalismanEligible);
                         return (
-                          <div key={i} data-talisman-index={i} className={`talisman-slot ${compact ? 'w-5 h-5' : ''} ${isSlotGreyedOut ? '' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? ((slotData.talismans[i]!.itemSet ? 'item-color-set' :
+                          <div key={i} data-talisman-index={i} className={`talisman-slot ${isSlotGreyedOut ? '' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? ((slotData.talismans[i]!.itemSet ? 'item-color-set' :
                             slotData.talismans[i]!.rarity === 'MYTHIC' ? 'item-color-mythic' :
                             slotData.talismans[i]!.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
                             slotData.talismans[i]!.rarity === 'RARE' ? 'item-color-rare' :
@@ -214,13 +216,13 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                               </Tooltip>
                             ) : (
                               <HoverTooltip content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
-                                <img
-                                  src="https://armory.returnofreckoning.com/icon/1"
-                                  alt="Empty talisman slot"
-                                  className="w-full h-full object-contain rounded cursor-pointer opacity-50"
-                                  onClick={() => handleTalismanClick(slot, i)}
-                                  onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
-                                />
+                                <div className="icon-frame-empty w-full h-full rounded cursor-pointer" onClick={() => handleTalismanClick(slot, i)} onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}>
+                                  <img
+                                    src={DEFAULT_SLOT_ICONS[EquipSlot.JEWELLERY1]}
+                                    alt="Empty talisman slot"
+                                    className="w-full h-full object-contain rounded opacity-50"
+                                  />
+                                </div>
                               </HoverTooltip>
                             )}
                           </div>
@@ -251,7 +253,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                             const isSlotGreyedOut = !isParentItemEligible || (slotData.talismans[i] && !isTalismanEligible);
                             
                             return (
-                              <div key={i} data-talisman-index={i} className={`talisman-slot ${compact ? 'w-5 h-5' : ''} ${isSlotGreyedOut ? '' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? ((slotData.talismans[i]!.itemSet ? 'item-color-set' :
+                              <div key={i} data-talisman-index={i} className={`talisman-slot ${isSlotGreyedOut ? '' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? ((slotData.talismans[i]!.itemSet ? 'item-color-set' :
                                 slotData.talismans[i]!.rarity === 'MYTHIC' ? 'item-color-mythic' :
                                 slotData.talismans[i]!.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
                                 slotData.talismans[i]!.rarity === 'RARE' ? 'item-color-rare' :
@@ -270,13 +272,13 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                                   </Tooltip>
                                 ) : (
                                   <HoverTooltip content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
-                                    <img
-                                      src="https://armory.returnofreckoning.com/icon/1"
-                                      alt="Empty talisman slot"
-                                      className="w-full h-full object-contain rounded cursor-pointer opacity-50"
-                                      onClick={() => handleTalismanClick(slot, i)}
-                                      onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
-                                    />
+                                    <div className="icon-frame-empty w-full h-full rounded cursor-pointer" onClick={() => handleTalismanClick(slot, i)} onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}>
+                                      <img
+                                        src={DEFAULT_SLOT_ICONS[EquipSlot.JEWELLERY1]}
+                                        alt="Empty talisman slot"
+                                        className="w-full h-full object-contain rounded opacity-50"
+                                      />
+                                    </div>
                                   </HoverTooltip>
                                 )}
                               </div>
@@ -291,7 +293,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
             </div>
           );
         })}
-      </div>
+        </div>
       
       <Suspense fallback={null}>
         <EquipmentSelector

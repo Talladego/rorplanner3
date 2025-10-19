@@ -1,17 +1,20 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import type { MouseEventHandler } from 'react';
 import { createPortal } from 'react-dom';
+import { useScale } from '../layout/ScaleContext';
 
 type HoverTooltipProps = {
   content: ReactNode;
   children: ReactNode;
   placement?: 'left' | 'right' | 'bottom';
   className?: string;
+  fixedWidth?: number; // optional: force a fixed width for normalization
 };
 
 // Lightweight hover tooltip suitable for inline rows (no portals)
 // Positions below the trigger; hides on scroll via CSS overflow of parent containers
-export default function HoverTooltip({ content, children, placement = 'right', className }: HoverTooltipProps) {
+export default function HoverTooltip({ content, children, placement = 'right', className, fixedWidth }: HoverTooltipProps) {
+  const uiScale = useScale();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const tooltipRef = useRef<HTMLSpanElement | null>(null);
@@ -21,7 +24,7 @@ export default function HoverTooltip({ content, children, placement = 'right', c
     const margin = 10;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const estimatedWidth = 320;
+  const estimatedWidth = fixedWidth ?? 320;
     const estimatedHeight = 60; // these tooltips are short, no wrap
 
     let x = rect.right + margin;
@@ -129,7 +132,7 @@ export default function HoverTooltip({ content, children, placement = 'right', c
         <span
           ref={tooltipRef}
           className={'fixed z-[11000] rounded-lg bg-gray-900 dark:bg-gray-800 p-2 text-xs leading-snug text-white shadow-lg border border-gray-700 dark:border-gray-600 pointer-events-none whitespace-normal'}
-          style={{ left: pos.x, top: pos.y, maxWidth: 360 }}
+          style={{ left: pos.x, top: pos.y, width: fixedWidth ?? undefined, maxWidth: fixedWidth ?? 360, transform: `scale(${uiScale})`, transformOrigin: 'top left' }}
           role="tooltip"
         >
           {content}

@@ -5,8 +5,8 @@ A modern React application for planning character equipment and renown loadouts 
 ## Features
 
 - ⚔️ Equipment planning for all character classes
-- �️ Renown planner with icons, tooltips, capped levels, and point budget
-- �🔁 Dual A/B loadout compare with side assignment
+- ⭐ Renown planner with icons, tooltips, capped levels, and point budget
+- 🔁 Dual A/B loadout compare with side assignment
 - 🎨 Dark/Light theme support
 - 🔍 Interactive equipment selection
 - 📊 Real-time stat calculations (items, talismans, set bonuses, renown, derived)
@@ -179,6 +179,18 @@ This keeps UI reactive without coupling components to the store internals.
 - `src/store/loadout/loadoutStoreAdapter.ts`: Adapter the Service uses to read/write store state.
 - `src/lib/apollo-client.ts`: Apollo client setup for GraphQL.
 
+### UI tiering (design system)
+
+- Tier 0: App background, black (`--background`)
+- Tier 1: Panels with colored outer frame, dark panel background (`.panel-container` + `.panel-border-*`)
+- Tier 2: Dashed inner containers with medium grey background (`.field-group`)
+- Tier 3: Detail elements with solid borders and dark grey background (`.equipment-slot`, `.talisman-slot`, `.icon-frame`)
+
+Conventions:
+- Equipment selector modal is a Tier 1 panel with blue border containing a Tier 2 group; item rows are Tier 3.
+- Equipment side panels (A/B) are Tier 1; inner content is a single Tier 2 container; slots and renown rows are Tier 3.
+- Compare Stats panel: Tier 1 (blue) with a single Tier 2 container; no inner Tier 1.
+
 ### Boundary rules (do/don't)
 
 - Components:
@@ -218,3 +230,33 @@ This keeps UI reactive without coupling components to the store internals.
 	- Keep the Store focused on state shape and pure calculations only.
 	- Subscribe to changes via Service; never from components to the store directly.
 	- Emit/handle typed events defined in `src/types/events.ts`.
+
+## Tablet roadmap (future work)
+
+Target: optional tablet-friendly mode for iPad/Android tablets; desktop remains the primary target. No current commitment; captured here for future work.
+
+- Viewport and breakpoints
+	- Add tablet breakpoints around 1024–1280px. Consider enabling `ScaleToFit` only on tablet widths to avoid layout reflow.
+	- Maintain 1440 desktop canvas; tablet uses single-column or stacked sections as needed.
+
+- Layout adaptations
+	- Dual compare (A/B): switch to tabs on tablet (A | B) instead of side-by-side panels.
+	- Equipment grid: single column with sticky header; Tier 2 containers continue to flex-fill vertically.
+	- Stats panel: collapsible sections to reduce scroll; keep the outer Tier 1 + inner Tier 2 contract.
+
+- Touch ergonomics
+	- Minimum touch target 44px; increase spacing for filters, pagination, and A/B toggles.
+	- Replace hover-only tooltips with tap-hold or inline expandable info blocks using the existing `HoverTooltip` API with a touch trigger.
+
+- Modals and overlays
+	- Equipment selector becomes a full-screen sheet on tablet; avoid viewport overflow. Keep Tier 1 (blue) wrapper with a single Tier 2 content group.
+	- Ensure portals for tooltips/menus use fixed positioning and avoid scroll-jank.
+
+- Performance considerations
+	- Defer preloading of large icon sets on cellular. Lazy-load heavy panels; memoize list rows (virtualization optional if needed).
+	- Ensure GraphQL requests batch and cache effectively on slower networks.
+
+- QA matrix
+	- iPad (10/11/12.9) Safari/Chrome, Android tablets (Chrome). Verify orientation changes, fixed headers, and overlay stacking.
+
+This roadmap is documentation-only; no code changes are included at this time.

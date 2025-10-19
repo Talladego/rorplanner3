@@ -1,10 +1,19 @@
 @import "tailwindcss";
 
 :root {
+  /* App background (black) */
   --background: #0a0a0a;
   --foreground: #f8f9fa;
-  --surface: #1a1a1a;
-  --surface-hover: #2a2a2a;
+  /* Triad of greys: panel (dark), frame (medium), element (light) */
+  --panel: #1a1a1a;        /* Dark grey panels */
+  --panel-hover: #222222;
+  --frame: #2a2a2a;        /* Medium grey dashed inner frames */
+  --frame-border: #555555; /* Dashed border color on frames (lightened for contrast) */
+  --element: #3a3a3a;      /* Light grey inner elements (solid borders) */
+  --element-hover: #454545;
+  /* Legacy aliases (kept for existing class names) */
+  --surface: var(--panel);
+  --surface-hover: var(--panel-hover);
   --border: #333333;
   --border-hover: #444444;
   --text-primary: #f8f9fa;
@@ -18,8 +27,16 @@
   :root {
     --background: #ffffff;
     --foreground: #171717;
-    --surface: #f8f9fa;
-    --surface-hover: #e9ecef;
+    /* Light theme equivalents for triad */
+    --panel: #f1f3f5;         /* Darker of light greys for panels */
+    --panel-hover: #e9ecef;
+    --frame: #f8f9fa;         /* Medium light for frames */
+    --frame-border: #dee2e6;
+    --element: #ffffff;       /* Brightest for inner elements */
+    --element-hover: #f8f9fa;
+    /* Legacy aliases */
+    --surface: var(--panel);
+    --surface-hover: var(--panel-hover);
     --border: #dee2e6;
     --border-hover: #ced4da;
     --text-primary: #212529;
@@ -30,16 +47,28 @@
   }
 }
 
+/* Ensure the page background always fills beyond app containers */
+html, body {
+  height: 100%;
+  background-color: var(--background);
+  color: var(--text-primary);
+}
+
 /* Custom Component Styles */
 .panel-container {
-  background-color: var(--surface);
+  background-color: var(--panel);
   padding: 1rem;
   border-radius: 0.5rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  border: 1px dashed var(--border); /* inner frame is dashed */
+  border: 0; /* Tier 1: no inner dashed border; colored outer frame via panel-border-* */
   /* Default text color inside panels to ensure readability on dark backgrounds */
   color: var(--text-primary);
   overflow: visible; /* allow absolute/fixed dropdowns to escape the panel */
+}
+
+/* Compact padding variant for Tier 1 panels when Tier 2 is the primary content */
+.panel-container-tight {
+  padding: 0.25rem;
 }
 
 /* Optional helper to lock panel sizes if applied */
@@ -67,6 +96,7 @@
   outline-offset: -2px;
 }
 
+
 .panel-heading {
   font-size: 1.5rem;
   line-height: 2rem;
@@ -89,7 +119,8 @@
 }
 
 .form-input-text {
-  background-color: var(--surface);
+  /* Tier 3: detail elements use dark background */
+  background-color: var(--panel);
   color: var(--text-primary);
 }
 
@@ -186,6 +217,14 @@
   background-color: rgb(31 41 55);
 }
 
+/* Modal variant to host a Tier 1 panel inside without double backgrounds/borders */
+.modal-as-panel {
+  background-color: transparent !important;
+  padding: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -201,12 +240,12 @@
 }
 
 .equipment-slot {
-  border-width: 2px;
-  border-style: solid; /* was dashed; now solid per request */
+  border-width: 1px;
+  border-style: solid; /* Tier 3 detail element */
   border-color: var(--border);
   padding: 0.5rem;
-  border-radius: 0.25rem;
-  background-color: var(--surface);
+  border-radius: 0.375rem;
+  background-color: var(--panel);
   transition: border-color 0.15s ease-in-out;
 }
 
@@ -253,9 +292,11 @@
 }
 
 .talisman-slot {
-  width: 1rem;
-  height: 1rem;
-  background-color: var(--surface);
+  /* Two stacked talisman slots plus gap-1 (0.25rem) should equal equipment icon height (3rem): 2*1.375rem + 0.25rem = 3rem */
+  width: 1.375rem;
+  height: 1.375rem;
+  /* Tier 3: detail elements inside equipment slot */
+  background-color: var(--panel);
   border-width: 1px;
   border-style: solid; /* ensure slot frames are solid */
   border-color: var(--border);
@@ -267,16 +308,16 @@
 }
 
 .talisman-slot:hover {
-  background-color: var(--surface-hover);
+  background-color: var(--panel-hover);
 }
 
 /* Group container for related fields (dashed rounded frame) */
 .field-group {
   border-width: 1px;
   border-style: dashed;
-  border-color: var(--border);
+  border-color: var(--frame-border);
   border-radius: 0.5rem;
-  background-color: var(--surface);
+  background-color: var(--frame);
   padding: 0.375rem; /* ~6px, compact */
 }
 
@@ -288,7 +329,7 @@
 .icon-frame {
   border-width: 1px;
   border-style: solid; /* revert: icon borders remain solid */
-  border-color: currentColor;
+  border-color: currentColor; /* use rarity color when applied */
   border-radius: 0.375rem; /* match equipment-icon and hover highlight */
 }
 
@@ -324,7 +365,7 @@
 .icon-frame-empty {
   border-width: 1px;
   border-style: solid;
-  border-color: var(--border);
+  border-color: var(--element);
   border-radius: 0.25rem;
 }
 

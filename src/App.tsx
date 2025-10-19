@@ -5,6 +5,7 @@ import { urlService } from './services/loadout/urlService';
 import DualToolbar from './components/toolbar/DualToolbar';
 import DualEquipmentLayout from './components/panels/DualEquipmentLayout';
 import ScaleToFit from './components/layout/ScaleToFit';
+import ScaleIndicator from './components/layout/ScaleIndicator';
 import ApolloProviderWrapper from './providers/ApolloProvider';
 import ErrorBoundary from './providers/ErrorBoundary';
 import { preloadCareerIcons } from './constants/careerIcons';
@@ -15,8 +16,8 @@ function App() {
   const location = useLocation();
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [characterLoaded, setCharacterLoaded] = useState<boolean>(false);
-  // Feature flag: allow downscaling on narrow windows
-  const enableScaleToFit = true;
+  // Feature flag: allow down/up-scaling on narrow/wide windows (disabled due to flicker)
+  const enableScaleToFit = false;
 
   // Set up URL service navigation callback
   useEffect(() => {
@@ -103,24 +104,42 @@ function App() {
   return (
     <ErrorBoundary>
       <ApolloProviderWrapper>
-        <div className="min-h-screen bg-gray-100 dark:bg-[var(--background)] p-4">
-          <header className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-primary">RorPlanner</h1>
-          </header>
-          <div className="mx-auto w-full">
-            {/* Feature flag: set enableScaleToFit to true to allow downscaling on narrow windows */}
-            {enableScaleToFit ? (
-              <ScaleToFit designWidth={1408} minScale={0.886}>
-                <DualToolbar />
-                <DualEquipmentLayout />
-              </ScaleToFit>
-            ) : (
-              <>
-                <DualToolbar />
-                <DualEquipmentLayout />
-              </>
-            )}
-          </div>
+  <div className="min-h-screen py-4">
+          {/* Feature flag: set enableScaleToFit to true to allow down/up-scaling */}
+          {enableScaleToFit ? (
+            <ScaleToFit designWidth={1440} minScale={0.75} maxScale={1920/1440}>
+              <ScaleIndicator />
+              <header className="relative text-center mb-8">
+                <h1 className="text-4xl font-bold text-primary">RorPlanner</h1>
+                <a
+                  href="https://discord.com/users/316636548353490944"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
+                >
+                  Feedback
+                </a>
+              </header>
+              <DualToolbar />
+              <DualEquipmentLayout />
+            </ScaleToFit>
+          ) : (
+            <div className="mx-auto" style={{ width: 1440, minWidth: 1440 }}>
+              <header className="relative text-center mb-8">
+                <h1 className="text-4xl font-bold text-primary">RorPlanner</h1>
+                <a
+                  href="https://discord.com/users/316636548353490944"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
+                >
+                  Feedback
+                </a>
+              </header>
+              <DualToolbar />
+              <DualEquipmentLayout />
+            </div>
+          )}
         </div>
       </ApolloProviderWrapper>
     </ErrorBoundary>

@@ -166,11 +166,11 @@ function SideToolbar({ side }: SideToolbarProps) {
           </div>
         </div>
 
-        {/* Group 2: Character + Load (slightly narrower) */}
+        {/* Group 2: Character + Load (input expands to button) */}
         <div className="col-span-5 h-full">
           <div className="field-group h-full">
-            <div className="grid grid-cols-12 gap-x-1 gap-y-1 items-end">
-              <div className="col-span-7">
+            <div className="flex items-end gap-1">
+              <div className="flex-1 min-w-0">
                 <label className="form-label text-xs">Character</label>
                 <input
                   type="text"
@@ -181,7 +181,7 @@ function SideToolbar({ side }: SideToolbarProps) {
                   className="form-input form-input-text control-compact mt-0.5 block w-full pl-2 pr-2 text-xs rounded-md"
                 />
               </div>
-              <div className="col-span-5 flex items-end justify-end gap-1">
+              <div className="flex items-end">
                 <button onClick={onLoadCharacter} className="btn btn-primary text-xs py-0.5 px-2 whitespace-nowrap">Load</button>
               </div>
             </div>

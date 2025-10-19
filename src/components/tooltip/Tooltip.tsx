@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Item, Loadout, EquipSlot } from '../../types';
 import { formatItemTypeName, formatSlotName } from '../../utils/formatters';
 import { loadoutService } from '../../services/loadout/loadoutService';
+import { useScale } from '../layout/ScaleContext';
 import ItemNameText from './ItemNameText';
 import RequirementsBlock from './RequirementsBlock';
 import StatLines from './StatLines';
@@ -23,6 +24,9 @@ interface TooltipProps {
 }
 
 export default function Tooltip({ children, item, className = '', isTalismanTooltip = false, loadoutId, side, slot, talismanIndex }: TooltipProps) {
+  const uiScale = useScale();
+  // Use a fixed width so item tooltips are consistently sized
+  const TOOLTIP_WIDTH = 320;
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [mirrorVisible, setMirrorVisible] = useState(false);
@@ -165,8 +169,8 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
     const viewportHeight = window.innerHeight;
 
     // Calculate position immediately without showing tooltip first
-    // Use estimated tooltip size for initial positioning
-    const estimatedTooltipWidth = 320;
+  // Use fixed tooltip size for initial positioning (matches rendered width)
+  const estimatedTooltipWidth = TOOLTIP_WIDTH;
     const estimatedTooltipHeight = 200;
 
     // Preferred anchoring: right side of element, aligned with top
@@ -462,8 +466,8 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
       {isVisible && createPortal(
         <div
           ref={tooltipRef}
-          className={`fixed z-[11000] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 max-w-xs pointer-events-none ${!itemEligible ? 'grayscale' : ''}`}
-          style={{ left: position.x, top: position.y }}
+          className={`fixed z-[11000] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 pointer-events-none ${!itemEligible ? 'grayscale' : ''}`}
+          style={{ left: position.x, top: position.y, width: TOOLTIP_WIDTH, maxWidth: TOOLTIP_WIDTH, transform: `scale(${uiScale})`, transformOrigin: 'top left' }}
         >
           {displayItem && renderTooltipContent(displayItem, itemEligible, getEquippedSetItemsCountForLoadout, getEffectiveLoadout())}
         </div>,
@@ -474,8 +478,8 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
       {isVisible && mirrorVisible && otherDisplayItem && createPortal(
         <div
           ref={mirrorTooltipRef}
-          className={`fixed z-[10990] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 max-w-xs pointer-events-none ${!otherEligible ? 'grayscale' : ''}`}
-          style={{ left: mirrorPosition.x, top: mirrorPosition.y }}
+          className={`fixed z-[10990] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 pointer-events-none ${!otherEligible ? 'grayscale' : ''}`}
+          style={{ left: mirrorPosition.x, top: mirrorPosition.y, width: TOOLTIP_WIDTH, maxWidth: TOOLTIP_WIDTH, transform: `scale(${uiScale})`, transformOrigin: 'top left' }}
         >
           {renderTooltipContent(otherDisplayItem, otherEligible, (setName: string) => {
             const otherLoCtx = side ? loadoutService.getLoadoutForSide(side === 'A' ? 'B' : 'A') : null;

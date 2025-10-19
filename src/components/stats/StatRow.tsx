@@ -52,8 +52,9 @@ export default function StatRow({
           <HoverTooltip
             placement="right"
             className="cursor-help w-full text-right"
+            fixedWidth={320}
             content={
-              <div className="max-w-[26rem] whitespace-nowrap overflow-x-auto">
+              <div className="max-w-[26rem] whitespace-normal break-words overflow-x-hidden">
                 <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatSummaryStatKey(statKey)} — A Contribution</div>
                 <ul className="space-y-0.5">
                   {sortedA.length === 0 ? (
@@ -82,8 +83,9 @@ export default function StatRow({
           <HoverTooltip
             placement="right"
             className="cursor-help w-full text-right"
+            fixedWidth={320}
             content={
-              <div className="max-w-[26rem] whitespace-nowrap overflow-x-auto">
+              <div className="max-w-[26rem] whitespace-normal break-words overflow-x-hidden">
                 <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatSummaryStatKey(statKey)} — B Contribution</div>
                 <ul className="space-y-0.5">
                   {sortedB.length === 0 ? (

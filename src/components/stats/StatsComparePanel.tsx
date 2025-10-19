@@ -204,15 +204,17 @@ export default function StatsComparePanel() {
 
   if (!hasAnyCareer) {
     return (
-      <div className="panel-container">
-        <h2 className="panel-heading">Compare Stats</h2>
-        <div className="stats-empty-message">Select a career to see stats</div>
+      <div className="field-group flex-1 min-h-0">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="panel-heading mb-0">Compare Stats</h2>
+        </div>
+  <div className="stats-empty-message">Select a career or load a character to see stats</div>
       </div>
     );
   }
 
   return (
-    <div className="panel-container">
+    <div className="field-group flex-1 min-h-0">
       <div className="flex items-center justify-between mb-2">
         <h2 className="panel-heading mb-0">Compare Stats</h2>
         <div className="flex items-center gap-3">
@@ -230,8 +232,8 @@ export default function StatsComparePanel() {
           </button>
         </div>
       </div>
-      {/* Global toggles row */}
-      <div className="flex items-center gap-6 mb-3">
+  {/* Global toggles row */}
+  <div className="flex items-center gap-6 mb-3">
         <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
           <input
             type="checkbox"

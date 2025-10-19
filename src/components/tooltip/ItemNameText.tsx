@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import { Item } from '../../types';
+import { Item, EquipSlot } from '../../types';
+import { isTwoHandedWeapon } from '../../utils/items';
 
 export interface ItemNameTextProps {
   item: Item;
@@ -18,6 +19,9 @@ function ItemNameText({ item }: ItemNameTextProps) {
       )}`}
     >
       {item.name}
+      {item.slot === EquipSlot.MAIN_HAND && isTwoHandedWeapon(item) ? (
+        <span className="text-muted"> (2H)</span>
+      ) : null}
     </p>
   );
 }

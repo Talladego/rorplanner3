@@ -2,7 +2,7 @@ import { memo, type ReactNode } from 'react';
 import Tooltip from '../tooltip/Tooltip';
 import { CAREER_RACE_MAPPING, Career, EquipSlot, Item, Stat } from '../../types';
 import { loadoutService } from '../../services/loadout/loadoutService';
-import { formatItemTypeName, formatSlotName, formatStatName, formatStatValue, isPercentItemStat, normalizeStatDisplayValue } from '../../utils/formatters';
+import { formatItemTypeName, formatSlotName, formatStatName, formatStatValue, isPercentItemStat, normalizeStatDisplayValue, formatFixed } from '../../utils/formatters';
 import { isTwoHandedWeapon } from '../../utils/items';
 import { CANNOT_USE_2H_MELEE, getOffhandBlockReason } from '../../constants/careerWeaponRules';
 
@@ -31,15 +31,24 @@ function formatTalismanStats(item: Item): string {
 function renderItemInfo(item: Item, filteredStats?: Stat[]): ReactNode {
   const typeName = formatItemTypeName(item.type);
   const slotNameRaw = formatSlotName(item.slot);
-  // If our heuristic marks this as a two-handed weapon and it's a main-hand candidate, render a bold "Two-Handed" label
-  const isTwoH = (item.slot === EquipSlot.MAIN_HAND && isTwoHandedWeapon(item));
-  const slotNode: ReactNode = isTwoH ? (<strong className="font-bold">Two-Handed</strong>) : slotNameRaw;
-  const dpsNum = Number(item.dps || 0);
-  const baseNode = (
-    <>
-      {typeName}, {slotNode}{dpsNum > 0 ? `, DPS: ${dpsNum}` : ''}, Item Level: {item.itemLevel}
-    </>
-  );
+  // Keep the actual slot label; handle 2H in the item name instead
+  const slotNode: ReactNode = slotNameRaw;
+  // Build base meta: Type, Slot, Item Level
+  const parts: string[] = [];
+  parts.push(`${typeName}`);
+  parts.push(`${slotNode}` as unknown as string);
+  parts.push(`Item Level: ${item.itemLevel}`);
+  // Append DPS/Block and Speed like in item tooltips
+  const isShield = item.type === 'BASIC_SHIELD' || item.type === 'SHIELD' || item.type === 'EXPERT_SHIELD';
+  if (isShield && item.armor > 0) {
+    parts.push(`${item.armor} Block Rating`);
+  } else if (item.dps > 0) {
+    parts.push(`${formatFixed(item.dps / 10, 1)} DPS`);
+  }
+  if (item.speed > 0) {
+    parts.push(`${formatFixed(item.speed / 100, 1)} Speed`);
+  }
+  const baseNode = (<>{parts.join(', ')}</>);
   if (!filteredStats || filteredStats.length === 0) return baseNode;
   const lines = (item.stats || []).filter((s) => s && filteredStats.includes(s.stat as Stat));
   if (lines.length === 0) return baseNode;
@@ -124,10 +133,10 @@ export function ResultsList({
         return (
           <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode} loadoutId={effectiveLoadoutId || undefined}>
             <div
-              className={`border p-1.5 rounded h-12 flex items-center ${
+              className={`equipment-slot p-1.5 h-12 flex items-center ${
                 isDisabled
-                  ? 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 cursor-not-allowed grayscale'
-                  : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'cursor-not-allowed grayscale'
+                  : 'cursor-pointer hover:bg-[var(--panel-hover)]'
               } transition-colors`}
               onClick={() => !isDisabled && onSelect(item as Item)}
             >
@@ -150,7 +159,10 @@ export function ResultsList({
                     item.rarity === 'RARE' ? 'item-color-rare' :
                     item.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
                     item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common'
-                  }`}>{item.name}</p>
+                  }`}>
+                    {item.name}
+                    {item.slot === EquipSlot.MAIN_HAND && isTwoHandedWeapon(item) ? (<span className="text-muted"> (2H)</span>) : null}
+                  </p>
                   <p className={`text-xs leading-tight text-muted`}>
                     <span>
                       {isTalismanMode ? formatTalismanStats(item) : renderItemInfo(item, statsFilter)}

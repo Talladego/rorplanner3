@@ -34,7 +34,10 @@ function LevelSelect({ value, onChange, maxLevel, statName, percent, totalsOverr
   );
 }
 
-export default memo(function RenownPanel({ loadoutId }: { loadoutId: string | null }) {
+// RenownPanel renders either:
+// - embedded mode: just the content (Tier 2/3 owned by parent layout)
+// - standalone: its own Tier 1 panel (not used in DualEquipmentLayout)
+export default memo(function RenownPanel({ loadoutId, embedded = false }: { loadoutId: string | null; embedded?: boolean }) {
   const { loadout } = useLoadoutById(loadoutId);
   const ra = loadout?.renownAbilities || {};
   const rr = loadout?.renownRank || 0;
@@ -110,10 +113,13 @@ export default memo(function RenownPanel({ loadoutId }: { loadoutId: string | nu
     );
   };
 
+  // Outer: Tier 1 only when not embedded; in embedded mode, parent supplies Tier 1/2
   return (
-    <div className="lg:col-span-2 panel-container relative">
+    <div className={embedded ? 'relative' : 'lg:col-span-2 panel-container relative'}>
       <div className="text-[11px] text-muted mb-1">Renown points: {spent}/{cap} (Remaining: {remaining})</div>
-      <div className="grid grid-cols-1 gap-0.5">
+  {/* Tier 3 container holds all ability rows */}
+  <div className="equipment-slot">
+        <div className="grid grid-cols-1 gap-1">
         {ABILITIES.map((ab) => {
           const currentLevel = (ra[ab.key as keyof typeof ra] as number) || 0;
           const costTable = (ab.costTotals && ab.costTotals.length ? ab.costTotals : DEFAULT_COST_TOTALS);
@@ -130,7 +136,7 @@ export default memo(function RenownPanel({ loadoutId }: { loadoutId: string | nu
           const rarity = rarityLevels[clamped] || ItemRarity.UTILITY;
           const color = getRarityColor(rarity);
           return (
-          <div key={ab.key} className="flex items-center justify-between gap-1 p-0.5 rounded bg-gray-800/60">
+          <div key={ab.key} className="flex items-center justify-between gap-1">
             <HoverTooltip content={renderAbilityTooltip(ab, clamped)}>
               <div className="flex items-center gap-1 min-w-0">
                 {/* Icon placeholder; will use ab.iconUrl when provided */}
@@ -160,6 +166,7 @@ export default memo(function RenownPanel({ loadoutId }: { loadoutId: string | nu
             />
           </div>
         );})}
+        </div>
       </div>
     </div>
   );

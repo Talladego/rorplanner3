@@ -143,7 +143,13 @@ export default function DualEquipmentLayout() {
     return true;
   };
 
-  const sideHeader = (label: 'A' | 'B') => {
+  const sideIndicator = (label: 'A' | 'B') => (
+    <div className="flex items-center gap-1.5 mb-1 min-w-0">
+      <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${label === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{label}</span>
+    </div>
+  );
+
+  const buttonsRow = (label: 'A' | 'B') => {
     const other = label === 'A' ? sideB : sideA;
     const self = label === 'A' ? sideA : sideB;
     const otherEmpty = isLoadoutEmpty(other);
@@ -155,15 +161,11 @@ export default function DualEquipmentLayout() {
   const otherRenownEmpty = !other?.renownAbilities || Object.values(other.renownAbilities).every((lvl) => !lvl);
   const nothingToCopy = otherEmpty && otherRenownEmpty;
     return (
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${label === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{label}</span>
-        </div>
-        <div className="flex items-center gap-1 flex-wrap min-w-0">
+      <div className="flex items-center justify-between gap-1 mb-2 min-w-0 whitespace-nowrap">
           {/* Renown toggler first; disabled if no career selected */}
           <button
             onClick={() => (label === 'A' ? setShowRenownA(v => !v) : setShowRenownB(v => !v))}
-            className={`btn btn-primary btn-sm whitespace-nowrap min-w-[80px] px-2 text-center ${!hasCareer ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`btn btn-primary btn-sm whitespace-nowrap min-w-[84px] px-2 text-center ${!hasCareer ? 'opacity-50 cursor-not-allowed' : ''}`}
             disabled={!hasCareer}
             title={hasCareer ? undefined : 'Select a career to edit renown'}
           >
@@ -172,7 +174,7 @@ export default function DualEquipmentLayout() {
           {/* Summary next; disabled only if neither equipment nor renown present */}
           <button
             onClick={() => setSummaryOpenFor(label)}
-            className={`btn btn-primary btn-sm whitespace-nowrap ${nothingToSummarize ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`btn btn-primary btn-sm whitespace-nowrap min-w-[84px] ${nothingToSummarize ? 'opacity-50 cursor-not-allowed' : ''}`}
             disabled={nothingToSummarize}
             title={nothingToSummarize ? 'Nothing to summarize' : undefined}
           >
@@ -181,7 +183,7 @@ export default function DualEquipmentLayout() {
           {label === 'A' ? (
             <button
               onClick={() => copySide('B','A')}
-              className={`btn btn-primary btn-sm whitespace-nowrap ${nothingToCopy ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`btn btn-primary btn-sm whitespace-nowrap min-w-[84px] ${nothingToCopy ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={nothingToCopy}
             >
               Copy from B
@@ -189,7 +191,7 @@ export default function DualEquipmentLayout() {
           ) : (
             <button
               onClick={() => copySide('A','B')}
-              className={`btn btn-primary btn-sm whitespace-nowrap ${nothingToCopy ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`btn btn-primary btn-sm whitespace-nowrap min-w-[84px] ${nothingToCopy ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={nothingToCopy}
             >
               Copy from A
@@ -218,7 +220,6 @@ export default function DualEquipmentLayout() {
             )}
           </span>
         </div>
-      </div>
     );
   };
 
@@ -226,32 +227,38 @@ export default function DualEquipmentLayout() {
     <div className="grid grid-cols-3 gap-4">
       {/* Left panel: Equipment A or Renown */}
       <div className="col-span-1">
-        <div className="panel-container panel-border-green-600 h-full">
-          {sideHeader('A')}
-          {showRenownA ? (
-            <RenownPanel loadoutId={sideA?.id || null} />
-          ) : (
-            <EquipmentPanel side="A" selectedCareer={sideA?.career || ''} loadoutId={sideA?.id || null} iconOnly hideHeading compact />
-          )}
+        <div className="panel-container panel-border-green-600 h-full flex flex-col">
+          {sideIndicator('A')}
+          <div className="field-group flex-1 min-h-0">
+            {buttonsRow('A')}
+            {showRenownA ? (
+              <RenownPanel loadoutId={sideA?.id || null} embedded />
+            ) : (
+              <EquipmentPanel side="A" selectedCareer={sideA?.career || ''} loadoutId={sideA?.id || null} iconOnly hideHeading compact />
+            )}
+          </div>
         </div>
       </div>
 
       {/* Middle panel: Stats compare */}
       <div className="col-span-1">
-        <div className="panel-container panel-border-blue-500 h-full">
+        <div className="panel-container panel-border-blue-500 h-full flex flex-col">
           <StatsComparePanel />
         </div>
       </div>
 
       {/* Right panel: Equipment B or Renown */}
       <div className="col-span-1">
-        <div className="panel-container panel-border-red-600 h-full">
-          {sideHeader('B')}
-          {showRenownB ? (
-            <RenownPanel loadoutId={sideB?.id || null} />
-          ) : (
-            <EquipmentPanel side="B" selectedCareer={sideB?.career || ''} loadoutId={sideB?.id || null} iconOnly hideHeading compact />
-          )}
+        <div className="panel-container panel-border-red-600 h-full flex flex-col">
+          {sideIndicator('B')}
+          <div className="field-group flex-1 min-h-0">
+            {buttonsRow('B')}
+            {showRenownB ? (
+              <RenownPanel loadoutId={sideB?.id || null} embedded />
+            ) : (
+              <EquipmentPanel side="B" selectedCareer={sideB?.career || ''} loadoutId={sideB?.id || null} iconOnly hideHeading compact />
+            )}
+          </div>
         </div>
       </div>
       {/* Summary Modal */}

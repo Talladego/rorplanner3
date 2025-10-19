@@ -8,6 +8,7 @@ import { useItemSearch } from '../../hooks/useItemSearch';
 import FilterControls from './FilterControls';
 import ResultsList from './ResultsList';
 import PaginationControls from './PaginationControls';
+import HoverTooltip from '../tooltip/HoverTooltip';
 
 interface EquipmentSelectorProps {
   slot: EquipSlot;
@@ -134,120 +135,122 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
 
   return (
     <div className="modal-overlay">
-      <div ref={modalRef} className="modal-container max-w-2xl">
-        <div className="modal-header">
-          <h2 className="modal-title">
-            {isTalismanMode ? `Select Talisman for ${formatSlotName(slot)}` : `Select Item for ${formatSlotName(slot)}`}
-          </h2>
-          <div className="flex items-center gap-3">
-            {!isTalismanMode && (
-              <div className="inline-flex items-center gap-2 text-xs select-none text-gray-900 dark:text-gray-100">
-                <label className="inline-flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="form-checkbox h-3 w-3"
-                    checked={enableCareerFilter}
-                    onChange={(e) => {
-                      const val = e.currentTarget.checked;
-                      setEnableCareerFilter(val);
-                      setCurrentPage(1);
-                      setPageHistory([]);
-                      setHookCurrentPage(1);
-                      setHookPageHistory([]);
-                      refetch(nameFilter, statsFilter, rarityFilter, val);
-                    }}
-                  />
-                  Enable Career Filter
-                </label>
-                <span
-                  className="cursor-help text-muted"
-                  title={`Filters results to items usable by the selected career. Turn OFF to find server-side anomalies or items that should be usable but are hidden by the API. Tip: Use OFF when searching by exact name to verify availability.`}
-                >
-                  ⓘ
-                </span>
+      {/* Tier 1 (blue frame) inside modal; modal-as-panel strips default modal chrome */}
+      <div ref={modalRef} className="modal-container modal-as-panel max-w-2xl">
+        <div className="panel-container panel-border-blue-500">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="panel-heading mb-0">
+              {isTalismanMode ? `Select Talisman for ${formatSlotName(slot)}` : `Select Item for ${formatSlotName(slot)}`}
+            </h2>
+            <div className="flex items-center gap-3">
+              {!isTalismanMode && (
+                <div className="inline-flex items-center gap-2 text-xs select-none text-gray-900 dark:text-gray-100">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-3 w-3"
+                      checked={enableCareerFilter}
+                      onChange={(e) => {
+                        const val = e.currentTarget.checked;
+                        setEnableCareerFilter(val);
+                        setCurrentPage(1);
+                        setPageHistory([]);
+                        setHookCurrentPage(1);
+                        setHookPageHistory([]);
+                        refetch(nameFilter, statsFilter, rarityFilter, val);
+                      }}
+                    />
+                    Enable Career Filter
+                  </label>
+                  <HoverTooltip content={`Filters results to items usable by the selected career. Turn OFF to find server-side anomalies or items that should be usable but are hidden by the API. Tip: Use OFF when searching by exact name to verify availability.`}>
+                    <span className="cursor-help text-muted">ⓘ</span>
+                  </HoverTooltip>
+                </div>
+              )}
+              <button 
+                onClick={onClose} 
+                className="modal-close-btn hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          {/* Tier 2 dashed container holds filters, list, and pagination */}
+          <div className="field-group">
+            <FilterControls
+              nameFilter={nameFilter}
+              onNameChange={(value) => handleNameFilterChange(value)}
+              rarityFilter={rarityFilter}
+              onRarityChange={(newRarityFilter) => {
+                onRarityFilterChange(newRarityFilter);
+                setCurrentPage(1);
+                setPageHistory([]);
+                setHookCurrentPage(1);
+                setHookPageHistory([]);
+                refetch(nameFilter, statsFilter, newRarityFilter);
+              }}
+              statsFilter={statsFilter}
+              onStatsChange={(normalized) => {
+                onStatsFilterChange(normalized);
+                setCurrentPage(1);
+                setPageHistory([]);
+                setHookCurrentPage(1);
+                setHookPageHistory([]);
+                refetch(nameFilter, normalized, rarityFilter);
+              }}
+              allowedStatOptions={allowedStatOptions}
+              onReset={() => {
+                onNameFilterChange('');
+                onStatsFilterChange([]);
+                onRarityFilterChange([]);
+                setEnableCareerFilter(true);
+                setCurrentPage(1);
+                setPageHistory([]);
+                setHookCurrentPage(1);
+                setHookPageHistory([]);
+                refetch('', [], [], true);
+              }}
+            />
+
+            {error ? (
+              <div className="text-center py-8">
+                <p className="text-red-500 dark:text-red-400 text-sm mb-2">Error loading items</p>
+                <p className="text-muted text-xs">{error}</p>
               </div>
+            ) : pageData.items.length === 0 && !loading ? (
+              <div className="text-center py-8">
+                <p className="text-muted text-sm">No items found</p>
+              </div>
+            ) : (
+              <ResultsList
+                items={pageData.items.length > ITEMS_PER_PAGE 
+                  ? pageData.items.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                  : pageData.items}
+                isTalismanMode={!!isTalismanMode}
+                loadoutId={loadoutId}
+                slot={slot}
+                career={career}
+                talismanSlotIndex={talismanSlotIndex}
+                onSelect={handleItemSelect}
+                effectiveLoadoutId={effectiveLoadout?.id}
+                statsFilter={statsFilter}
+              />
             )}
-            <button 
-              onClick={onClose} 
-              className="modal-close-btn hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
-              aria-label="Close"
-            >
-              ✕
-            </button>
+
+            <PaginationControls
+              loading={loading}
+              totalCount={pageData.totalCount}
+              currentPage={currentPage}
+              pageSize={ITEMS_PER_PAGE}
+              hasNextPage={pageData.hasNextPage}
+              hasPreviousPage={pageData.hasPreviousPage}
+              pageHistoryLength={pageHistory.length}
+              onPrev={handlePreviousPage}
+              onNext={handleNextPage}
+            />
           </div>
         </div>
-
-        <FilterControls
-          nameFilter={nameFilter}
-          onNameChange={(value) => handleNameFilterChange(value)}
-          rarityFilter={rarityFilter}
-          onRarityChange={(newRarityFilter) => {
-            onRarityFilterChange(newRarityFilter);
-            setCurrentPage(1);
-            setPageHistory([]);
-            setHookCurrentPage(1);
-            setHookPageHistory([]);
-            refetch(nameFilter, statsFilter, newRarityFilter);
-          }}
-          statsFilter={statsFilter}
-          onStatsChange={(normalized) => {
-            onStatsFilterChange(normalized);
-            setCurrentPage(1);
-            setPageHistory([]);
-            setHookCurrentPage(1);
-            setHookPageHistory([]);
-            refetch(nameFilter, normalized, rarityFilter);
-          }}
-          allowedStatOptions={allowedStatOptions}
-          onReset={() => {
-            onNameFilterChange('');
-            onStatsFilterChange([]);
-            onRarityFilterChange([]);
-            setEnableCareerFilter(true);
-            setCurrentPage(1);
-            setPageHistory([]);
-            setHookCurrentPage(1);
-            setHookPageHistory([]);
-            refetch('', [], [], true);
-          }}
-        />
-
-        {error ? (
-          <div className="text-center py-8">
-            <p className="text-red-500 dark:text-red-400 text-sm mb-2">Error loading items</p>
-            <p className="text-muted text-xs">{error}</p>
-          </div>
-        ) : pageData.items.length === 0 && !loading ? (
-          <div className="text-center py-8">
-            <p className="text-muted text-sm">No items found</p>
-          </div>
-        ) : (
-          <ResultsList
-            items={pageData.items.length > ITEMS_PER_PAGE 
-              ? pageData.items.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
-              : pageData.items}
-            isTalismanMode={!!isTalismanMode}
-            loadoutId={loadoutId}
-            slot={slot}
-            career={career}
-            talismanSlotIndex={talismanSlotIndex}
-            onSelect={handleItemSelect}
-            effectiveLoadoutId={effectiveLoadout?.id}
-            statsFilter={statsFilter}
-          />
-        )}
-
-        <PaginationControls
-          loading={loading}
-          totalCount={pageData.totalCount}
-          currentPage={currentPage}
-          pageSize={ITEMS_PER_PAGE}
-          hasNextPage={pageData.hasNextPage}
-          hasPreviousPage={pageData.hasPreviousPage}
-          pageHistoryLength={pageHistory.length}
-          onPrev={handlePreviousPage}
-          onNext={handleNextPage}
-        />
       </div>
     </div>
   );

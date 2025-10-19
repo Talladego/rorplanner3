@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ScaleContext } from './ScaleContext';
 
 interface ScaleToFitProps {
   children: React.ReactNode;
@@ -6,6 +7,8 @@ interface ScaleToFitProps {
   designWidth: number;
   /** Smallest scale to allow (0..1). Default 0.8 */
   minScale?: number;
+  /** Largest scale to allow (>1 enables upscale). Default 1 */
+  maxScale?: number;
 }
 
 /**
@@ -14,7 +17,7 @@ interface ScaleToFitProps {
  * - Computes a scale factor = min(1, availableWidth / designWidth), clamped by minScale.
  * - Uses a ResizeObserver on the inner content to reserve scaled height in layout.
  */
-export default function ScaleToFit({ children, designWidth, minScale = 0.8 }: ScaleToFitProps) {
+export default function ScaleToFit({ children, designWidth, minScale = 0.8, maxScale = 1 }: ScaleToFitProps) {
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -26,7 +29,10 @@ export default function ScaleToFit({ children, designWidth, minScale = 0.8 }: Sc
     if (!el) return;
     const update = () => {
       const available = el.clientWidth;
-      const s = Math.min(1, Math.max(minScale, available / designWidth));
+      // Subtract a tiny cushion to avoid fractional overflow that can trigger horizontal scrollbars
+      const cushion = 2; // px
+      const desired = (available - cushion) / designWidth;
+      const s = Math.max(minScale, Math.min(maxScale, desired));
       setScale(s);
     };
     update();
@@ -51,18 +57,20 @@ export default function ScaleToFit({ children, designWidth, minScale = 0.8 }: Sc
   }, []);
 
   return (
-    <div ref={outerRef} style={{ position: 'relative', height: innerHeight * scale }}>
-      <div
-        ref={innerRef}
-        style={{
-          width: designWidth,
-          transform: `scale(${scale})`,
-          transformOrigin: 'top center',
-          margin: '0 auto',
-        }}
-      >
-        {children}
+    <ScaleContext.Provider value={scale}>
+      <div ref={outerRef} style={{ position: 'relative', height: innerHeight * scale }}>
+        <div
+          ref={innerRef}
+          style={{
+            width: designWidth,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top center',
+            margin: '0 auto',
+          }}
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </ScaleContext.Provider>
   );
 }

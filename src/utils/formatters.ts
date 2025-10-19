@@ -172,6 +172,13 @@ export function formatNumber(value: number, decimals: number = 0): string {
 }
 
 /**
+ * Format a number with a fixed number of decimals, always showing trailing zeros.
+ */
+export function formatFixed(value: number, decimals: number = 1): string {
+  return Number.isFinite(value) ? value.toFixed(decimals) : String(value);
+}
+
+/**
  * Normalize raw stat values for display.
  * RANGE and RADIUS are stored in inches (game units), but should be shown in feet (divide by 12).
  * Accepts either a StatsSummary key (camelCase) or a Stat enum.

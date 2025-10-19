@@ -32,7 +32,7 @@ export function FilterControls({
           placeholder="Filter by name..."
           value={nameFilter}
           onChange={(e) => onNameChange(e.target.value)}
-          className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-1.5 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent form-input form-input-text"
         />
       </div>
       {/* Rarity */}
@@ -45,7 +45,7 @@ export function FilterControls({
             onRarityChange(newRarityFilter);
           }}
           size={1}
-          className={`w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+          className={`w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent form-input form-input-text`}
         >
           <option value="" className="text-muted">All Rarities</option>
           {Object.values(ItemRarity).map(rarity => (
@@ -65,7 +65,7 @@ export function FilterControls({
             onStatsChange(normalized);
           }}
           size={1}
-          className={`w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+          className={`w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent form-input form-input-text`}
         >
           <option value="" className="text-muted">All Stats</option>
           {allowedStatOptions.map(stat => (
