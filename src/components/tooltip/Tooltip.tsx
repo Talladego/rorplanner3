@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Item, Loadout, EquipSlot } from '../../types';
 import { formatItemTypeName, formatSlotName } from '../../utils/formatters';
 import { loadoutService } from '../../services/loadout/loadoutService';
@@ -370,6 +371,53 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
     };
   }, [isVisible]);
 
+  // Reflow tooltip positions on scroll/resize while visible to keep anchors accurate under transforms
+  useEffect(() => {
+    if (!isVisible) return;
+    const updatePositions = () => {
+      try {
+        if (triggerRef.current && tooltipRef.current) {
+          const rect = triggerRef.current.getBoundingClientRect();
+          const tipRect = tooltipRef.current.getBoundingClientRect();
+          const m = 10;
+          let x = rect.right + m;
+          let y = rect.top;
+          if (x + tipRect.width > window.innerWidth) x = rect.left - tipRect.width - m;
+          if (y + tipRect.height > window.innerHeight) y = window.innerHeight - tipRect.height - m;
+          if (x < m) x = m;
+          if (y < m) y = m;
+          setPosition({ x, y });
+        }
+        if (mirrorVisible && mirrorTooltipRef.current && side && slot) {
+          const otherSide = side === 'A' ? 'B' : 'A';
+          const otherAnchorKey = `${otherSide}:${slot}${typeof talismanIndex === 'number' ? `:t${talismanIndex}` : ''}`;
+          const targetEl = document.querySelector(`[data-anchor-key="${otherAnchorKey}"]`) as HTMLElement | null;
+          if (targetEl) {
+            const tRect = targetEl.getBoundingClientRect();
+            const mtRect = mirrorTooltipRef.current.getBoundingClientRect();
+            const m2 = 10;
+            let mx = tRect.right + m2;
+            let my = tRect.top;
+            if (mx + mtRect.width > window.innerWidth) mx = tRect.left - mtRect.width - m2;
+            if (my + mtRect.height > window.innerHeight) my = window.innerHeight - mtRect.height - m2;
+            if (mx < m2) mx = m2;
+            if (my < m2) my = m2;
+            setMirrorPosition({ x: mx, y: my });
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('scroll', updatePositions, true);
+    window.addEventListener('resize', updatePositions);
+    updatePositions();
+    return () => {
+      window.removeEventListener('scroll', updatePositions, true);
+      window.removeEventListener('resize', updatePositions);
+    };
+  }, [isVisible, mirrorVisible, side, slot, talismanIndex]);
+
   // no-op: removed local talisman renderer in favor of shared renderers
 
   if (!item) {
@@ -411,31 +459,30 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
         {children}
       </div>
 
-      {isVisible && (
+      {isVisible && createPortal(
         <div
           ref={tooltipRef}
-          className={`fixed z-50 bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 max-w-xs pointer-events-none ${!itemEligible ? 'grayscale' : ''}`}
-          style={{
-            left: position.x,
-            top: position.y,
-          }}
+          className={`fixed z-[11000] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 max-w-xs pointer-events-none ${!itemEligible ? 'grayscale' : ''}`}
+          style={{ left: position.x, top: position.y }}
         >
           {displayItem && renderTooltipContent(displayItem, itemEligible, getEquippedSetItemsCountForLoadout, getEffectiveLoadout())}
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Mirror tooltip over opposite side slot/talisman */}
-      {isVisible && mirrorVisible && otherDisplayItem && (
+      {isVisible && mirrorVisible && otherDisplayItem && createPortal(
         <div
           ref={mirrorTooltipRef}
-          className={`fixed z-40 bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 max-w-xs pointer-events-none ${!otherEligible ? 'grayscale' : ''}`}
+          className={`fixed z-[10990] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 max-w-xs pointer-events-none ${!otherEligible ? 'grayscale' : ''}`}
           style={{ left: mirrorPosition.x, top: mirrorPosition.y }}
         >
           {renderTooltipContent(otherDisplayItem, otherEligible, (setName: string) => {
             const otherLoCtx = side ? loadoutService.getLoadoutForSide(side === 'A' ? 'B' : 'A') : null;
             return getEquippedSetItemsCountForSpecificLoadout(setName, otherLoCtx);
           }, side ? loadoutService.getLoadoutForSide(side === 'A' ? 'B' : 'A') : null)}
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

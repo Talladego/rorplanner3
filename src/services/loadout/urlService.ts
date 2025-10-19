@@ -66,6 +66,8 @@ class UrlService {
 			if (n > 0) params[`renown.${key}`] = String(n);
 		});
 		Object.entries(loadout.items).forEach(([slot, slotData]: [string, LoadoutItem]) => {
+			// Skip trophy slots entirely in share URLs
+			if (slot.startsWith('TROPHY')) return;
 			if (slotData?.item?.id) params[`item.${slot}`] = slotData.item.id;
 			if (slotData?.talismans) {
 				slotData.talismans.forEach((talisman, index: number) => {
@@ -107,6 +109,8 @@ class UrlService {
 		for (const [key, value] of params.entries()) {
 			if (key.startsWith(`${prefix}.item.`)) {
 				const slot = key.substring(`${prefix}.item.`.length);
+				// Ignore trophy slots from URL decoding
+				if (slot.startsWith('TROPHY')) continue;
 				if (!loadout.items[slot]) loadout.items[slot] = { item: null, talismans: [] };
 				loadout.items[slot].item = { id: value };
 			} else if (key.startsWith(`${prefix}.talisman.`)) {
@@ -114,6 +118,8 @@ class UrlService {
 				const parts = rest.split('.');
 				if (parts.length === 2) {
 					const slot = parts[0];
+					// Ignore trophy slots from URL decoding
+					if (slot.startsWith('TROPHY')) continue;
 					const index = parseInt(parts[1], 10);
 					if (!loadout.items[slot]) loadout.items[slot] = { item: null, talismans: [] };
 					loadout.items[slot].talismans[index] = { id: value };
@@ -177,7 +183,9 @@ class UrlService {
 				});
 				const charAFlag = params.get('loadCharacterA');
 				if (charAFlag) loadoutService.setCharacterStatusForLoadout(aId, true, charAFlag);
-				const perSlotA = Object.entries(a.items).map(([slotKey, data]) => (async () => {
+				const perSlotA = Object.entries(a.items)
+					.filter(([slotKey]) => !slotKey.startsWith('TROPHY'))
+					.map(([slotKey, data]) => (async () => {
 					const slot = slotKey as unknown as EquipSlot;
 					if (data.item?.id) {
 						const item = await loadoutService.getItemWithDetails(data.item.id);
@@ -211,7 +219,9 @@ class UrlService {
 				});
 				const charBFlag = params.get('loadCharacterB');
 				if (charBFlag) loadoutService.setCharacterStatusForLoadout(bId, true, charBFlag);
-				const perSlotB = Object.entries(b.items).map(([slotKey, data]) => (async () => {
+				const perSlotB = Object.entries(b.items)
+					.filter(([slotKey]) => !slotKey.startsWith('TROPHY'))
+					.map(([slotKey, data]) => (async () => {
 					const slot = slotKey as unknown as EquipSlot;
 					if (data.item?.id) {
 						const item = await loadoutService.getItemWithDetails(data.item.id);

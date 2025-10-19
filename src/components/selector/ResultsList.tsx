@@ -3,6 +3,8 @@ import Tooltip from '../tooltip/Tooltip';
 import { CAREER_RACE_MAPPING, Career, EquipSlot, Item, Stat } from '../../types';
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { formatItemTypeName, formatSlotName, formatStatName, formatStatValue, isPercentItemStat, normalizeStatDisplayValue } from '../../utils/formatters';
+import { isTwoHandedWeapon } from '../../utils/items';
+import { CANNOT_USE_2H_MELEE, getOffhandBlockReason } from '../../constants/careerWeaponRules';
 
 export interface ResultsListProps {
   items: Item[];
@@ -28,11 +30,19 @@ function formatTalismanStats(item: Item): string {
 
 function renderItemInfo(item: Item, filteredStats?: Stat[]): ReactNode {
   const typeName = formatItemTypeName(item.type);
-  const slotName = formatSlotName(item.slot);
-  const base = `${typeName}, ${slotName}, Item Level: ${item.itemLevel}`;
-  if (!filteredStats || filteredStats.length === 0) return base;
+  const slotNameRaw = formatSlotName(item.slot);
+  // If our heuristic marks this as a two-handed weapon and it's a main-hand candidate, render a bold "Two-Handed" label
+  const isTwoH = (item.slot === EquipSlot.MAIN_HAND && isTwoHandedWeapon(item));
+  const slotNode: ReactNode = isTwoH ? (<strong className="font-bold">Two-Handed</strong>) : slotNameRaw;
+  const dpsNum = Number(item.dps || 0);
+  const baseNode = (
+    <>
+      {typeName}, {slotNode}{dpsNum > 0 ? `, DPS: ${dpsNum}` : ''}, Item Level: {item.itemLevel}
+    </>
+  );
+  if (!filteredStats || filteredStats.length === 0) return baseNode;
   const lines = (item.stats || []).filter((s) => s && filteredStats.includes(s.stat as Stat));
-  if (lines.length === 0) return base;
+  if (lines.length === 0) return baseNode;
   const rendered = lines.map((line) => {
     const isPct = isPercentItemStat(line.stat, line.percentage);
     const normalized = isPct ? line.value : normalizeStatDisplayValue(line.stat, line.value);
@@ -42,7 +52,7 @@ function renderItemInfo(item: Item, filteredStats?: Stat[]): ReactNode {
   }).join(' / ');
   return (
     <>
-      {base}, <span className="text-gray-900 dark:text-gray-100 font-medium">{rendered}</span>
+      {baseNode}, <span className="text-gray-900 dark:text-gray-100 font-medium">{rendered}</span>
     </>
   );
 }
@@ -84,12 +94,32 @@ export function ResultsList({
           }
           return item.slot !== targetSlot;
         })();
+
+        // If a two-handed weapon is equipped in MAIN_HAND, disallow any OFF_HAND selections
+        const currentLoadout = loadoutId
+          ? (loadoutService.getAllLoadouts().find(l => l.id === loadoutId) || loadoutService.getCurrentLoadout())
+          : loadoutService.getCurrentLoadout();
+        const mainHandItem = currentLoadout?.items?.[EquipSlot.MAIN_HAND]?.item || null;
+        const isOffhandDisallowedByTwoHandedMain = !isTalismanMode && slot === EquipSlot.OFF_HAND && !!mainHandItem && isTwoHandedWeapon(mainHandItem as Item);
+        const offHandItem = currentLoadout?.items?.[EquipSlot.OFF_HAND]?.item || null;
+        const isMainhand2HDisallowedByOffhand = !isTalismanMode && slot === EquipSlot.MAIN_HAND && !!offHandItem && isTwoHandedWeapon(item as Item);
+
+        // Career off-hand policy: if OFF_HAND is selected, determine if the item type is allowed for the selected career
+        const offhandPolicyReason = !isTalismanMode && slot === EquipSlot.OFF_HAND && eligibilityCareer
+          ? getOffhandBlockReason(eligibilityCareer as Career, item as Item)
+          : null;
+
+        // UI-only: careers that cannot use two-handed melee
+        const cannotUse2HReason = !isTalismanMode && slot === EquipSlot.MAIN_HAND && eligibilityCareer && isTwoHandedWeapon(item as Item)
+          ? (CANNOT_USE_2H_MELEE.has(eligibilityCareer as Career) ? 'This career cannot equip two-handed weapons' : null)
+          : null;
+
         const isTalismanAlreadySlotted = isTalismanMode && talismanSlotIndex !== undefined && (
           loadoutId
             ? loadoutService.isTalismanAlreadySlottedInItemForLoadout(loadoutId, item.id, slot, talismanSlotIndex)
             : loadoutService.isTalismanAlreadySlottedInItem(item.id, slot, talismanSlotIndex)
         );
-        const isDisabled = isAlreadyEquipped || isCareerRestricted || isRaceRestricted || isTalismanAlreadySlotted || isSlotIncompatible;
+  const isDisabled = isAlreadyEquipped || isCareerRestricted || isRaceRestricted || isTalismanAlreadySlotted || isSlotIncompatible || isOffhandDisallowedByTwoHandedMain || isMainhand2HDisallowedByOffhand || !!offhandPolicyReason || !!cannotUse2HReason;
 
         return (
           <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode} loadoutId={effectiveLoadoutId || undefined}>
@@ -132,7 +162,15 @@ export function ResultsList({
                           ? 'Not usable by this career'
                           : isRaceRestricted
                             ? 'Not usable by this race'
-                            : isSlotIncompatible
+                            : isOffhandDisallowedByTwoHandedMain
+                              ? 'Two-handed main-hand equipped'
+                              : isMainhand2HDisallowedByOffhand
+                              ? 'Off-hand equipped'
+                              : offhandPolicyReason
+                                ? offhandPolicyReason
+                                : cannotUse2HReason
+                                  ? cannotUse2HReason
+                                : isSlotIncompatible
                               ? 'Not compatible with this slot'
                               : isTalismanAlreadySlotted
                                 ? 'Already slotted in this item'
