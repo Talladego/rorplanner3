@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Career } from '../../types';
+import { Career, LoadoutSide } from '../../types';
 import { formatCareerName } from '../../utils/formatters';
 import { getCareerIconUrl } from '../../constants/careerIcons';
 import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
@@ -13,9 +13,11 @@ interface CareerSelectProps {
   onChange: (career: Career | '') => void;
   placeholder?: string;
   size?: Size;
+  // Which side's career mappings to use for non-empty highlighting
+  side: LoadoutSide;
 }
 
-export default function CareerSelect({ value, onChange, placeholder = 'Select Career', size = 'md' }: CareerSelectProps) {
+export default function CareerSelect({ value, onChange, placeholder = 'Select Career', size = 'md', side }: CareerSelectProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -35,22 +37,24 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
 
   // Panel should match the control's width and alignment
 
-  // Determine which careers have at least one non-empty loadout in the store
+  // Determine which careers are non-empty for THIS side only
   const recomputeNonEmptyCareers = () => {
-    const set: Partial<Record<Career, boolean>> = {};
+    const result: Partial<Record<Career, boolean>> = {};
     const loadouts = loadoutStoreAdapter.getLoadouts();
-    for (const l of loadouts) {
-      if (!l || !l.career) continue;
-      // Non-empty heuristic: any equipped item or any non-null talisman
+    for (const career of careers) {
+      const mappedId = loadoutStoreAdapter.getSideCareerLoadoutId(side, career as Career);
+      if (!mappedId) continue;
+      const l = loadouts.find((lo) => lo.id === mappedId);
+      if (!l) continue;
+      // Non-empty heuristic: any equipped item or any non-null talisman or any renown points
       const hasItem = Object.values(l.items || {}).some((entry) => !!entry?.item);
       const hasTalis = Object.values(l.items || {}).some((entry) => (entry?.talismans || []).some((t) => !!t));
-      // Treat any non-zero renown allocation as a non-empty loadout as well
       const hasRenown = l.renownAbilities && Object.values(l.renownAbilities).some((v) => (Number(v) || 0) > 0);
       if (hasItem || hasTalis || hasRenown) {
-        set[l.career] = true;
+        result[career as Career] = true;
       }
     }
-    setNonEmptyCareers(set);
+    setNonEmptyCareers(result);
   };
 
   useEffect(() => {
@@ -85,7 +89,7 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
       document.removeEventListener('mousedown', onDocClick);
       unsub();
     };
-  }, [open]);
+  }, [open, side, careers.length]);
 
   const openMenu = () => {
     setOpen(true);

@@ -129,6 +129,7 @@ function SideToolbar({ side }: SideToolbarProps) {
                 <label className="form-label text-xs">Career</label>
                 <div className="mt-0.5">
                   <CareerSelect
+                    side={side}
                     value={selectedCareer}
                     onChange={(career) => onCareerChange(career)}
                     placeholder="Select"
