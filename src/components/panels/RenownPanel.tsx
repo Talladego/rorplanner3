@@ -14,7 +14,7 @@ const roman = ['', 'I', 'II', 'III', 'IV', 'V']; // map: 0->'', 1->I, 2->II, 3->
 function LevelSelect({ value, onChange, maxLevel, statName, percent, totalsOverride, visibleMaxLevel = 5 }: { value: number; onChange: (v: number) => void; maxLevel: number; statName: string; percent?: boolean; totalsOverride?: number[]; visibleMaxLevel?: number }) {
   return (
     <select
-      className="w-28 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      className="form-input form-input-text text-xs py-0.5 px-1 rounded w-28"
       value={value}
       onChange={(e) => onChange(Number(e.currentTarget.value))}
     >
@@ -136,7 +136,10 @@ export default memo(function RenownPanel({ loadoutId, embedded = false }: { load
           const rarity = rarityLevels[clamped] || ItemRarity.UTILITY;
           const color = getRarityColor(rarity);
           return (
-          <div key={ab.key} className="flex items-center justify-between gap-1">
+          <div
+            key={ab.key}
+            className="flex items-center justify-between gap-1 rounded px-1 -mx-1 hover:bg-gray-800/60 hover:ring-1 hover:ring-gray-700 transition-colors"
+          >
             <HoverTooltip content={renderAbilityTooltip(ab, clamped)}>
               <div className="flex items-center gap-1 min-w-0">
                 {/* Icon placeholder; will use ab.iconUrl when provided */}

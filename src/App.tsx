@@ -110,7 +110,7 @@ function App() {
             <ScaleToFit designWidth={1440} minScale={0.75} maxScale={1920/1440}>
               <ScaleIndicator />
               <header className="relative text-center mb-8">
-                <h1 className="text-4xl font-bold text-primary">RorPlanner</h1>
+                <h1 className="text-4xl font-bold text-primary font-brand">RorPlanner</h1>
                 <a
                   href="https://discord.com/users/316636548353490944"
                   target="_blank"
@@ -126,7 +126,7 @@ function App() {
           ) : (
             <div className="mx-auto" style={{ width: 1440, minWidth: 1440 }}>
               <header className="relative text-center mb-8">
-                <h1 className="text-4xl font-bold text-primary">RorPlanner</h1>
+                <h1 className="text-4xl font-bold text-primary font-brand">RorPlanner</h1>
                 <a
                   href="https://discord.com/users/316636548353490944"
                   target="_blank"

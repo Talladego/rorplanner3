@@ -235,6 +235,9 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                 onStatsFilterChange([]);
                 onRarityFilterChange([]);
                 setEnableCareerFilter(true);
+                // Also reset Block invalid items to default ON
+                setBlockInvalid(true);
+                setBlockInvalidItems(true);
                 setCurrentPage(1);
                 setPageHistory([]);
                 setHookCurrentPage(1);

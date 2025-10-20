@@ -135,6 +135,14 @@ export default function StatsComparePanel() {
   // Offense groups: common, then melee, ranged, magic
   const offenseGroups: Row[][] = [offenseRows, meleeRows, rangedRows, magicRows];
   const offenseAny = offenseGroups.some(g => g.length > 0);
+  // Determine if any section has rows; if none, hide the Tier 3 container entirely
+  const showAnyStats = (
+    baseRows.length > 0 ||
+    defenseRows.length > 0 ||
+    offenseAny ||
+    healingRows.length > 0 ||
+    otherRows.length > 0
+  );
   // Determine if any side has a selected career
   const loadoutA = aId ? loadoutService.getLoadoutForSide('A') : null;
   const loadoutB = bId ? loadoutService.getLoadoutForSide('B') : null;
@@ -306,50 +314,60 @@ export default function StatsComparePanel() {
         <div className="text-xs text-muted mb-2">Assign loadouts to both A and B to compare.</div>
       )}
 
-      {/* Primary Stats */}
-      {baseRows.length > 0 && (
-        <div className="stats-section">
-          {renderSection('Primary Stats', baseRows)}
-        </div>
-      )}
+      {/* Stats content in Tier 3 container (hidden entirely if no stats) */}
+      {showAnyStats && (
+        <div className="equipment-slot">
+          {/* Primary Stats */}
+          {baseRows.length > 0 && (
+            <div className="stats-section">
+              {renderSection('Primary Stats', baseRows)}
+            </div>
+          )}
 
-      {/* Defense Stats */}
-      {defenseRows.length > 0 && (
-        <div className="stats-section">
-          {renderSection('Defense', defenseRows)}
-        </div>
-      )}
+          {/* Defense Stats */}
+          {defenseRows.length > 0 && (
+            <div className="stats-section">
+              {renderSection('Defense', defenseRows)}
+            </div>
+          )}
 
-      {/* Offense with thin separators between groups (common, melee, ranged, magic) */}
-      {offenseAny && (
-        <div className="stats-section">
-          <h3 className="stats-section-title">Offense</h3>
-          <div className="my-1 h-px bg-gray-700 opacity-60" />
-          <div className="mt-1">
-            {offenseGroups.filter(g => g.length > 0).map((group, idx, arr) => (
-              <div key={idx}>
-                {renderSection('', group, false, 'subsection', false)}
-                {idx < arr.length - 1 && (
-                  <div className="my-1 h-px bg-gray-700 opacity-60" />
-                )}
+          {/* Offense with thin separators between groups (common, melee, ranged, magic) */}
+          {offenseAny && (
+            <div className="stats-section">
+              <h3 className="stats-section-title">Offense</h3>
+              <div className="my-1 h-px bg-gray-700 opacity-60" />
+              <div className="mt-1">
+                {offenseGroups.filter(g => g.length > 0).map((group, idx, arr) => (
+                  <div key={idx}>
+                    {renderSection('', group, false, 'subsection', false)}
+                    {idx < arr.length - 1 && (
+                      <div className="my-1 h-px bg-gray-700 opacity-60" />
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
+          {/* Healing Stats */}
+          {healingRows.length > 0 && (
+            <div className="stats-section">
+              {renderSection('Healing', healingRows)}
+            </div>
+          )}
+
+          {/* Other Stats */}
+          {otherRows.length > 0 && (
+            <div className="stats-section">
+              {renderSection('Other', otherRows)}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Healing Stats */}
-      {healingRows.length > 0 && (
-        <div className="stats-section">
-          {renderSection('Healing', healingRows)}
-        </div>
-      )}
-
-      {/* Other Stats */}
-      {otherRows.length > 0 && (
-        <div className="stats-section">
-          {renderSection('Other', otherRows)}
-        </div>
+      {/* Empty message when careers exist but there are no visible stats */}
+      {!showAnyStats && (
+        <div className="stats-empty-message">Select a career or load a character to see stats</div>
       )}
 
       {shareOpen && (

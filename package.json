@@ -10,6 +10,7 @@
     "lint:fix": "eslint --fix",
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck",
+  "generate:base-stats": "npx tsx scripts/generateBaseStats.ts",
     "probe:jewellery3-talismans": "npx tsx scripts/probe-jewellery3-talismans.ts",
     "probe:item": "npx tsx scripts/probe-item.ts",
     "probe:item-buffs": "npx tsx scripts/probe-item-buffs.ts",

@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { Career } from '../../types';
 import { formatCareerName } from '../../utils/formatters';
 import { getCareerIconUrl } from '../../constants/careerIcons';
+import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
+import { loadoutService } from '../../services/loadout/loadoutService';
 
 type Size = 'sm' | 'md';
 
@@ -19,14 +21,42 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [nonEmptyCareers, setNonEmptyCareers] = useState<Partial<Record<Career, boolean>>>({});
 
   const careers = useMemo(() => Object.values(Career), []);
 
-  const selectedLabel = value ? formatCareerName(value as Career) : placeholder;
+  const selectedLabel = useMemo(() => {
+    if (!value) return placeholder;
+    // Do not include asterisk in the control label; only show it in the dropdown menu items
+    return formatCareerName(value as Career);
+  }, [value, placeholder]);
   const iconSize = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
   const itemPadding = size === 'sm' ? 'py-0.5 px-2 text-xs' : 'py-2 px-3 text-sm';
 
+  // Panel should match the control's width and alignment
+
+  // Determine which careers have at least one non-empty loadout in the store
+  const recomputeNonEmptyCareers = () => {
+    const set: Partial<Record<Career, boolean>> = {};
+    const loadouts = loadoutStoreAdapter.getLoadouts();
+    for (const l of loadouts) {
+      if (!l || !l.career) continue;
+      // Non-empty heuristic: any equipped item or any non-null talisman
+      const hasItem = Object.values(l.items || {}).some((entry) => !!entry?.item);
+      const hasTalis = Object.values(l.items || {}).some((entry) => (entry?.talismans || []).some((t) => !!t));
+      // Treat any non-zero renown allocation as a non-empty loadout as well
+      const hasRenown = l.renownAbilities && Object.values(l.renownAbilities).some((v) => (Number(v) || 0) > 0);
+      if (hasItem || hasTalis || hasRenown) {
+        set[l.career] = true;
+      }
+    }
+    setNonEmptyCareers(set);
+  };
+
   useEffect(() => {
+    // Initial compute
+    recomputeNonEmptyCareers();
+
     const onDocClick = (e: MouseEvent) => {
       if (!open) return;
       const t = e.target as Node;
@@ -35,7 +65,26 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
       setOpen(false);
     };
     document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
+    // Subscribe to loadout changes to keep asterisk state in sync
+    const unsub = loadoutService.subscribeToAllEvents((ev) => {
+      switch (ev.type) {
+        case 'ITEM_UPDATED':
+        case 'TALISMAN_UPDATED':
+        case 'LOADOUT_RESET':
+        case 'LOADOUT_CREATED':
+        case 'LOADOUT_SWITCHED':
+        case 'CAREER_CHANGED':
+        case 'SIDE_LOADOUT_ASSIGNED':
+        case 'STATS_UPDATED': // covers renown ability level changes and resets
+        case 'RENOWN_RANK_CHANGED':
+          recomputeNonEmptyCareers();
+          break;
+      }
+    });
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      unsub();
+    };
   }, [open]);
 
   const openMenu = () => {
@@ -115,7 +164,9 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
           ) : (
             <div className={`${iconSize}`} />
           )}
-          <span className="truncate">{selectedLabel}</span>
+          <span className={`${value ? (nonEmptyCareers[value as Career] ? 'text-white' : 'text-gray-400') : ''} truncate`}>
+            {selectedLabel}
+          </span>
         </span>
         <svg className="w-4 h-4 text-secondary" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fillRule="evenodd" d="M10 12a1 1 0 01-.707-.293l-4-4a1 1 0 111.414-1.414L10 9.586l3.293-3.293a1 1 0 111.414 1.414l-4 4A1 1 0 0110 12z" clipRule="evenodd" />
@@ -144,7 +195,7 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
                 onClick={() => selectIndex(idx)}
               >
                 <img src={getCareerIconUrl(career)} alt={label} className={`${iconSize} rounded`} />
-                <span className="truncate">{label}</span>
+                <span className={`${nonEmptyCareers[career] ? 'text-white' : 'text-gray-400'} truncate`}>{label}</span>
               </div>
             );
           })}

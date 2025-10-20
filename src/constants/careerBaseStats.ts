@@ -1,4 +1,5 @@
 import { Career, StatsSummary } from '../types';
+import GENERATED_CAREER_BASE_STATS from './careerBaseStats.generated';
 
 // Base stat keys we support from provided data and used in Compare panel
 export type BaseStatKey =
@@ -15,7 +16,8 @@ export type BaseStats = Record<BaseStatKey, number>;
 
 // Data structure: per career → per level → base stats (with no gear)
 // Seeded with level 1 values provided by user. Add level 40 anchors when available.
-export const CAREER_BASE_STATS: Record<Career, Record<number, BaseStats>> = {
+// Merge generated full per-level stats with any hand-maintained anchors as fallback/overrides
+const MANUAL_CAREER_BASE_STATS: Partial<Record<Career, Record<number, BaseStats>>> = {
   [Career.IRON_BREAKER]: {
     1: { strength: 50, willpower: 55, toughness: 65, wounds: 60, initiative: 45, weaponSkill: 60, ballisticSkill: 40, intelligence: 35 },
     40: { strength: 147, ballisticSkill: 98, intelligence: 74, toughness: 221, weaponSkill: 196, initiative: 123, willpower: 172, wounds: 606 },
@@ -118,6 +120,16 @@ export const CAREER_BASE_STATS: Record<Career, Record<number, BaseStats>> = {
     40: { strength: 98, ballisticSkill: 74, intelligence: 221, toughness: 147, weaponSkill: 123, initiative: 172, willpower: 196, wounds: 391 },
   },
 };
+
+// Combine generated and manual, where manual entries override when both present
+const merged: Partial<Record<Career, Record<number, BaseStats>>> = { ...GENERATED_CAREER_BASE_STATS };
+for (const career of Object.keys(MANUAL_CAREER_BASE_STATS) as Career[]) {
+  const manual = MANUAL_CAREER_BASE_STATS[career]!;
+  const generatedForCareer = (GENERATED_CAREER_BASE_STATS as Partial<Record<Career, Record<number, BaseStats>>>)[career] || {};
+  merged[career] = { ...generatedForCareer, ...manual } as Record<number, BaseStats>;
+}
+
+export const CAREER_BASE_STATS = merged as Record<Career, Record<number, BaseStats>>;
 
 const ZERO_BASE: BaseStats = {
   strength: 0,

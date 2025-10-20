@@ -125,22 +125,27 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
     );
   }
 
-  // Custom slot order for the desired layout
+  // Custom slot order: 2 columns
+  // Column 1: Helm, Shoulders, Back, Body, Gloves, Belt, Boots, Pocket 1
+  // Column 2: Main Hand, Off Hand, Ranged, Jewel 1, Jewel 2, Jewel 3, Jewel 4, Pocket 2
+  // Event will be centered under Pocket 1 and Pocket 2 via a full-width row.
   const slotOrder = [
     // Row 1
-    EquipSlot.HELM, EquipSlot.MAIN_HAND, EquipSlot.JEWELLERY1,
+    EquipSlot.HELM,           EquipSlot.MAIN_HAND,
     // Row 2
-    EquipSlot.SHOULDER, EquipSlot.OFF_HAND, EquipSlot.JEWELLERY2,
+    EquipSlot.SHOULDER,       EquipSlot.OFF_HAND,
     // Row 3
-    EquipSlot.BACK, EquipSlot.RANGED_WEAPON, EquipSlot.JEWELLERY3,
-    // Row 4 (Body armor, empty slot, Jewel 4)
-    EquipSlot.BODY, null, EquipSlot.JEWELLERY4,
+    EquipSlot.BACK,           EquipSlot.RANGED_WEAPON,
+    // Row 4
+    EquipSlot.BODY,           EquipSlot.JEWELLERY1,
     // Row 5
-    EquipSlot.GLOVES, EquipSlot.EVENT, null,
+    EquipSlot.GLOVES,         EquipSlot.JEWELLERY2,
     // Row 6
-    EquipSlot.BELT, EquipSlot.POCKET1, null,
+    EquipSlot.BELT,           EquipSlot.JEWELLERY3,
     // Row 7
-    EquipSlot.BOOTS, EquipSlot.POCKET2, null,
+    EquipSlot.BOOTS,          EquipSlot.JEWELLERY4,
+    // Row 8
+    EquipSlot.POCKET1,        EquipSlot.POCKET2,
   ];
 
   const wrapperClass = hideHeading ? 'relative' : 'lg:col-span-2 panel-container relative';
@@ -148,15 +153,16 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   return (
     <div className={wrapperClass}>
       {!hideHeading && <h2 className="panel-heading">Equipment</h2>}
-  <div className={`grid grid-cols-3 ${compact ? 'gap-1' : 'gap-2'}`}>
+    {/* Grid of equipment slots */}
+  <div className={`grid grid-cols-2 ${compact ? 'gap-1' : 'gap-2'}`}>
         {slotOrder.map((slot, index) => {
           if (slot === null) {
-            return <div key={`empty-${index}`} className="invisible"></div>;
+            return <div key={`empty-${index}`} className="relative invisible"></div>;
           }
 
           const slotData = effectiveLoadout.items[slot];
           const item = slotData.item || null;
-          // Slot compatibility mirror of selector rules
+          // Slot compatibility mirror of selector rules (per target slot)
           const invalidBySlotIncompatible = !!item && (() => {
             const targetSlot = slot;
             if (targetSlot === EquipSlot.POCKET1 || targetSlot === EquipSlot.POCKET2) {
@@ -219,7 +225,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                           slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common'} relative z-10`}>
                           {/* Invalid overlay in top-left */}
                           {isSlotItemInvalid && (
-                            <span className="absolute top-0 left-0 text-red-500 text-xs leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold" title="Invalid item for current rules or requirements">🛇</span>
+                            <span className="absolute top-0 left-0 text-red-500 text-xs leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold pointer-events-none" title="Invalid item for current rules or requirements">🛇</span>
                           )}
                           <img
                             src={slotData.item.iconUrl}
@@ -242,57 +248,81 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                       </div>
                     </HoverTooltip>
                   )}
-                  {iconOnly && slotData.item && slotData.item.talismanSlots > 0 && (
-                    <div className="flex flex-row items-start gap-2 ml-1">
-                      <div className="flex flex-col justify-start items-start gap-1">
-                      {Array.from({ length: slotData.item.talismanSlots }, (_, i) => {
-                        const t = slotData.talismans[i];
-                        const seenBefore = new Set<string>();
-                        for (let k = 0; k < i; k++) {
-                          const prev = slotData.talismans[k];
-                          if (prev && prev.id) seenBefore.add(prev.id);
-                        }
-                        const isDuplicateTalisman = !!(t && t.id && seenBefore.has(t.id));
-                        return (
-                          <div key={i} data-talisman-index={i} className={`talisman-slot${isDuplicateTalisman ? ' invalid' : ''} ${t ? 'border-current ' : ''}${t ? ((t.itemSet ? 'item-color-set' :
-                            t.rarity === 'MYTHIC' ? 'item-color-mythic' :
-                            t.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
-                            t.rarity === 'RARE' ? 'item-color-rare' :
-                            t.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
-                            t.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')) : ''} relative`}> 
-                            {t ? (
-                              <Tooltip item={t} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i}>
-                                <div className="relative">
-                                  {isDuplicateTalisman && (
-                                    <span className="absolute top-0 left-0 text-red-500 text-[10px] leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold" title="Duplicate talisman">🛇</span>
+                  {/* Icon-only label and horizontal talismans */}
+                  {iconOnly && (
+                    slotData.item ? (
+                      <div className="flex items-start gap-2 ml-1 w-full justify-between">
+                        {/* Slot label: item name with rarity color */}
+                        <div className="min-w-0 flex-1">
+                          <p 
+                            className={`equipment-item-name ${(slotData.item.itemSet ? 'item-color-set' :
+                              slotData.item.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                              slotData.item.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                              slotData.item.rarity === 'RARE' ? 'item-color-rare' :
+                              slotData.item.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                              slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')}`}
+                            title={slotData.item.name}
+                          >
+                            {slotData.item.name}
+                          </p>
+                        </div>
+                        {/* Talismans arranged vertically, right-aligned */}
+                        {slotData.item.talismanSlots > 0 && (
+                          <div className="flex flex-col items-end gap-1">
+                            {Array.from({ length: slotData.item.talismanSlots }, (_, i) => {
+                              const t = slotData.talismans[i];
+                              const seenBefore = new Set<string>();
+                              for (let k = 0; k < i; k++) {
+                                const prev = slotData.talismans[k];
+                                if (prev && prev.id) seenBefore.add(prev.id);
+                              }
+                              const isDuplicateTalisman = !!(t && t.id && seenBefore.has(t.id));
+                              return (
+                                <div key={i} data-talisman-index={i} className={`talisman-slot${isDuplicateTalisman ? ' invalid' : ''} ${t ? 'border-current ' : ''}${t ? ((t.itemSet ? 'item-color-set' :
+                                  t.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                                  t.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                                  t.rarity === 'RARE' ? 'item-color-rare' :
+                                  t.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                                  t.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')) : ''} relative`}>
+                                  {t ? (
+                                    <Tooltip item={t} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i}>
+                                      <div className="relative">
+                                        {isDuplicateTalisman && (
+                                          <span className="absolute top-0 left-0 text-red-500 text-[10px] leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold pointer-events-none" title="Duplicate talisman">🛇</span>
+                                        )}
+                                        <img
+                                          src={t.iconUrl}
+                                          alt={t.name}
+                                          className={`w-full h-full object-contain rounded cursor-pointer`}
+                                          onClick={() => handleTalismanClick(slot, i)}
+                                          onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
+                                          data-anchor-key={side ? `${side}:${slot}:t${i}` : undefined}
+                                        />
+                                      </div>
+                                    </Tooltip>
+                                  ) : (
+                                    <HoverTooltip content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
+                                      <div className="icon-frame-empty w-full h-full rounded cursor-pointer" onClick={() => handleTalismanClick(slot, i)} onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}>
+                                        <img
+                                          src={DEFAULT_SLOT_ICONS[EquipSlot.JEWELLERY1]}
+                                          alt="Empty talisman slot"
+                                          className="w-full h-full object-contain rounded opacity-50"
+                                        />
+                                      </div>
+                                    </HoverTooltip>
                                   )}
-                                  <img
-                                    src={t.iconUrl}
-                                    alt={t.name}
-                                    className={`w-full h-full object-contain rounded cursor-pointer`}
-                                    onClick={() => handleTalismanClick(slot, i)}
-                                    onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
-                                    data-anchor-key={side ? `${side}:${slot}:t${i}` : undefined}
-                                  />
                                 </div>
-                              </Tooltip>
-                            ) : (
-                              <HoverTooltip content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
-                                <div className="icon-frame-empty w-full h-full rounded cursor-pointer" onClick={() => handleTalismanClick(slot, i)} onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}>
-                                  <img
-                                    src={DEFAULT_SLOT_ICONS[EquipSlot.JEWELLERY1]}
-                                    alt="Empty talisman slot"
-                                    className="w-full h-full object-contain rounded opacity-50"
-                                  />
-                                </div>
-                              </HoverTooltip>
-                            )}
+                              );
+                            })}
                           </div>
-                        );
-                      })}
+                        )}
                       </div>
-                      {/* Overlay handles invalid indicator; remove inline marker */}
-                    </div>
+                    ) : (
+                      // Empty slot: show slot label (slot name) right-aligned where talisman 0 would be
+                      <div className="ml-1 w-full flex justify-end">
+                        <p className="equipment-slot-name" title={formatSlotName(slot)}>{formatSlotName(slot)}</p>
+                      </div>
+                    )
                   )}
                   {!iconOnly && (
                     <div className="equipment-text">
@@ -331,7 +361,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                                       <Tooltip item={t} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i}>
                                         <div className="relative">
                                           {isDuplicateTalisman && (
-                                            <span className="absolute top-0 left-0 text-red-500 text-[10px] leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold" title="Duplicate talisman">🛇</span>
+                                            <span className="absolute top-0 left-0 text-red-500 text-[10px] leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold pointer-events-none" title="Duplicate talisman">🛇</span>
                                           )}
                                           <img
                                             src={t.iconUrl}
@@ -368,6 +398,101 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
             </div>
           );
         })}
+        {/* Centered Event tile spanning both columns */}
+        {(() => {
+          const slot = EquipSlot.EVENT;
+          const slotData = effectiveLoadout.items[slot];
+          const item = slotData.item || null;
+          // Match single-column width inside a two-column grid (subtract half the gap)
+          const eventTileWidth = compact ? 'calc(50% - 0.125rem)' : 'calc(50% - 0.25rem)';
+          // Event: only accept items for EVENT slot
+          const invalidBySlotIncompatible = !!item && (item.slot !== EquipSlot.EVENT);
+          const invalidByLevel = item ? !isItemEligible(item) : false;
+          const invalidByCareer = item && selectedCareer
+            ? (item.careerRestriction && item.careerRestriction.length > 0 && !item.careerRestriction.includes(selectedCareer))
+            : false;
+          const invalidByRace = item && selectedCareer
+            ? (item.raceRestriction && item.raceRestriction.length > 0 && !item.raceRestriction.some(r => (CAREER_RACE_MAPPING[selectedCareer as Career] || []).includes(r)))
+            : false;
+          const invalidBy2HConflict = false;
+          const invalidByPolicy = false;
+          const earlierSlots = slotOrder.filter((s): s is EquipSlot => s !== null);
+          const invalidByUniqueDuplicate = !!item && !!item.uniqueEquipped && earlierSlots.some((s) => {
+            const earlier = effectiveLoadout.items[s]?.item || null;
+            return earlier && earlier.id === item.id;
+          });
+          const isSlotItemInvalid = !!item && (invalidByLevel || invalidByCareer || invalidByRace || invalidBySlotIncompatible || invalidBy2HConflict || invalidByPolicy || invalidByUniqueDuplicate);
+          return (
+            <div key="event-full" className="col-span-2 flex justify-center">
+              <div className="relative" data-side={side || ''} data-slot={slot} style={{ width: eventTileWidth, maxWidth: '100%' }}>
+                <div className={`equipment-slot ${compact ? 'p-1' : ''}`}>
+                  <div className={(iconOnly ? 'flex items-start gap-1' : 'flex items-start gap-2')}>
+                    {slotData.item ? (
+                      <Tooltip item={{ ...slotData.item, talismans: slotData.talismans }} loadoutId={effectiveLoadout.id} side={side} slot={slot}>
+                        <div
+                          className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}${isSlotItemInvalid ? ' invalid' : ''}`}
+                          onClick={() => handleSlotClick(slot)}
+                          onContextMenu={(e) => handleSlotRightClick(e, slot)}
+                          data-anchor-key={side ? `${side}:${slot}` : undefined}
+                        >
+                          <div className={`icon-frame ${slotData.item.itemSet ? 'item-color-set' :
+                            slotData.item.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                            slotData.item.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                            slotData.item.rarity === 'RARE' ? 'item-color-rare' :
+                            slotData.item.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                            slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common'} relative z-10`}>
+                            {isSlotItemInvalid && (
+                              <span className="absolute top-0 left-0 text-red-500 text-xs leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold pointer-events-none" title="Invalid item for current rules or requirements">🛇</span>
+                            )}
+                            <img
+                              src={slotData.item.iconUrl}
+                              alt={slotData.item.name}
+                              className={`w-full h-full object-contain rounded`}
+                            />
+                          </div>
+                        </div>
+                      </Tooltip>
+                    ) : (
+                      <HoverTooltip content={hasCareer ? `Click to select ${formatSlotName(slot)}` : 'Select a career first'}>
+                        <div
+                          className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}`}
+                          onClick={() => handleSlotClick(slot)}
+                          onContextMenu={(e) => handleSlotRightClick(e, slot)}
+                        >
+                          <div className="icon-frame-empty w-full h-full rounded">
+                            <img src={DEFAULT_SLOT_ICONS[slot]} alt={`${slot} slot`} className="w-full h-full object-contain rounded opacity-50" />
+                          </div>
+                        </div>
+                      </HoverTooltip>
+                    )}
+                    {/* Icon-only label and talismans/slot name for Event (usually no talismans) */}
+                    {iconOnly && (
+                      slotData.item ? (
+                        <div className="ml-1">
+                          <p 
+                            className={`equipment-item-name ${(slotData.item.itemSet ? 'item-color-set' :
+                              slotData.item.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                              slotData.item.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                              slotData.item.rarity === 'RARE' ? 'item-color-rare' :
+                              slotData.item.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                              slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')}`}
+                            title={slotData.item.name}
+                          >
+                            {slotData.item.name}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="ml-1">
+                          <p className="equipment-slot-name" title={formatSlotName(slot)}>{formatSlotName(slot)}</p>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         </div>
       
       <Suspense fallback={null}>

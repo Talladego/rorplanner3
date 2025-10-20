@@ -106,7 +106,7 @@ function buildStatsBlock(loadout: Loadout | null): string {
   if (rows.length === 0) return '';
   // No width cap: allow full content
   const table = renderAsciiTable(['Stat', 'Value'], rows, ['left', 'right']);
-  return 'Stats (respecting toggles)\n' + table;
+  return 'Stats\n' + table;
 }
 
 function buildSummary(loadout: Loadout | null, opts?: { showItems?: boolean; showRenown?: boolean; showStats?: boolean }) {
@@ -183,7 +183,7 @@ function buildSummary(loadout: Loadout | null, opts?: { showItems?: boolean; sho
     // Renown table: no width cap
     out += 'Renown\n' + renderAsciiTable(['Ability', 'Rank', 'Effect'], renownRows, ['left', 'center', 'left']) + '\n';
   }
-  // Stats block respecting toggles
+  // Stats block
   const statsBlock = (opts?.showStats ?? false) ? buildStatsBlock(loadout) : '';
   if (statsBlock && (opts?.showStats ?? false)) {
     out += statsBlock + '\n';
@@ -291,7 +291,7 @@ export default function LoadoutSummaryModal({ open, onClose, loadout }: LoadoutS
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="modal-container modal-as-panel max-w-none">
+      <div className="modal-container modal-as-panel max-w-2xl">
         <div className="panel-container panel-border-blue-500">
           <div className="flex items-center justify-between mb-2">
             <h2 className="panel-heading mb-0">Loadout Summary</h2>
@@ -325,7 +325,7 @@ export default function LoadoutSummaryModal({ open, onClose, loadout }: LoadoutS
               <textarea
                 readOnly
                 ref={textareaRef}
-                className="w-[128ch] h-80 form-input form-input-text rounded-md p-3 font-mono text-sm"
+                className="w-[128ch] h-[36rem] form-input form-input-text rounded-md p-3 font-mono text-sm"
                 value={text}
               />
             </div>

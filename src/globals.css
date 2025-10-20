@@ -239,6 +239,12 @@ html, body {
   color: var(--text-primary);
 }
 
+/* Brand font utility for the main title */
+.font-brand {
+  font-family: 'Libre Caslon Display', ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  letter-spacing: 0.01em; /* slight tighten for display */
+}
+
 .equipment-slot {
   border-width: 1px;
   border-style: solid; /* Tier 3 detail element */
@@ -311,6 +317,16 @@ html, body {
   background-color: var(--panel-hover);
 }
 
+/* Talisman images: smooth transform/brightness like item icons */
+.talisman-slot img {
+  transition: transform 120ms ease, filter 120ms ease;
+}
+/* On hover, talisman images pop and brighten */
+.talisman-slot:hover img {
+  transform: scale(1.05);
+  filter: brightness(1.1) drop-shadow(0 0 2px rgba(255,255,255,0.25));
+}
+
 /* Group container for related fields (dashed rounded frame) */
 .field-group {
   border-width: 1px;
@@ -344,13 +360,83 @@ html, body {
   border-radius: 0.375rem; /* slightly rounder corners for clarity */
 }
 
+/* Apply the same hover-bright ring to empty frames */
+.hover-bright .icon-frame-empty,
+.hover-bright.icon-frame-empty {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.65);
+  border-color: #fff !important;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 0.375rem;
+}
+.equipment-icon:hover .icon-frame-empty {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.65);
+  border-color: #fff !important;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 0.375rem;
+}
+
 /* Talismans: keep thinner glow */
 .hover-bright.talisman-slot {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.65);
   border-color: #fff !important;
 }
 
+/* Apply white ring on hover for empty talisman frames as well */
+.talisman-slot.icon-frame-empty:hover,
+.talisman-slot:hover .icon-frame-empty,
+.talisman-slot:not(.invalid):hover {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.65);
+  border-color: #fff !important;
+}
+
 .hover-bright img {
+  filter: brightness(1.1) drop-shadow(0 0 2px rgba(255,255,255,0.25));
+}
+
+/* Scale item/talisman icons on hover for parity */
+.talisman-slot:hover img {
+  transform: scale(1.05);
+}
+
+/* Smooth scale animation for icon images */
+.icon-frame img,
+.icon-frame-empty img {
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+/* Ensure empty frame images also brighten when their container is hover-bright */
+.hover-bright .icon-frame-empty img,
+.hover-bright.icon-frame-empty img {
+  border-radius: 0.375rem;
+  filter: brightness(1.1) drop-shadow(0 0 2px rgba(255,255,255,0.25));
+}
+.equipment-icon:hover .icon-frame-empty img {
+  border-radius: 0.375rem;
+  filter: brightness(1.1) drop-shadow(0 0 2px rgba(255,255,255,0.25));
+  transform: scale(1.05);
+}
+
+/* Apply same scale to slotted item images when highlighted */
+.hover-bright .icon-frame img,
+.hover-bright.icon-frame img {
+  transform: scale(1.05);
+}
+.equipment-icon:hover .icon-frame img {
+  transform: scale(1.05);
+}
+
+/* Empty item slots: apply the same pop/glow on hover as slotted item icons */
+.equipment-icon:hover .icon-frame-empty {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.65);
+  border-color: #fff !important;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 0.375rem;
+}
+.equipment-icon:hover .icon-frame-empty img {
+  border-radius: 0.375rem;
   filter: brightness(1.1) drop-shadow(0 0 2px rgba(255,255,255,0.25));
 }
 
@@ -387,7 +473,7 @@ html, body {
 .icon-frame-empty {
   border-width: 1px;
   border-style: solid;
-  border-color: var(--element);
+  border-color: var(--border); /* match talisman-slot grey border */
   border-radius: 0.25rem;
 }
 
