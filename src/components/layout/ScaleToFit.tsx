@@ -43,7 +43,7 @@ export default function ScaleToFit({ children, designWidth, minScale = 0.8, maxS
       ro.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [designWidth, minScale]);
+  }, [designWidth, minScale, maxScale]);
 
   // Track natural inner height to reserve space (transforms don't affect layout)
   useEffect(() => {

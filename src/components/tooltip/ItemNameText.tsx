@@ -20,7 +20,7 @@ function ItemNameText({ item }: ItemNameTextProps) {
     >
       {item.name}
       {item.slot === EquipSlot.MAIN_HAND && isTwoHandedWeapon(item) ? (
-        <span className="text-muted"> (2H)</span>
+        <span className="text-secondary font-medium"> (2H)</span>
       ) : null}
     </p>
   );

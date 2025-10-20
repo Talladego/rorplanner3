@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { isPercentSummaryKey } from '../../utils/formatters';
 import type { StatsSummary } from '../../types';
 import { urlService } from '../../services/loadout/urlService';
+import { setIncludeBaseStats as setBaseShared, setIncludeDerivedStats as setDerivedShared, setIncludeRenownStats as setRenownShared } from '../../services/ui/statsToggles';
 import StatRow from './StatRow';
 import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide } from '../../utils/statsCompareHelpers';
 
@@ -16,6 +17,7 @@ export default function StatsComparePanel() {
   const [tick, setTick] = useState(0); // force rerender on stats updates
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
+  const shareRef = useRef<HTMLTextAreaElement | null>(null);
   const [includeBaseStats, setIncludeBaseStats] = useState(false);
   const [includeDerivedStats, setIncludeDerivedStats] = useState(false);
   const [includeRenownStats, setIncludeRenownStats] = useState(false);
@@ -24,6 +26,31 @@ export default function StatsComparePanel() {
   // no external version tick needed; event updates of ids trigger rerender
 
   useEffect(() => {
+    // Initialize stats toggle state from URL short keys if present
+    try {
+      const sp = urlService.getSearchParams();
+      const mask = sp.get('s');
+      if (mask != null) {
+        const n = parseInt(mask, 10);
+        if (Number.isFinite(n)) {
+          const b = !!(n & 1);
+          const r = !!(n & 2);
+          const d = !!(n & 4);
+          setIncludeBaseStats(b); setBaseShared(b);
+          setIncludeRenownStats(r); setRenownShared(r);
+          setIncludeDerivedStats(d); setDerivedShared(d);
+        }
+      } else {
+        const b = sp.get('s.b');
+        const r = sp.get('s.r');
+        const d = sp.get('s.d');
+        if (b === '1' || b === '0') { const v = b === '1'; setIncludeBaseStats(v); setBaseShared(v); }
+        if (r === '1' || r === '0') { const v = r === '1'; setIncludeRenownStats(v); setRenownShared(v); }
+        if (d === '1' || d === '0') { const v = d === '1'; setIncludeDerivedStats(v); setDerivedShared(v); }
+      }
+    } catch {
+      // ignore invalid or missing URL params for stats toggles
+    }
     const pull = () => {
       setAId(loadoutService.getSideLoadoutId('A'));
       setBId(loadoutService.getSideLoadoutId('B'));
@@ -112,6 +139,15 @@ export default function StatsComparePanel() {
   const loadoutA = aId ? loadoutService.getLoadoutForSide('A') : null;
   const loadoutB = bId ? loadoutService.getLoadoutForSide('B') : null;
   const hasAnyCareer = Boolean(loadoutA?.career || loadoutB?.career);
+
+  // Auto-focus and preselect share URL when modal opens
+  useEffect(() => {
+    if (shareOpen && shareRef.current) {
+      const el = shareRef.current;
+      el.focus();
+      el.select();
+    }
+  }, [shareOpen]);
 
   const renderSection = (
     title: string,
@@ -223,7 +259,11 @@ export default function StatsComparePanel() {
             onClick={() => {
               const a = aId ? loadoutService.getLoadoutForSide('A') : null;
               const b = bId ? loadoutService.getLoadoutForSide('B') : null;
-              const url = urlService.buildCompareShareUrl(a, b);
+              const url = urlService.buildCompareShareUrl(a, b, {
+                includeBaseStats,
+                includeRenownStats,
+                includeDerivedStats,
+              });
               setShareUrl(url);
               setShareOpen(true);
             }}
@@ -239,7 +279,7 @@ export default function StatsComparePanel() {
             type="checkbox"
             className="form-checkbox h-3 w-3"
             checked={includeBaseStats}
-            onChange={(e) => setIncludeBaseStats(e.currentTarget.checked)}
+            onChange={(e) => { const v = e.currentTarget.checked; setIncludeBaseStats(v); setBaseShared(v); }}
           />
           Career Stats
         </label>
@@ -248,7 +288,7 @@ export default function StatsComparePanel() {
             type="checkbox"
             className="form-checkbox h-3 w-3"
             checked={includeRenownStats}
-            onChange={(e) => setIncludeRenownStats(e.currentTarget.checked)}
+            onChange={(e) => { const v = e.currentTarget.checked; setIncludeRenownStats(v); setRenownShared(v); }}
           />
           Renown Stats
         </label>
@@ -257,7 +297,7 @@ export default function StatsComparePanel() {
             type="checkbox"
             className="form-checkbox h-3 w-3"
             checked={includeDerivedStats}
-            onChange={(e) => setIncludeDerivedStats(e.currentTarget.checked)}
+            onChange={(e) => { const v = e.currentTarget.checked; setIncludeDerivedStats(v); setDerivedShared(v); }}
           />
           Derived Stats
         </label>
@@ -335,14 +375,23 @@ export default function StatsComparePanel() {
                     }
                   }}
                 >Copy</button>
-                <button className="btn btn-primary btn-sm" onClick={() => setShareOpen(false)}>Close</button>
+                <button 
+                  onClick={() => setShareOpen(false)} 
+                  className="modal-close-btn hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
               </div>
             </div>
             <div>
-              <input
+              <textarea
+                ref={shareRef}
                 readOnly
                 value={shareUrl}
-                className="form-input form-input-text w-full rounded-md p-2"
+                className="form-input form-input-text w-full rounded-md p-2 font-mono text-xs"
+                style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
+                rows={3}
                 onFocus={(e) => e.currentTarget.select()}
               />
             </div>

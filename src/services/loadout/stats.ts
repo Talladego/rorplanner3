@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { StatsSummary } from '../../types';
+import { StatsSummary, EquipSlot, Career, CAREER_RACE_MAPPING } from '../../types';
 import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
-import { isShieldType } from '../../utils/items';
+import { isShieldType, isTwoHandedWeapon } from '../../utils/items';
 import { getItemColor } from '../../utils/rarityColors';
 import { STAT_TO_SUMMARY_KEY, SUMMARY_KEY_TO_STAT } from '../../constants/statMaps';
+import { getOffhandBlockReason, STAFF_ONLY_CAREERS, TWO_H_ONLY_CAREERS, CANNOT_USE_2H_MELEE } from '../../constants/careerWeaponRules';
 
 /**
  * Compute aggregate stats for a specific loadout id.
@@ -26,11 +27,62 @@ export function computeStatsForLoadout(loadoutId: string, opts?: { includeRenown
 
   const statToKey = STAT_TO_SUMMARY_KEY;
   const result = { ...zero };
-  const isEligible = (it: any | null): boolean => {
+  // Use the UI slot order so that conflicts invalidate the later slot
+  const SLOT_ORDER_UI: EquipSlot[] = [
+    EquipSlot.HELM, EquipSlot.MAIN_HAND, EquipSlot.JEWELLERY1,
+    EquipSlot.SHOULDER, EquipSlot.OFF_HAND, EquipSlot.JEWELLERY2,
+    EquipSlot.BACK, EquipSlot.RANGED_WEAPON, EquipSlot.JEWELLERY3,
+    EquipSlot.BODY, EquipSlot.JEWELLERY4,
+    EquipSlot.GLOVES, EquipSlot.EVENT,
+    EquipSlot.BELT, EquipSlot.POCKET1,
+    EquipSlot.BOOTS, EquipSlot.POCKET2,
+  ];
+  // Determine if an item is fully valid for contribution given the loadout and slot
+  const isItemFullyValid = (slot: EquipSlot, it: any | null): boolean => {
     if (!it) return false;
     const levelOk = !it.levelRequirement || it.levelRequirement <= loadout.level;
     const rrOk = !it.renownRankRequirement || it.renownRankRequirement <= loadout.renownRank;
-    return levelOk && rrOk;
+    if (!levelOk || !rrOk) return false;
+    // Slot compatibility mirror of selector rules
+    if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
+      if (!(it.slot === EquipSlot.POCKET1 || it.slot === EquipSlot.POCKET2)) return false;
+    } else if (slot === EquipSlot.MAIN_HAND) {
+      if (!(it.slot === EquipSlot.MAIN_HAND || it.slot === EquipSlot.EITHER_HAND)) return false;
+    } else if (slot === EquipSlot.OFF_HAND) {
+      if (!(it.slot === EquipSlot.OFF_HAND || it.slot === EquipSlot.EITHER_HAND)) return false;
+    } else if (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4) {
+      if (!(it.slot === slot || it.slot === EquipSlot.JEWELLERY1)) return false;
+    } else {
+      if (it.slot !== slot) return false;
+    }
+    // Career restrictions
+    const career: Career | null = (loadout.career as Career) || null;
+    if (career && Array.isArray(it.careerRestriction) && it.careerRestriction.length > 0) {
+      if (!it.careerRestriction.includes(career)) return false;
+    }
+    // Race restrictions (derive allowed races by career)
+    if (career && Array.isArray(it.raceRestriction) && it.raceRestriction.length > 0) {
+      const allowedRaces = CAREER_RACE_MAPPING[career] || [];
+      const raceOk = it.raceRestriction.some((r: any) => allowedRaces.includes(r));
+      if (!raceOk) return false;
+    }
+    // Cross-slot constraints (2H/off-hand policies)
+  const mainItem = loadout.items[EquipSlot.MAIN_HAND]?.item || null;
+    // If OFF_HAND item and main hand is 2H, off-hand is invalid
+    if (slot === EquipSlot.OFF_HAND && mainItem && isTwoHandedWeapon(mainItem)) return false;
+    // If MAIN_HAND and offhand exists, but equipping main is 2H -> still valid for main; conflict hides offhand only
+    // Enforce staff-only and 2H-only careers on MAIN_HAND
+    if (slot === EquipSlot.MAIN_HAND && career && it) {
+      if (STAFF_ONLY_CAREERS.has(career) && it.type !== 'STAFF') return false;
+      if (TWO_H_ONLY_CAREERS.has(career) && !isTwoHandedWeapon(it)) return false;
+      if (CANNOT_USE_2H_MELEE.has(career) && isTwoHandedWeapon(it)) return false;
+    }
+    // Off-hand policy enforcement
+    if (slot === EquipSlot.OFF_HAND && career) {
+      const reason = getOffhandBlockReason(career, it);
+      if (reason) return false;
+    }
+    return true;
   };
   const addStat = (statsArr?: any[]) => {
     (statsArr || []).forEach(s => {
@@ -40,8 +92,19 @@ export function computeStatsForLoadout(loadoutId: string, opts?: { includeRenown
       }
     });
   };
-  Object.values(loadout.items).forEach(({ item, talismans }) => {
-    const itemEligible = isEligible(item);
+  const seenUnique = new Set<string>();
+  SLOT_ORDER_UI.forEach((slot) => {
+    const entry = loadout.items[slot];
+    if (!entry) return;
+    const { item, talismans } = entry;
+    let itemEligible = isItemFullyValid(slot, item);
+    if (item && item.uniqueEquipped) {
+      if (seenUnique.has(item.id)) {
+        itemEligible = false; // later duplicate is invalid
+      } else if (itemEligible) {
+        seenUnique.add(item.id);
+      }
+    }
     if (item && itemEligible) {
       if (item.armor) {
         if (isShieldType(item.type as unknown as string)) {
@@ -53,17 +116,31 @@ export function computeStatsForLoadout(loadoutId: string, opts?: { includeRenown
       }
       addStat(item.stats);
     }
+    // Track duplicate talismans per item: later duplicates are invalid
+    const seenTalismanIds = new Set<string>();
     (talismans || []).forEach(t => {
-      const talismanEligible = isEligible(t);
-      if (t && itemEligible && talismanEligible) {
+      const talismanEligible = !!t && (!t.levelRequirement || t.levelRequirement <= loadout.level) && (!t.renownRankRequirement || t.renownRankRequirement <= loadout.renownRank) && (
+        !t.raceRestriction || t.raceRestriction.length === 0 || !loadout.career || (CAREER_RACE_MAPPING[loadout.career as Career] || []).some(r => t.raceRestriction.includes(r))
+      );
+      const isDuplicate = !!(t && t.id && seenTalismanIds.has(t.id));
+      if (t && t.id) seenTalismanIds.add(t.id);
+      if (t && itemEligible && talismanEligible && !isDuplicate) {
         if (t.armor) (result.armor as number) += Number(t.armor) || 0;
         addStat(t.stats);
       }
     });
   });
   const setCounts: Record<string, { count: number; bonuses: any[] } > = {};
-  Object.values(loadout.items).forEach(({ item }) => {
-    if (item && item.itemSet && isEligible(item)) {
+  const seenUniqueForSets = new Set<string>();
+  SLOT_ORDER_UI.forEach((slot) => {
+    const entry = loadout.items[slot];
+    if (!entry) return;
+    const item = entry.item;
+    let itemEligible = !!item && isItemFullyValid(slot, item);
+    if (item && item.uniqueEquipped) {
+      if (seenUniqueForSets.has(item.id)) itemEligible = false; else if (itemEligible) seenUniqueForSets.add(item.id);
+    }
+    if (item && item.itemSet && itemEligible) {
       const name = item.itemSet.name;
       if (!setCounts[name]) setCounts[name] = { count: 0, bonuses: item.itemSet.bonuses || [] };
       setCounts[name].count += 1;
@@ -147,14 +224,63 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
   if (!loadout) return [] as Array<{ name: string; count: number; totalValue: number; percentage: boolean; color?: string }>;
   const target = SUMMARY_KEY_TO_STAT[String(statKey)] || '';
   const res = new Map<string, { name: string; count: number; totalValue: number; percentage: boolean; color?: string }>();
-  const isEligible = (it: any | null): boolean => {
+  const isItemFullyValid = (slot: EquipSlot, it: any | null): boolean => {
     if (!it) return false;
     const levelOk = !it.levelRequirement || it.levelRequirement <= loadout.level;
     const rrOk = !it.renownRankRequirement || it.renownRankRequirement <= loadout.renownRank;
-    return levelOk && rrOk;
+    if (!levelOk || !rrOk) return false;
+    // Slot compatibility mirror of selector rules
+    if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
+      if (!(it.slot === EquipSlot.POCKET1 || it.slot === EquipSlot.POCKET2)) return false;
+    } else if (slot === EquipSlot.MAIN_HAND) {
+      if (!(it.slot === EquipSlot.MAIN_HAND || it.slot === EquipSlot.EITHER_HAND)) return false;
+    } else if (slot === EquipSlot.OFF_HAND) {
+      if (!(it.slot === EquipSlot.OFF_HAND || it.slot === EquipSlot.EITHER_HAND)) return false;
+    } else if (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4) {
+      if (!(it.slot === slot || it.slot === EquipSlot.JEWELLERY1)) return false;
+    } else {
+      if (it.slot !== slot) return false;
+    }
+    const career: Career | null = (loadout.career as Career) || null;
+    if (career && Array.isArray(it.careerRestriction) && it.careerRestriction.length > 0) {
+      if (!it.careerRestriction.includes(career)) return false;
+    }
+    if (career && Array.isArray(it.raceRestriction) && it.raceRestriction.length > 0) {
+      const allowedRaces = CAREER_RACE_MAPPING[career] || [];
+      const raceOk = it.raceRestriction.some((r: any) => allowedRaces.includes(r));
+      if (!raceOk) return false;
+    }
+    const mainItem = loadout.items[EquipSlot.MAIN_HAND]?.item || null;
+    if (slot === EquipSlot.OFF_HAND && mainItem && isTwoHandedWeapon(mainItem)) return false;
+    if (slot === EquipSlot.MAIN_HAND && career) {
+      if (STAFF_ONLY_CAREERS.has(career) && it.type !== 'STAFF') return false;
+      if (TWO_H_ONLY_CAREERS.has(career) && !isTwoHandedWeapon(it)) return false;
+      if (CANNOT_USE_2H_MELEE.has(career) && isTwoHandedWeapon(it)) return false;
+    }
+    if (slot === EquipSlot.OFF_HAND && career) {
+      const reason = getOffhandBlockReason(career, it);
+      if (reason) return false;
+    }
+    return true;
   };
-  Object.values(loadout.items).forEach(({ item, talismans }) => {
-    const itemEligible = isEligible(item);
+  const SLOT_ORDER_UI: EquipSlot[] = [
+    EquipSlot.HELM, EquipSlot.MAIN_HAND, EquipSlot.JEWELLERY1,
+    EquipSlot.SHOULDER, EquipSlot.OFF_HAND, EquipSlot.JEWELLERY2,
+    EquipSlot.BACK, EquipSlot.RANGED_WEAPON, EquipSlot.JEWELLERY3,
+    EquipSlot.BODY, EquipSlot.JEWELLERY4,
+    EquipSlot.GLOVES, EquipSlot.EVENT,
+    EquipSlot.BELT, EquipSlot.POCKET1,
+    EquipSlot.BOOTS, EquipSlot.POCKET2,
+  ];
+  const seenUnique = new Set<string>();
+  SLOT_ORDER_UI.forEach((slot) => {
+    const entry = loadout.items[slot];
+    if (!entry) return;
+    const { item, talismans } = entry;
+    let itemEligible = isItemFullyValid(slot, item);
+    if (item && item.uniqueEquipped) {
+      if (seenUnique.has(item.id)) itemEligible = false; else if (itemEligible) seenUnique.add(item.id);
+    }
     if (item && itemEligible) {
       if (target === 'ARMOR' && item.armor) {
         if (!isShieldType(item.type as unknown as string)) {
@@ -176,9 +302,14 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
         }
       });
     }
+    const seenTalismanIds = new Set<string>();
     (talismans || []).forEach(t => {
-      const talismanEligible = isEligible(t);
-      if (t && itemEligible && talismanEligible) {
+      const talismanEligible = !!t && (!t.levelRequirement || t.levelRequirement <= loadout.level) && (!t.renownRankRequirement || t.renownRankRequirement <= loadout.renownRank) && (
+        !t.raceRestriction || t.raceRestriction.length === 0 || !loadout.career || (CAREER_RACE_MAPPING[loadout.career as Career] || []).some(r => t.raceRestriction.includes(r))
+      );
+      const isDuplicate = !!(t && t.id && seenTalismanIds.has(t.id));
+      if (t && t.id) seenTalismanIds.add(t.id);
+      if (t && itemEligible && talismanEligible && !isDuplicate) {
         if (target === 'ARMOR' && t.armor) {
           const key = t.name + '|armor';
           const prev = res.get(key) || { name: t.name, count: 0, totalValue: 0, percentage: false, color: getItemColor(t) };
@@ -196,8 +327,16 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
   });
   const counts: Record<string, number> = {};
   const bonusesMap: Record<string, any[]> = {};
-  Object.values(loadout.items).forEach(({ item }) => {
-    if (item && item.itemSet && isEligible(item)) {
+  const seenUniqueForSets = new Set<string>();
+  SLOT_ORDER_UI.forEach((slot) => {
+    const entry = loadout.items[slot];
+    if (!entry) return;
+    const item = entry.item;
+    let itemEligible = !!item && isItemFullyValid(slot, item);
+    if (item && item.uniqueEquipped) {
+      if (seenUniqueForSets.has(item.id)) itemEligible = false; else if (itemEligible) seenUniqueForSets.add(item.id);
+    }
+    if (item && item.itemSet && itemEligible) {
       const name = item.itemSet.name;
       counts[name] = (counts[name] || 0) + 1;
       if (!bonusesMap[name]) bonusesMap[name] = item.itemSet.bonuses || [];

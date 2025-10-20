@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Career, EquipSlot, Item, ItemRarity, Stat } from '../types';
 import { loadoutService } from '../services/loadout/loadoutService';
 
-const ITEMS_PER_PAGE = 10;
+import { DEFAULT_PAGE_SIZE } from '../constants/ui';
 
 export interface PageData {
   items: Item[];
@@ -26,6 +26,7 @@ export interface UseItemSearchParams {
   nameFilter: string;
   statsFilter: Stat[];
   rarityFilter: ItemRarity[];
+  pageSize?: number;
 }
 
 export function useItemSearch({
@@ -40,6 +41,7 @@ export function useItemSearch({
   nameFilter,
   statsFilter,
   rarityFilter,
+  pageSize = DEFAULT_PAGE_SIZE,
 }: UseItemSearchParams) {
   const [pageData, setPageData] = useState<PageData>({ items: [], hasNextPage: false, hasPreviousPage: false, startCursor: null, endCursor: null, totalCount: 0 });
   const [loading, setLoading] = useState(false);
@@ -69,13 +71,13 @@ export function useItemSearch({
         connection = await loadoutService.getTalismansForSlot(
           slot,
           holdingItemLevelReq!,
-          ITEMS_PER_PAGE,
+          pageSize,
           isBackwards ? undefined : after,
           filter,
           stats,
           rarities,
           isBackwards ? (beforeCursor ?? undefined) : undefined,
-          isBackwards ? ITEMS_PER_PAGE : undefined
+          isBackwards ? pageSize : undefined
         );
       } else {
         const careerFilterEnabled = careerFilterEnabledOverride ?? enableCareerFilter;
@@ -83,7 +85,7 @@ export function useItemSearch({
         connection = await loadoutService.getItemsForSlot(
           slot as EquipSlot,
           careerParam,
-          ITEMS_PER_PAGE,
+          pageSize,
           isBackwards ? undefined : after,
           effectiveLevel,
           effectiveRenown,
@@ -91,7 +93,7 @@ export function useItemSearch({
           stats,
           rarities,
           isBackwards ? (beforeCursor ?? undefined) : undefined,
-          isBackwards ? ITEMS_PER_PAGE : undefined
+          isBackwards ? pageSize : undefined
         );
       }
 
@@ -110,7 +112,7 @@ export function useItemSearch({
     } finally {
       setLoading(false);
     }
-  }, [isTalismanMode, holdingItemLevelReq, enableCareerFilter, slot, career, effectiveLevel, effectiveRenown]);
+  }, [isTalismanMode, holdingItemLevelReq, enableCareerFilter, slot, career, effectiveLevel, effectiveRenown, pageSize]);
 
   const refetch = useCallback((filter?: string, stats?: Stat[], rarities?: ItemRarity[], careerFilterEnabledOverride?: boolean) => {
     setCurrentPage(1);
@@ -145,6 +147,15 @@ export function useItemSearch({
     wasOpenRef.current = isOpen;
   }, [isOpen, fetchItems, nameFilter, statsFilter, rarityFilter]);
 
+  // When pageSize changes while open, reset pagination and refetch with new limit
+  useEffect(() => {
+    if (!isOpen) return;
+    setCurrentPage(1);
+    setPageHistory([]);
+    setPageData({ items: [], hasNextPage: false, hasPreviousPage: false, startCursor: null, endCursor: null, totalCount: 0 });
+    fetchItems(undefined, nameFilter, statsFilter, rarityFilter);
+  }, [pageSize, isOpen, fetchItems, nameFilter, statsFilter, rarityFilter]);
+
   return {
     pageData,
     loading,
@@ -156,6 +167,6 @@ export function useItemSearch({
     refetch,
     pageHistory,
     setPageHistory,
-    ITEMS_PER_PAGE,
+    ITEMS_PER_PAGE: pageSize,
   } as const;
 }

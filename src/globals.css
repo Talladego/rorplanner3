@@ -354,6 +354,28 @@ html, body {
   filter: brightness(1.1) drop-shadow(0 0 2px rgba(255,255,255,0.25));
 }
 
+/* When invalid, switch hover highlight to red for both items and talismans */
+.invalid.hover-bright .icon-frame,
+.invalid.hover-bright.icon-frame {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.7); /* red-500 */
+  border-color: rgb(239 68 68) !important;
+}
+
+.invalid.hover-bright.talisman-slot {
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.7);
+  border-color: rgb(239 68 68) !important;
+}
+
+/* Tooltip wraps item triggers, so hover-bright may be on an outer wrapper
+   while the 'invalid' class is on the inner equipment-icon. Cover that case. */
+.hover-bright .equipment-icon.invalid .icon-frame {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.7);
+  border-color: rgb(239 68 68) !important;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 0.375rem;
+}
+
 /* Ensure inner image corners match the rounded highlight */
 .icon-frame img,
 .hover-bright .icon-frame img,

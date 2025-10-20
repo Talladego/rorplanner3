@@ -1,29 +1,25 @@
 import { memo } from 'react';
-import { Item, ItemStat, Loadout } from '../../types';
+import { Item, ItemStat } from '../../types';
 import { formatStatName, formatStatValue, isPercentItemStat, normalizeStatDisplayValue } from '../../utils/formatters';
 
 export interface TalismanSlotsBlockProps {
   item: Item;
-  eligible: boolean;
-  loadout: Loadout | null;
-  isItemEligibleForLoadout: (lo: Loadout | null, it: Item | null) => boolean;
 }
 
-function TalismanSlotsBlock({ item, eligible, loadout, isItemEligibleForLoadout }: TalismanSlotsBlockProps) {
+function TalismanSlotsBlock({ item }: TalismanSlotsBlockProps) {
   if (item.talismanSlots <= 0) return null;
   return (
     <div className="mb-2">
-      <div className={`text-xs ${eligible ? 'text-gray-200' : 'text-gray-500'}`}>
+      <div className={`text-xs text-gray-200`}>
         {Array.from({ length: item.talismanSlots }).map((_, i) => {
           const t = item.talismans?.[i] || null;
-          const talismanEligible = t ? isItemEligibleForLoadout(loadout, t) : true;
           return (
             <div key={i} className="flex items-center gap-2 mb-0.5">
               <div className="flex items-center gap-1">
                 <img
                   src={t?.iconUrl || 'https://armory.returnofreckoning.com/icon/1'}
                   alt={t?.name || 'Empty Talisman Slot'}
-                  className={`w-4 h-4 object-contain rounded ${t && !talismanEligible ? 'grayscale' : ''}`}
+                  className={`w-4 h-4 object-contain rounded`}
                 />
                 <span className={`text-xs`}>
                   {t ? (

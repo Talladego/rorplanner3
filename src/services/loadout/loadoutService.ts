@@ -13,8 +13,9 @@ import { SEARCH_CHARACTERS, GET_CHARACTER } from './queries';
 import { getItemsForSlotApi, getTalismansForItemLevelApi, getItemWithDetailsApi } from './api';
 import { computeStatsForLoadout as computeStatsForLoadoutExternal, getStatContributionsForLoadout as getStatContributionsForLoadoutExternal } from './stats';
 import { isTwoHandedWeapon } from '../../utils/items';
-import { getOffhandBlockReason, STAFF_ONLY_CAREERS, TWO_H_ONLY_CAREERS } from '../../constants/careerWeaponRules';
+import { getOffhandBlockReason, STAFF_ONLY_CAREERS, TWO_H_ONLY_CAREERS, CANNOT_USE_2H_MELEE } from '../../constants/careerWeaponRules';
 import { sanitizeHasStats, getAllowedFilterStats } from './filters';
+import { getBlockInvalidItems } from '../ui/selectorPrefs';
 import * as selectors from './selectors';
 import {
   cloneLoadout as cloneLoadoutMutation,
@@ -223,40 +224,64 @@ export const loadoutService = {
   },
 
   async updateItem(slot: EquipSlot, item: Item | null) {
-    // Validate unique-equipped constraints
-    if (item) {
-      const validation = this.canEquipUniqueItem(item);
-      if (!validation.canEquip) {
-        throw new Error(validation.reason || 'Cannot equip this unique item');
+    // When importing a character OR when the UI toggle allows invalid selections, bypass validations
+    const shouldValidate = !this._isCharacterLoading && getBlockInvalidItems();
+    if (shouldValidate) {
+      // Validate unique-equipped constraints
+      if (item) {
+        const validation = this.canEquipUniqueItem(item);
+        if (!validation.canEquip) {
+          throw new Error(validation.reason || 'Cannot equip this unique item');
+        }
       }
-    }
 
-    // Enforce two-handed vs off-hand exclusivity on current loadout
-    const beforeLoadout = loadoutStoreAdapter.getCurrentLoadout();
-    if (beforeLoadout) {
-      const main = beforeLoadout.items[EquipSlot.MAIN_HAND]?.item || null;
-      const off = beforeLoadout.items[EquipSlot.OFF_HAND]?.item || null;
-      const career = beforeLoadout.career || null;
-      if (slot === EquipSlot.MAIN_HAND && item && isTwoHandedWeapon(item) && off) {
-        throw new Error('Cannot equip a two-handed weapon while an off-hand is equipped');
-      }
-      if (slot === EquipSlot.OFF_HAND && item && main && isTwoHandedWeapon(main)) {
-        throw new Error('Cannot equip an off-hand while a two-handed weapon is equipped in the main hand');
-      }
-      if (slot === EquipSlot.OFF_HAND && item && career) {
-        const reason = getOffhandBlockReason(career, item);
-        if (reason) throw new Error(reason);
-      }
-      if (slot === EquipSlot.MAIN_HAND && item && career) {
-        // Staff-only careers: must equip STAFF in main hand; no off-hand permitted
-        if (STAFF_ONLY_CAREERS.has(career as any)) {
-          if (item.type !== 'STAFF') {
-            throw new Error('This career must equip a two-handed staff in the main hand');
+      // Enforce two-handed vs off-hand exclusivity on current loadout
+      const beforeLoadout = loadoutStoreAdapter.getCurrentLoadout();
+      if (beforeLoadout) {
+        const main = beforeLoadout.items[EquipSlot.MAIN_HAND]?.item || null;
+        const off = beforeLoadout.items[EquipSlot.OFF_HAND]?.item || null;
+        const career = beforeLoadout.career || null;
+        if (slot === EquipSlot.MAIN_HAND && item && isTwoHandedWeapon(item) && off) {
+          throw new Error('Cannot equip a two-handed weapon while an off-hand is equipped');
+        }
+        if (slot === EquipSlot.OFF_HAND && item && main && isTwoHandedWeapon(main)) {
+          throw new Error('Cannot equip an off-hand while a two-handed weapon is equipped in the main hand');
+        }
+        if (slot === EquipSlot.OFF_HAND && item && career) {
+          const reason = getOffhandBlockReason(career, item);
+          if (reason) throw new Error(reason);
+        }
+        // Slot compatibility (mirror selector rules)
+        if (item) {
+          if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
+            if (!(item.slot === EquipSlot.POCKET1 || item.slot === EquipSlot.POCKET2)) throw new Error('Not compatible with this slot');
+          } else if (slot === EquipSlot.MAIN_HAND) {
+            if (!(item.slot === EquipSlot.MAIN_HAND || item.slot === EquipSlot.EITHER_HAND)) throw new Error('Not compatible with this slot');
+          } else if (slot === EquipSlot.OFF_HAND) {
+            if (!(item.slot === EquipSlot.OFF_HAND || item.slot === EquipSlot.EITHER_HAND)) throw new Error('Not compatible with this slot');
+          } else if (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4) {
+            if (!(item.slot === slot || item.slot === EquipSlot.JEWELLERY1)) throw new Error('Not compatible with this slot');
+          } else {
+            if (item.slot !== slot) throw new Error('Not compatible with this slot');
           }
         }
-        if (TWO_H_ONLY_CAREERS.has(career as any)) {
-          if (!isTwoHandedWeapon(item)) {
-            throw new Error('This career must equip a two-handed weapon in the main hand');
+
+        if (slot === EquipSlot.MAIN_HAND && item && career) {
+          // Staff-only careers: must equip STAFF in main hand; no off-hand permitted
+          if (STAFF_ONLY_CAREERS.has(career as any)) {
+            if (item.type !== 'STAFF') {
+              throw new Error('This career must equip a two-handed staff in the main hand');
+            }
+          }
+          if (TWO_H_ONLY_CAREERS.has(career as any)) {
+            if (!isTwoHandedWeapon(item)) {
+              throw new Error('This career must equip a two-handed weapon in the main hand');
+            }
+          }
+          if (CANNOT_USE_2H_MELEE.has(career as any)) {
+            if (isTwoHandedWeapon(item)) {
+              throw new Error('This career cannot equip two-handed weapons');
+            }
           }
         }
       }
@@ -278,39 +303,62 @@ export const loadoutService = {
   },
 
   async updateItemForLoadout(loadoutId: string, slot: EquipSlot, item: Item | null) {
-    // Validate unique-equipped only within that loadout
-    if (item) {
-      const validation = this.canEquipUniqueItem(item, loadoutId);
-      if (!validation.canEquip) {
-        throw new Error(validation.reason || 'Cannot equip this unique item');
+  const shouldValidate = !this._isCharacterLoading && getBlockInvalidItems();
+  if (shouldValidate) {
+      // Validate unique-equipped only within that loadout
+      if (item) {
+        const validation = this.canEquipUniqueItem(item, loadoutId);
+        if (!validation.canEquip) {
+          throw new Error(validation.reason || 'Cannot equip this unique item');
+        }
       }
-    }
 
-    // Enforce two-handed vs off-hand exclusivity on the specified loadout
-    const target = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
-    if (target) {
-      const main = target.items[EquipSlot.MAIN_HAND]?.item || null;
-      const off = target.items[EquipSlot.OFF_HAND]?.item || null;
-      const career = target.career || null;
-      if (slot === EquipSlot.MAIN_HAND && item && isTwoHandedWeapon(item) && off) {
-        throw new Error('Cannot equip a two-handed weapon while an off-hand is equipped');
-      }
-      if (slot === EquipSlot.OFF_HAND && item && main && isTwoHandedWeapon(main)) {
-        throw new Error('Cannot equip an off-hand while a two-handed weapon is equipped in the main hand');
-      }
-      if (slot === EquipSlot.OFF_HAND && item && career) {
-        const reason = getOffhandBlockReason(career, item);
-        if (reason) throw new Error(reason);
-      }
-      if (slot === EquipSlot.MAIN_HAND && item && career) {
-        if (STAFF_ONLY_CAREERS.has(career as any)) {
-          if (item.type !== 'STAFF') {
-            throw new Error('This career must equip a two-handed staff in the main hand');
+      // Enforce two-handed vs off-hand exclusivity on the specified loadout
+      const target = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
+      if (target) {
+        const main = target.items[EquipSlot.MAIN_HAND]?.item || null;
+        const off = target.items[EquipSlot.OFF_HAND]?.item || null;
+        const career = target.career || null;
+        if (slot === EquipSlot.MAIN_HAND && item && isTwoHandedWeapon(item) && off) {
+          throw new Error('Cannot equip a two-handed weapon while an off-hand is equipped');
+        }
+        if (slot === EquipSlot.OFF_HAND && item && main && isTwoHandedWeapon(main)) {
+          throw new Error('Cannot equip an off-hand while a two-handed weapon is equipped in the main hand');
+        }
+        if (slot === EquipSlot.OFF_HAND && item && career) {
+          const reason = getOffhandBlockReason(career, item);
+          if (reason) throw new Error(reason);
+        }
+        // Slot compatibility (mirror selector rules)
+        if (item) {
+          if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
+            if (!(item.slot === EquipSlot.POCKET1 || item.slot === EquipSlot.POCKET2)) throw new Error('Not compatible with this slot');
+          } else if (slot === EquipSlot.MAIN_HAND) {
+            if (!(item.slot === EquipSlot.MAIN_HAND || item.slot === EquipSlot.EITHER_HAND)) throw new Error('Not compatible with this slot');
+          } else if (slot === EquipSlot.OFF_HAND) {
+            if (!(item.slot === EquipSlot.OFF_HAND || item.slot === EquipSlot.EITHER_HAND)) throw new Error('Not compatible with this slot');
+          } else if (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4) {
+            if (!(item.slot === slot || item.slot === EquipSlot.JEWELLERY1)) throw new Error('Not compatible with this slot');
+          } else {
+            if (item.slot !== slot) throw new Error('Not compatible with this slot');
           }
         }
-        if (TWO_H_ONLY_CAREERS.has(career as any)) {
-          if (!isTwoHandedWeapon(item)) {
-            throw new Error('This career must equip a two-handed weapon in the main hand');
+
+        if (slot === EquipSlot.MAIN_HAND && item && career) {
+          if (STAFF_ONLY_CAREERS.has(career as any)) {
+            if (item.type !== 'STAFF') {
+              throw new Error('This career must equip a two-handed staff in the main hand');
+            }
+          }
+          if (TWO_H_ONLY_CAREERS.has(career as any)) {
+            if (!isTwoHandedWeapon(item)) {
+              throw new Error('This career must equip a two-handed weapon in the main hand');
+            }
+          }
+          if (CANNOT_USE_2H_MELEE.has(career as any)) {
+            if (isTwoHandedWeapon(item)) {
+              throw new Error('This career cannot equip two-handed weapons');
+            }
           }
         }
       }
@@ -725,20 +773,32 @@ export const loadoutService = {
   // (defensive: new loadouts start at 0, but keep this to satisfy UX expectations)
   this.resetRenownAbilitiesForLoadout(loadoutId);
 
-      // Set all the items (skip trophy slots)
+      // Set all the items (skip trophy slots). Be resilient: skip incompatible slots instead of aborting.
+      const skipped: Array<{ slot: string; itemId?: string; reason: string }> = [];
       for (const [slot, loadoutItem] of Object.entries(items)) {
         if (slot.startsWith('TROPHY')) continue;
-        // Apply item first
-        await this.updateItem(slot as EquipSlot, loadoutItem.item);
-        // Then talismans for that slot (if any)
-        if (loadoutItem.talismans && Array.isArray(loadoutItem.talismans)) {
-          for (let index = 0; index < loadoutItem.talismans.length; index++) {
-            const talisman = loadoutItem.talismans[index];
-            if (talisman) {
-              await this.updateTalisman(slot as EquipSlot, index, talisman);
+        try {
+          if (loadoutItem.item) {
+            await this.updateItem(slot as EquipSlot, loadoutItem.item);
+          }
+          // Only attempt talismans if the base item was applied
+          if (loadoutItem.item && loadoutItem.talismans && Array.isArray(loadoutItem.talismans)) {
+            for (let index = 0; index < loadoutItem.talismans.length; index++) {
+              const talisman = loadoutItem.talismans[index];
+              if (talisman) {
+                await this.updateTalisman(slot as EquipSlot, index, talisman);
+              }
             }
           }
+        } catch (e: unknown) {
+          const reason = (e && (e as Error).message) ? (e as Error).message : 'Unknown error';
+          skipped.push({ slot, itemId: loadoutItem.item?.id, reason });
+          // Continue importing remaining slots
+          console.warn(`[importFromCharacter] Skipping slot ${slot} item ${loadoutItem.item?.id ?? 'n/a'}: ${reason}`);
         }
+      }
+      if (skipped.length > 0) {
+        console.info('[importFromCharacter] Completed with skipped slots:', skipped);
       }
 
       // Mark as loaded from character and ensure side mapping

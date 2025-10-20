@@ -16,6 +16,7 @@ export interface ResultsListProps {
   onSelect: (item: Item) => void;
   effectiveLoadoutId?: string | undefined | null;
   statsFilter: Stat[];
+  blockInvalidItems?: boolean;
 }
 
 function formatTalismanStats(item: Item): string {
@@ -76,6 +77,7 @@ export function ResultsList({
   onSelect,
   effectiveLoadoutId,
   statsFilter,
+  blockInvalidItems = true,
 }: ResultsListProps) {
   return (
     <div className="space-y-0.5">
@@ -130,15 +132,16 @@ export function ResultsList({
         );
   const isDisabled = isAlreadyEquipped || isCareerRestricted || isRaceRestricted || isTalismanAlreadySlotted || isSlotIncompatible || isOffhandDisallowedByTwoHandedMain || isMainhand2HDisallowedByOffhand || !!offhandPolicyReason || !!cannotUse2HReason;
 
+        const blocked = blockInvalidItems && isDisabled;
         return (
           <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode} loadoutId={effectiveLoadoutId || undefined}>
             <div
-              className={`equipment-slot p-1.5 h-12 flex items-center ${
-                isDisabled
-                  ? 'cursor-not-allowed grayscale'
-                  : 'cursor-pointer hover:bg-[var(--panel-hover)]'
-              } transition-colors`}
-              onClick={() => !isDisabled && onSelect(item as Item)}
+              className={`equipment-slot p-1.5 h-12 flex items-center rounded ${
+                blocked
+                  ? 'cursor-not-allowed'
+                  : 'cursor-pointer hover-bright hover:bg-[var(--panel-hover)] hover:ring-2 hover:ring-white/30 hover:brightness-110'
+              } transition`}
+              onClick={() => !blocked && onSelect(item as Item)}
             >
               <div className={`flex items-center space-x-2 w-full`}>
                 <img
@@ -161,32 +164,36 @@ export function ResultsList({
                     item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common'
                   }`}>
                     {item.name}
-                    {item.slot === EquipSlot.MAIN_HAND && isTwoHandedWeapon(item) ? (<span className="text-muted"> (2H)</span>) : null}
+                      {item.slot === EquipSlot.MAIN_HAND && isTwoHandedWeapon(item) ? (
+                        <span className="text-secondary font-medium"> (2H)</span>
+                      ) : null}
                   </p>
-                  <p className={`text-xs leading-tight text-muted`}>
-                    <span>
+                  <p className={`text-xs leading-tight text-muted flex items-center justify-between gap-2`}>
+                    <span className="min-w-0">
                       {isTalismanMode ? formatTalismanStats(item) : renderItemInfo(item, statsFilter)}
                     </span>
-                    {isDisabled && (
-                      <span> — {isAlreadyEquipped
-                        ? 'Already equipped (Unique)'
-                        : isCareerRestricted
-                          ? 'Not usable by this career'
-                          : isRaceRestricted
-                            ? 'Not usable by this race'
-                            : isOffhandDisallowedByTwoHandedMain
-                              ? 'Two-handed main-hand equipped'
-                              : isMainhand2HDisallowedByOffhand
-                              ? 'Off-hand equipped'
-                              : offhandPolicyReason
-                                ? offhandPolicyReason
-                                : cannotUse2HReason
-                                  ? cannotUse2HReason
-                                : isSlotIncompatible
-                              ? 'Not compatible with this slot'
-                              : isTalismanAlreadySlotted
-                                ? 'Already slotted in this item'
-                                : null}
+                    {blocked && (
+                      <span className="text-red-400 text-right flex-shrink-0">
+                        <span className="mr-1">🛇</span>
+                        {isAlreadyEquipped
+                          ? 'Already equipped (Unique)'
+                          : isCareerRestricted
+                            ? 'Not usable by this career'
+                            : isRaceRestricted
+                              ? 'Not usable by this race'
+                              : isOffhandDisallowedByTwoHandedMain
+                                ? 'Two-handed main-hand equipped'
+                                : isMainhand2HDisallowedByOffhand
+                                ? 'Off-hand equipped'
+                                : offhandPolicyReason
+                                  ? offhandPolicyReason
+                                  : cannotUse2HReason
+                                    ? cannotUse2HReason
+                                  : isSlotIncompatible
+                                ? 'Not compatible with this slot'
+                                : isTalismanAlreadySlotted
+                                  ? 'Already slotted in this item'
+                                  : ''}
                       </span>
                     )}
                   </p>

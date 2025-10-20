@@ -1,13 +1,16 @@
 import React, { useState, Suspense } from 'react';
-import { EquipSlot, Item, Stat, Career, ItemRarity } from '../../types';
+import { EquipSlot, Item, Stat, Career, ItemRarity, CAREER_RACE_MAPPING } from '../../types';
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { useLoadoutData } from '../../hooks/useLoadoutData';
 import { useLoadoutById } from '../../hooks/useLoadoutById';
 const EquipmentSelector = React.lazy(() => import('../selector/EquipmentSelector'));
+import { getBlockInvalidItems } from '../../services/ui/selectorPrefs';
 import { DEFAULT_SLOT_ICONS } from '../../constants/slotIcons';
 import Tooltip from '../tooltip/Tooltip';
 import HoverTooltip from '../tooltip/HoverTooltip';
 import { formatSlotName } from '../../utils/formatters';
+import { isTwoHandedWeapon } from '../../utils/items';
+import { getOffhandBlockReason, STAFF_ONLY_CAREERS, TWO_H_ONLY_CAREERS, CANNOT_USE_2H_MELEE } from '../../constants/careerWeaponRules';
 
 interface EquipmentPanelProps {
   selectedCareer: Career | '';
@@ -29,6 +32,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
 
   const [talismanSlot, setTalismanSlot] = useState<{ slot: EquipSlot; index: number } | null>(null);
   const hasCareer = !!selectedCareer;
+  const blockInvalidItems = getBlockInvalidItems();
 
   // Persistent filter state for items (carry across equipment slots within this panel)
   const [itemNameFilter, setItemNameFilter] = useState('');
@@ -151,6 +155,50 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
           }
 
           const slotData = effectiveLoadout.items[slot];
+          const item = slotData.item || null;
+          // Slot compatibility mirror of selector rules
+          const invalidBySlotIncompatible = !!item && (() => {
+            const targetSlot = slot;
+            if (targetSlot === EquipSlot.POCKET1 || targetSlot === EquipSlot.POCKET2) {
+              return !(item.slot === EquipSlot.POCKET1 || item.slot === EquipSlot.POCKET2);
+            }
+            if (targetSlot === EquipSlot.MAIN_HAND) {
+              return !(item.slot === EquipSlot.MAIN_HAND || item.slot === EquipSlot.EITHER_HAND);
+            }
+            if (targetSlot === EquipSlot.OFF_HAND) {
+              return !(item.slot === EquipSlot.OFF_HAND || item.slot === EquipSlot.EITHER_HAND);
+            }
+            if (targetSlot === EquipSlot.JEWELLERY2 || targetSlot === EquipSlot.JEWELLERY3 || targetSlot === EquipSlot.JEWELLERY4) {
+              return !(item.slot === targetSlot || item.slot === EquipSlot.JEWELLERY1);
+            }
+            return item.slot !== targetSlot;
+          })();
+          const invalidByLevel = item ? !isItemEligible(item) : false;
+          const invalidByCareer = item && selectedCareer
+            ? (item.careerRestriction && item.careerRestriction.length > 0 && !item.careerRestriction.includes(selectedCareer))
+            : false;
+          const invalidByRace = item && selectedCareer
+            ? (item.raceRestriction && item.raceRestriction.length > 0 && !item.raceRestriction.some(r => (CAREER_RACE_MAPPING[selectedCareer as Career] || []).includes(r)))
+            : false;
+          const mainItem = effectiveLoadout.items[EquipSlot.MAIN_HAND]?.item || null;
+          const invalidBy2HConflict = item ? (
+            (slot === EquipSlot.OFF_HAND && mainItem && isTwoHandedWeapon(mainItem))
+          ) : false;
+          const invalidByPolicy = item && selectedCareer ? (
+            (slot === EquipSlot.OFF_HAND && !!getOffhandBlockReason(selectedCareer as Career, item)) ||
+            (slot === EquipSlot.MAIN_HAND && (
+              (STAFF_ONLY_CAREERS.has(selectedCareer as Career) && item.type !== 'STAFF') ||
+              (TWO_H_ONLY_CAREERS.has(selectedCareer as Career) && !isTwoHandedWeapon(item)) ||
+              (CANNOT_USE_2H_MELEE.has(selectedCareer as Career) && isTwoHandedWeapon(item))
+            ))
+          ) : false;
+          // Unique-equpped: if the same unique item appears earlier in the UI order, mark this later one invalid
+          const earlierSlots = slotOrder.slice(0, index).filter((s): s is EquipSlot => s !== null);
+          const invalidByUniqueDuplicate = !!item && !!item.uniqueEquipped && earlierSlots.some((s) => {
+            const earlier = effectiveLoadout.items[s]?.item || null;
+            return earlier && earlier.id === item.id;
+          });
+          const isSlotItemInvalid = !!item && (invalidByLevel || invalidByCareer || invalidByRace || invalidBySlotIncompatible || invalidBy2HConflict || invalidByPolicy || invalidByUniqueDuplicate);
           return (
             <div key={slot} className="relative" data-side={side || ''} data-slot={slot}>
               <div className={`equipment-slot ${compact ? 'p-1' : ''}`}>
@@ -158,21 +206,25 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                   {slotData.item ? (
                     <Tooltip item={{ ...slotData.item, talismans: slotData.talismans }} loadoutId={effectiveLoadout.id} side={side} slot={slot}>
                       <div
-                        className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}`}
+                        className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}${isSlotItemInvalid ? ' invalid' : ''}`}
                         onClick={() => handleSlotClick(slot)}
                         onContextMenu={(e) => handleSlotRightClick(e, slot)}
                         data-anchor-key={side ? `${side}:${slot}` : undefined}
                       >
-                        <div className={`icon-frame ${!isItemEligible(slotData.item) ? 'grayscale' : ''} ${slotData.item.itemSet ? 'item-color-set' :
+                        <div className={`icon-frame ${slotData.item.itemSet ? 'item-color-set' :
                           slotData.item.rarity === 'MYTHIC' ? 'item-color-mythic' :
                           slotData.item.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
                           slotData.item.rarity === 'RARE' ? 'item-color-rare' :
                           slotData.item.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
-                          slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common'}`}>
+                          slotData.item.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common'} relative z-10`}>
+                          {/* Invalid overlay in top-left */}
+                          {isSlotItemInvalid && (
+                            <span className="absolute top-0 left-0 text-red-500 text-xs leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold" title="Invalid item for current rules or requirements">🛇</span>
+                          )}
                           <img
                             src={slotData.item.iconUrl}
                             alt={slotData.item.name}
-                            className={`w-full h-full object-contain rounded ${!isItemEligible(slotData.item) ? 'grayscale' : ''}`}
+                            className={`w-full h-full object-contain rounded`}
                           />
                         </div>
                       </div>
@@ -191,28 +243,38 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                     </HoverTooltip>
                   )}
                   {iconOnly && slotData.item && slotData.item.talismanSlots > 0 && (
-                    <div className="flex flex-col justify-start items-start gap-1 ml-1">
+                    <div className="flex flex-row items-start gap-2 ml-1">
+                      <div className="flex flex-col justify-start items-start gap-1">
                       {Array.from({ length: slotData.item.talismanSlots }, (_, i) => {
-                        const isParentItemEligible = isItemEligible(slotData.item!);
-                        const isTalismanEligible = slotData.talismans[i] ? isItemEligible(slotData.talismans[i]) : true;
-                        const isSlotGreyedOut = !isParentItemEligible || (slotData.talismans[i] && !isTalismanEligible);
+                        const t = slotData.talismans[i];
+                        const seenBefore = new Set<string>();
+                        for (let k = 0; k < i; k++) {
+                          const prev = slotData.talismans[k];
+                          if (prev && prev.id) seenBefore.add(prev.id);
+                        }
+                        const isDuplicateTalisman = !!(t && t.id && seenBefore.has(t.id));
                         return (
-                          <div key={i} data-talisman-index={i} className={`talisman-slot ${isSlotGreyedOut ? '' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? ((slotData.talismans[i]!.itemSet ? 'item-color-set' :
-                            slotData.talismans[i]!.rarity === 'MYTHIC' ? 'item-color-mythic' :
-                            slotData.talismans[i]!.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
-                            slotData.talismans[i]!.rarity === 'RARE' ? 'item-color-rare' :
-                            slotData.talismans[i]!.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
-                            slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')) : ''}`}> 
-                            {slotData.talismans[i] ? (
-                              <Tooltip item={slotData.talismans[i]} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i}>
-                                <img
-                                  src={slotData.talismans[i]!.iconUrl}
-                                  alt={slotData.talismans[i]!.name}
-                                  className={`w-full h-full object-contain rounded cursor-pointer ${!isTalismanEligible ? 'grayscale' : ''}`}
-                                  onClick={() => handleTalismanClick(slot, i)}
-                                  onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
-                                  data-anchor-key={side ? `${side}:${slot}:t${i}` : undefined}
-                                />
+                          <div key={i} data-talisman-index={i} className={`talisman-slot${isDuplicateTalisman ? ' invalid' : ''} ${t ? 'border-current ' : ''}${t ? ((t.itemSet ? 'item-color-set' :
+                            t.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                            t.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                            t.rarity === 'RARE' ? 'item-color-rare' :
+                            t.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                            t.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')) : ''} relative`}> 
+                            {t ? (
+                              <Tooltip item={t} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i}>
+                                <div className="relative">
+                                  {isDuplicateTalisman && (
+                                    <span className="absolute top-0 left-0 text-red-500 text-[10px] leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold" title="Duplicate talisman">🛇</span>
+                                  )}
+                                  <img
+                                    src={t.iconUrl}
+                                    alt={t.name}
+                                    className={`w-full h-full object-contain rounded cursor-pointer`}
+                                    onClick={() => handleTalismanClick(slot, i)}
+                                    onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
+                                    data-anchor-key={side ? `${side}:${slot}:t${i}` : undefined}
+                                  />
+                                </div>
                               </Tooltip>
                             ) : (
                               <HoverTooltip content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
@@ -228,6 +290,8 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                           </div>
                         );
                       })}
+                      </div>
+                      {/* Overlay handles invalid indicator; remove inline marker */}
                     </div>
                   )}
                   {!iconOnly && (
@@ -246,31 +310,40 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                       )}
                       {/* Talisman slots */}
                       {slotData.item && slotData.item.talismanSlots > 0 && (
-                        <div className="flex justify-start mt-1 gap-1">
+                        <div className="flex justify-start items-center mt-1 gap-2">
+                          <div className="flex gap-1">
                           {Array.from({ length: slotData.item.talismanSlots }, (_, i) => {
-                            const isParentItemEligible = isItemEligible(slotData.item);
-                            const isTalismanEligible = slotData.talismans[i] ? isItemEligible(slotData.talismans[i]) : true;
-                            const isSlotGreyedOut = !isParentItemEligible || (slotData.talismans[i] && !isTalismanEligible);
-                            
-                            return (
-                              <div key={i} data-talisman-index={i} className={`talisman-slot ${isSlotGreyedOut ? '' : ''} ${slotData.talismans[i] ? 'border-current ' : ''}${slotData.talismans[i] ? ((slotData.talismans[i]!.itemSet ? 'item-color-set' :
-                                slotData.talismans[i]!.rarity === 'MYTHIC' ? 'item-color-mythic' :
-                                slotData.talismans[i]!.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
-                                slotData.talismans[i]!.rarity === 'RARE' ? 'item-color-rare' :
-                                slotData.talismans[i]!.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
-                                slotData.talismans[i]!.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')) : ''}`}> 
-                                {slotData.talismans[i] ? (
-                                  <Tooltip item={slotData.talismans[i]} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i}>
-                                    <img
-                                      src={slotData.talismans[i]!.iconUrl}
-                                      alt={slotData.talismans[i]!.name}
-                                      className={`w-full h-full object-contain rounded cursor-pointer ${!isTalismanEligible ? 'grayscale' : ''}`}
-                                      onClick={() => handleTalismanClick(slot, i)}
-                                      onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
-                                      data-anchor-key={side ? `${side}:${slot}:t${i}` : undefined}
-                                    />
-                                  </Tooltip>
-                                ) : (
+                                const t = slotData.talismans[i];
+                                const seenBefore = new Set<string>();
+                                for (let k = 0; k < i; k++) {
+                                  const prev = slotData.talismans[k];
+                                  if (prev && prev.id) seenBefore.add(prev.id);
+                                }
+                                const isDuplicateTalisman = !!(t && t.id && seenBefore.has(t.id));
+                                return (
+                                  <div key={i} data-talisman-index={i} className={`talisman-slot${isDuplicateTalisman ? ' invalid' : ''} ${t ? 'border-current ' : ''}${t ? ((t.itemSet ? 'item-color-set' :
+                                    t.rarity === 'MYTHIC' ? 'item-color-mythic' :
+                                    t.rarity === 'VERY_RARE' ? 'item-color-very-rare' :
+                                    t.rarity === 'RARE' ? 'item-color-rare' :
+                                    t.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
+                                    t.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')) : ''} relative`}> 
+                                    {t ? (
+                                      <Tooltip item={t} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i}>
+                                        <div className="relative">
+                                          {isDuplicateTalisman && (
+                                            <span className="absolute top-0 left-0 text-red-500 text-[10px] leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold" title="Duplicate talisman">🛇</span>
+                                          )}
+                                          <img
+                                            src={t.iconUrl}
+                                            alt={t.name}
+                                            className={`w-full h-full object-contain rounded cursor-pointer`}
+                                            onClick={() => handleTalismanClick(slot, i)}
+                                            onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
+                                            data-anchor-key={side ? `${side}:${slot}:t${i}` : undefined}
+                                          />
+                                        </div>
+                                      </Tooltip>
+                                    ) : (
                                   <HoverTooltip content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
                                     <div className="icon-frame-empty w-full h-full rounded cursor-pointer" onClick={() => handleTalismanClick(slot, i)} onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}>
                                       <img
@@ -284,6 +357,8 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                               </div>
                             );
                           })}
+                          </div>
+                          {/* Overlay handles invalid indicator; remove inline marker */}
                         </div>
                       )}
                     </div>
@@ -317,6 +392,9 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
         onStatsFilterChange={talismanSlot ? setTalismanStatsFilter : setItemStatsFilter}
         onRarityFilterChange={talismanSlot ? setTalismanRarityFilter : setItemRarityFilter}
         selectedCareer={selectedCareer}
+  // pass UI preference through props for initial render behavior
+  // @ts-expect-error prop is read in EquipmentSelector via checkbox state
+  blockInvalidItems={blockInvalidItems}
         />
       </Suspense>
     </div>
