@@ -249,10 +249,7 @@ export default function StatsComparePanel() {
   if (!hasAnyCareer) {
     return (
       <div className="field-group flex-1 min-h-0">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="panel-heading mb-0">Compare Stats</h2>
-        </div>
-  <div className="stats-empty-message">Select a career or load a character to see stats</div>
+        <div className="stats-empty-message">Select a career or load a character to see stats</div>
       </div>
     );
   }
@@ -260,7 +257,37 @@ export default function StatsComparePanel() {
   return (
     <div className="field-group flex-1 min-h-0">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="panel-heading mb-0">Compare Stats</h2>
+        {/* Global toggles row (left) */}
+        <div className="flex items-center gap-6">
+          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+            <input
+              type="checkbox"
+              className="form-checkbox h-3 w-3"
+              checked={includeBaseStats}
+              onChange={(e) => { const v = e.currentTarget.checked; setIncludeBaseStats(v); setBaseShared(v); }}
+            />
+            Career Stats
+          </label>
+          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+            <input
+              type="checkbox"
+              className="form-checkbox h-3 w-3"
+              checked={includeRenownStats}
+              onChange={(e) => { const v = e.currentTarget.checked; setIncludeRenownStats(v); setRenownShared(v); }}
+            />
+            Renown Stats
+          </label>
+          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+            <input
+              type="checkbox"
+              className="form-checkbox h-3 w-3"
+              checked={includeDerivedStats}
+              onChange={(e) => { const v = e.currentTarget.checked; setIncludeDerivedStats(v); setDerivedShared(v); }}
+            />
+            Derived Stats
+          </label>
+        </div>
+        {/* Share button (right) */}
         <div className="flex items-center gap-3">
           <button
             className="btn btn-primary btn-sm"
@@ -279,36 +306,6 @@ export default function StatsComparePanel() {
             Share
           </button>
         </div>
-      </div>
-  {/* Global toggles row */}
-  <div className="flex items-center gap-6 mb-3">
-        <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
-          <input
-            type="checkbox"
-            className="form-checkbox h-3 w-3"
-            checked={includeBaseStats}
-            onChange={(e) => { const v = e.currentTarget.checked; setIncludeBaseStats(v); setBaseShared(v); }}
-          />
-          Career Stats
-        </label>
-        <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
-          <input
-            type="checkbox"
-            className="form-checkbox h-3 w-3"
-            checked={includeRenownStats}
-            onChange={(e) => { const v = e.currentTarget.checked; setIncludeRenownStats(v); setRenownShared(v); }}
-          />
-          Renown Stats
-        </label>
-        <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
-          <input
-            type="checkbox"
-            className="form-checkbox h-3 w-3"
-            checked={includeDerivedStats}
-            onChange={(e) => { const v = e.currentTarget.checked; setIncludeDerivedStats(v); setDerivedShared(v); }}
-          />
-          Derived Stats
-        </label>
       </div>
       {(!aId || !bId) && (
         <div className="text-xs text-muted mb-2">Assign loadouts to both A and B to compare.</div>

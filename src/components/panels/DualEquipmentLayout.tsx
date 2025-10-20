@@ -144,9 +144,10 @@ export default function DualEquipmentLayout() {
   };
 
   const sideIndicator = (label: 'A' | 'B') => (
-    <div className="flex items-center gap-1.5 mb-1 min-w-0">
+    <h2 className="panel-heading font-brand flex items-center gap-2">
       <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${label === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{label}</span>
-    </div>
+      <span>Loadout</span>
+    </h2>
   );
 
   const buttonsRow = (label: 'A' | 'B') => {
@@ -243,6 +244,7 @@ export default function DualEquipmentLayout() {
       {/* Middle panel: Stats compare */}
       <div className="col-span-1">
         <div className="panel-container panel-border-blue-500 h-full flex flex-col">
+          <h2 className="panel-heading font-brand">Compare Stats</h2>
           <StatsComparePanel />
         </div>
       </div>

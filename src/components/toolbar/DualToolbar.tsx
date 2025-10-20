@@ -117,9 +117,10 @@ function SideToolbar({ side }: SideToolbarProps) {
 
   return (
     <div className={`panel-container ${side === 'A' ? 'panel-border-green-600' : 'panel-border-red-600'}`}>
-      <div className="text-xs font-semibold mb-1 flex items-center gap-1.5">
+      <h2 className="panel-heading font-brand flex items-center gap-2">
         <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${side === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{side}</span>
-      </div>
+        <span>Character</span>
+      </h2>
   <div className="grid grid-cols-12 gap-x-1 gap-y-1 items-stretch">
         {/* Group 1: Career + Lvl + RR + Reset */}
         <div className="col-span-7 h-full">
