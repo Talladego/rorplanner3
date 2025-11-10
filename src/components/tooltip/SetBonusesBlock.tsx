@@ -5,20 +5,26 @@ import { formatStatName, formatStatValue, isPercentItemStat, normalizeStatDispla
 export interface SetBonusesBlockProps {
   item: Item;
   eligible: boolean;
-  getEquippedCount: (setName: string) => number;
+  getEquippedCount: (setId: string, setName: string) => number;
 }
 
 function SetBonusesBlock({ item, eligible, getEquippedCount }: SetBonusesBlockProps) {
   if (!item.itemSet) return null;
   const bonuses = item.itemSet.bonuses || [];
+  const setId = String(item.itemSet.id || item.itemSet.name);
+  const equippedCount = getEquippedCount(setId, item.itemSet.name);
+  const thresholds = bonuses.map(b => b.itemsRequired).sort((a, b) => a - b);
+  const nextRequired = thresholds.find(t => t >= equippedCount) ?? (thresholds.length ? thresholds[thresholds.length - 1] : undefined);
   return (
     <div className="mb-2">
       <div className={`text-xs ${eligible ? 'text-gray-200' : 'text-gray-500'}`}>
-        <div className={`font-medium mb-1 ${eligible ? 'text-green-400' : 'text-gray-500'}`}>{item.itemSet.name}</div>
+        <div className={`font-medium mb-1 ${eligible ? 'text-green-400' : 'text-gray-500'}`}>
+          {item.itemSet.name}
+          {typeof nextRequired === 'number' ? ` (${equippedCount}/${nextRequired})` : ''}
+        </div>
         {bonuses.length > 0 ? (
           <div className="space-y-0.5">
             {bonuses.map((bonus, idx: number) => {
-              const equippedCount = getEquippedCount(item.itemSet!.name);
               const isActive = equippedCount >= bonus.itemsRequired;
               const formatBonusValue = (bonusValue: ItemSetBonusValue) => {
                 if (!bonusValue) return 'No bonus data';
@@ -37,7 +43,7 @@ function SetBonusesBlock({ item, eligible, getEquippedCount }: SetBonusesBlockPr
               };
               return (
                 <div key={idx} className={isActive && eligible ? 'text-green-400' : 'text-gray-500'}>
-                  ({bonus.itemsRequired} piece bonus:) {formatBonusValue(bonus.bonus)}
+                  ({bonus.itemsRequired} piece bonus) {formatBonusValue(bonus.bonus)}
                 </div>
               );
             })}

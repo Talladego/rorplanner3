@@ -1,0 +1,78 @@
+query GetCharacter($id: ID!) {
+  character(id: $id) {
+    id
+    name
+    level
+    renownRank
+    career
+    items {
+      equipSlot
+      item {
+        id
+        name
+        description
+        type
+        slot
+        rarity
+        armor
+        dps
+        speed
+        levelRequirement
+        renownRankRequirement
+        itemLevel
+        uniqueEquipped
+        stats { stat value percentage }
+        careerRestriction
+        raceRestriction
+        iconUrl
+        talismanSlots
+        itemSet {
+          id
+          name
+          bonuses {
+            itemsRequired
+            bonus {
+              __typename
+              ... on ItemStat { stat value percentage }
+              ... on Ability { name description }
+            }
+          }
+        }
+        abilities { name }
+        buffs { name }
+      }
+      talismans {
+        id
+        name
+        description
+        type
+        slot
+        rarity
+        armor
+        dps
+        speed
+        levelRequirement
+        renownRankRequirement
+        itemLevel
+        uniqueEquipped
+        stats { stat value percentage }
+        careerRestriction
+        raceRestriction
+        iconUrl
+        talismanSlots
+        itemSet {
+          id
+          name
+          bonuses {
+            itemsRequired
+            bonus {
+              __typename
+              ... on ItemStat { stat value percentage }
+              ... on Ability { name description }
+            }
+          }
+        }
+      }
+    }
+  }
+}

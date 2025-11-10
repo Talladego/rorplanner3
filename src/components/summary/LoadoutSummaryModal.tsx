@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loadout, EquipSlot, StatsSummary } from '../../types';
 import { RENOWN_ABILITIES } from '../../services/loadout/renownConfig';
 import { formatCareerName, formatSlotName, formatSummaryStatKey, isPercentSummaryKey, normalizeStatDisplayValue } from '../../utils/formatters';
-import { buildEmptySummary, computeTotalStatsForSide, rowDefs } from '../../utils/statsCompareHelpers';
+import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide } from '../../utils/statsCompareHelpers';
 import { getAllToggles } from '../../services/ui/statsToggles';
 import { loadoutService } from '../../services/loadout/loadoutService';
+import { computeAllDamageHealingBonuses } from '../../utils/damageHealingBonuses';
 
 interface LoadoutSummaryModalProps {
   open: boolean;
@@ -26,7 +27,8 @@ function renderAsciiTable(headers: string[], rows: Array<Array<string | number>>
     const maxW = maxWidths && maxWidths[i] ? maxWidths[i] : undefined;
     const headLen = String(clip(String(headers[i] ?? ''), maxW)).length;
     const maxRow = rows.reduce((m, r) => Math.max(m, String(clip(String(r[i] ?? ''), maxW)).length), 0);
-    return Math.max(headLen, maxRow);
+    const w = Math.max(headLen, maxRow);
+    return maxW ? Math.min(w, maxW) : w;
   });
   const padCell = (text: string, width: number, a: Align) => {
     const len = text.length;
@@ -58,68 +60,130 @@ function buildStatsBlock(loadout: Loadout | null): string {
   const { includeBaseStats, includeRenownStats, includeDerivedStats } = getAllToggles();
   const empty: StatsSummary = buildEmptySummary();
   const stats: StatsSummary = computeTotalStatsForSide(loadoutService.getActiveSide(), loadout.id || null, empty, includeBaseStats, includeDerivedStats, includeRenownStats);
-  // Include every stat shown in the Compare panel: flatten all rowDefs in order and include non-zero rows only
-  const defs = [
-    ...rowDefs.base,
-    ...rowDefs.defense,
-    ...rowDefs.offense,
-    ...rowDefs.melee,
-    ...rowDefs.ranged,
-    ...rowDefs.magic,
-    ...rowDefs.healing,
-    ...rowDefs.other,
-  ];
-  const seen = new Set<string>();
-  const rows: Array<[string, string]> = [];
-  defs.forEach(({ key }) => {
-    if (seen.has(key as string)) return; // avoid duplicates if any
-    seen.add(key as string);
-    const k = key as keyof StatsSummary;
-    let v = Number((stats[k] as number) ?? 0);
-    // Match Compare panel's effective percent handling for these rows
-    if (k === 'outgoingDamage') {
-  const itemPct = Number(stats.outgoingDamage || 0);
-  const renownPct = Number(stats.outgoingDamagePercent || 0);
+  // Helper to compute display value same as compare panel
+  const computeDisplayValue = (key: keyof StatsSummary, s: StatsSummary, contrib?: Array<{ name: string; totalValue: number }>): number => {
+    if (key === 'outgoingDamage') {
+      const itemPct = Number(s.outgoingDamage || 0);
+      const renownPct = Number(s.outgoingDamagePercent || 0);
       const mult = (1 + itemPct / 100) * (1 + renownPct / 100);
-      v = (mult - 1) * 100;
-    } else if (k === 'incomingDamage') {
-  const itemPct = Number(stats.incomingDamage || 0);
-  const renownPct = Number(stats.incomingDamagePercent || 0);
+      return (mult - 1) * 100;
+    } else if (key === 'incomingDamage') {
+      const itemPct = Number(s.incomingDamage || 0);
+      const renownPct = Number(s.incomingDamagePercent || 0);
       const mult = (1 + itemPct / 100) * (1 + renownPct / 100);
-      v = (mult - 1) * 100;
-    } else if (k === 'outgoingHealPercent') {
-      // Items and renown both land in the same bucket; multiplicative rendering for display
-  const total = Number(stats.outgoingHealPercent || 0);
-      // Without contributions split here, assume additive bucket; keep as-is (matches compare logic fallback when not splitting)
-      v = total;
+      return (mult - 1) * 100;
+    } else if (key === 'outgoingHealPercent') {
+      if (contrib && contrib.length) {
+        const total = Number(s.outgoingHealPercent || 0);
+        const renown = contrib.filter(c => c.name.startsWith('From Renown')).reduce((acc, c) => acc + (Number(c.totalValue) || 0), 0);
+        const itemPct = total - renown;
+        const renownPct = renown;
+        const mult = (1 + itemPct / 100) * (1 + renownPct / 100);
+        return (mult - 1) * 100;
+      }
+      return Number(s.outgoingHealPercent || 0);
     }
-    if (!v) return; // omit zeros
-    // Normalize units for range/radius/healthRegen for readability
-    const needsNorm = k === 'range' || k === 'radius' || k === 'healthRegen';
-    const displayV = needsNorm ? normalizeStatDisplayValue(k as string, v) : v;
-    // Use contributions to refine percent decision when possible
-  const contrib = loadout.id ? loadoutService.getStatContributionsForLoadout(loadout.id, k as string) : [];
-  const isPct = isPercentSummaryKey(k as string, contrib as Array<{ percentage?: boolean }>);
-    const val = isPct ? `${Number(displayV.toFixed(2))}%` : `${Math.trunc(displayV)}`;
-    rows.push([formatSummaryStatKey(k as string), val]);
-  });
-  if (rows.length === 0) return '';
-  // No width cap: allow full content
-  const table = renderAsciiTable(['Stat', 'Value'], rows, ['left', 'right']);
+    return Number(s[key] ?? 0);
+  };
+
+  // Row builder with formatting consistent with compare panel decimal rules
+  const makeSectionRows = (defs: Array<{ key: keyof StatsSummary }>): Array<[string, string]> => {
+    const rows: Array<[string, string]> = [];
+    const seen = new Set<string>();
+    defs.forEach(({ key }) => {
+      const k = key as keyof StatsSummary;
+      if (seen.has(k as string)) return;
+      seen.add(k as string);
+      const contrib = loadout.id ? buildContributionsForKeyForSide(loadoutService.getActiveSide(), loadout.id, k as string, stats, includeBaseStats, includeDerivedStats, includeRenownStats) : [];
+      const rawValue = computeDisplayValue(k, stats, contrib as Array<{ name: string; totalValue: number }>);
+      if (!rawValue) return; // omit zeros
+      const needsNorm = k === 'range' || k === 'radius' || k === 'healthRegen';
+      const displayV = needsNorm ? normalizeStatDisplayValue(k as string, rawValue) : rawValue;
+      const isPct = isPercentSummaryKey(k as string, contrib);
+      // Decimal rule: only one decimal for percent rows with derived contribution; otherwise integers
+      const hasDerived = contrib.some(c => c.name.includes('(Derived)'));
+      const formatted = isPct
+        ? ((includeDerivedStats && hasDerived) ? `${(Math.round(displayV * 10) / 10).toFixed(1)}%` : `${Math.trunc(displayV)}%`)
+        : `${needsNorm ? Math.trunc(displayV) : Math.trunc(displayV)}`;
+      rows.push([formatSummaryStatKey(k as string), formatted]);
+    });
+    return rows;
+  };
+
+  // Build a single table with simple section/subsection divider rows
+  const allRows: Array<[string, string]> = [];
+
+  // Primary Stats
+  const primaryRows = makeSectionRows(rowDefs.base);
+  if (primaryRows.length) {
+    allRows.push(['— Primary Stats —', '']);
+    primaryRows.forEach(r => allRows.push(r));
+  }
+
+  // Defense
+  const defenseRows = makeSectionRows(rowDefs.defense);
+  if (defenseRows.length) {
+    allRows.push(['— Defense —', '']);
+    defenseRows.forEach(r => allRows.push(r));
+  }
+
+  // Offense and subsections
+  const offenseRows = makeSectionRows(rowDefs.offense);
+  const damageHealing = includeDerivedStats ? computeAllDamageHealingBonuses(stats, { applyDR: false }) : null;
+  const meleeDerived = damageHealing && (damageHealing.meleeDamageBonus || 0) !== 0 ? [['Melee Damage Bonus', `${(Math.round((damageHealing.meleeDamageBonus) * 10) / 10).toFixed(1)}`] as [string, string]] : [];
+  const rangedDerived = damageHealing && (damageHealing.rangedDamageBonus || 0) !== 0 ? [['Ranged Damage Bonus', `${(Math.round((damageHealing.rangedDamageBonus) * 10) / 10).toFixed(1)}`] as [string, string]] : [];
+  const magicDerived = damageHealing && (damageHealing.magicDamageBonus || 0) !== 0 ? [['Magic Damage Bonus', `${(Math.round((damageHealing.magicDamageBonus) * 10) / 10).toFixed(1)}`] as [string, string]] : [];
+
+  const meleeRows = makeSectionRows(rowDefs.melee);
+  const rangedRows = makeSectionRows(rowDefs.ranged);
+  const magicRows = makeSectionRows(rowDefs.magic);
+
+  if (offenseRows.length || meleeRows.length || rangedRows.length || magicRows.length || meleeDerived.length || rangedDerived.length || magicDerived.length) {
+    allRows.push(['— Offense —', '']);
+    offenseRows.forEach(r => allRows.push(r));
+    if (meleeRows.length || meleeDerived.length) {
+      allRows.push(['  Melee', '']);
+      [...meleeDerived, ...meleeRows].forEach(r => allRows.push(r));
+    }
+    if (rangedRows.length || rangedDerived.length) {
+      allRows.push(['  Ranged', '']);
+      [...rangedDerived, ...rangedRows].forEach(r => allRows.push(r));
+    }
+    if (magicRows.length || magicDerived.length) {
+      allRows.push(['  Magic', '']);
+      [...magicDerived, ...magicRows].forEach(r => allRows.push(r));
+    }
+  }
+
+  // Healing
+  const healingRows = makeSectionRows(rowDefs.healing);
+  const healingDerived = damageHealing && (damageHealing.healingBonus || 0) !== 0 ? [['Healing Bonus', `${(Math.round((damageHealing.healingBonus) * 10) / 10).toFixed(1)}`] as [string, string]] : [];
+  if (healingRows.length || healingDerived.length) {
+    allRows.push(['— Healing —', '']);
+    [...healingDerived, ...healingRows].forEach(r => allRows.push(r));
+  }
+
+  // Other
+  const otherRows = makeSectionRows(rowDefs.other);
+  if (otherRows.length) {
+    allRows.push(['— Other —', '']);
+    otherRows.forEach(r => allRows.push(r));
+  }
+
+  if (allRows.length === 0) return '';
+  const table = renderAsciiTable(['Stat', 'Value'], allRows, ['left', 'right'], [30,10]);
   return 'Stats\n' + table;
 }
 
 function buildSummary(loadout: Loadout | null, opts?: { showItems?: boolean; showRenown?: boolean; showStats?: boolean }) {
   if (!loadout) return 'No loadout selected.';
   let out = '';
-  // Info table (Career, Level, RR)
-  const infoRows: Array<[string, string]> = [
-    ['Career', loadout.career ? formatCareerName(loadout.career) : '—'],
-    ['Level', String(loadout.level)],
-    ['RR', String(loadout.renownRank)],
-  ];
-  // Info table: no width cap
-  out += 'Info\n' + renderAsciiTable(['Field', 'Value'], infoRows, ['left', 'right']) + '\n';
+  // Single-row Info block (Career | Level | RR)
+  out += 'Info\n' + renderAsciiTable(['Career', 'Level', 'RR'], [[
+    loadout.career ? formatCareerName(loadout.career) : '—',
+    String(loadout.level),
+    String(loadout.renownRank),
+  ]], ['left','right','right'], [18,6,4]) + '\n';
   // Renown (only show if anything allocated)
   const ra = loadout.renownAbilities || {} as NonNullable<Loadout['renownAbilities']>;
   const roman = (lvl: number) => ['', 'I', 'II', 'III', 'IV', 'V'][Math.max(0, Math.min(5, Math.trunc(lvl)))] || '';
@@ -180,8 +244,7 @@ function buildSummary(loadout: Loadout | null, opts?: { showItems?: boolean; sho
     }
   });
   if ((opts?.showRenown ?? false) && renownRows.length > 0) {
-    // Renown table: no width cap
-    out += 'Renown\n' + renderAsciiTable(['Ability', 'Rank', 'Effect'], renownRows, ['left', 'center', 'left']) + '\n';
+    out += 'Renown\n' + renderAsciiTable(['Ability', 'Rank', 'Effect'], renownRows, ['left', 'center', 'left'], [26,5,54]) + '\n';
   }
   // Stats block
   const statsBlock = (opts?.showStats ?? false) ? buildStatsBlock(loadout) : '';
@@ -226,8 +289,7 @@ function buildSummary(loadout: Loadout | null, opts?: { showItems?: boolean; sho
     itemRows.push([formatSlotName(slot), itemName, tl.join(', ')]);
   });
   if ((opts?.showItems ?? true) && itemRows.length > 0) {
-    // Items table: no width cap; allow full talisman lists
-    out += 'Items\n' + renderAsciiTable(['Slot', 'Item', 'Talismans'], itemRows, ['left', 'left', 'left']);
+    out += 'Items\n' + renderAsciiTable(['Slot', 'Item', 'Talismans'], itemRows, ['left', 'left', 'left'], [14,42,42]);
   }
   return out;
 }

@@ -29,6 +29,11 @@ const STAT_LABEL_OVERRIDES: Record<string, string> = {
   blockStrikethroughMelee: 'Reduced Chance to be Blocked (Melee)',
   blockStrikethroughRanged: 'Reduced Chance to be Blocked (Ranged)',
   blockStrikethroughMagic: 'Reduced Chance to be Blocked (Magic)',
+  // Derived-only display labels (not backing StatsSummary keys)
+  meleeDamageBonus: 'Melee Damage Bonus',
+  rangedDamageBonus: 'Ranged Damage Bonus',
+  magicDamageBonus: 'Magic Damage Bonus',
+  healingBonus: 'Healing Bonus',
 };
 
 /**

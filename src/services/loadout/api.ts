@@ -1,23 +1,33 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import client from '../../lib/apollo-client';
 import { EquipSlot, Item, Career, Stat, ItemRarity } from '../../types';
-import { SEARCH_CHARACTERS, GET_CHARACTER, GET_POCKET_ITEMS, GET_TALISMANS } from './queries';
-import { gql } from '@apollo/client';
-import { makeListKey, getFromListCache, setInListCache, warmIconCacheFromConnection } from './cache';
+import {
+  GetCharactersDocument,
+  GetCharacterDocument,
+  GetPocketItemsDocument,
+  GetTalismansDocument,
+  GetItemDocument,
+  type GetCharactersQuery,
+  type GetCharacterQuery,
+  type GetPocketItemsQuery,
+  type GetTalismansQuery,
+  type GetItemQuery,
+} from '../../generated/graphql';
+import { makeListKey, getFromListCache, setInListCache, warmIconCacheFromConnection, adaptItemsConnection } from './cache';
 
 /**
  * Search for characters by name.
  * Returns the raw Apollo query data; caller extracts edges/nodes.
  */
-export async function searchCharactersByName(name: string) {
-  const { data } = await client.query({ query: SEARCH_CHARACTERS, variables: { name } });
-  return data;
+export async function searchCharactersByName(name: string): Promise<GetCharactersQuery> {
+  const { data } = await client.query({ query: GetCharactersDocument, variables: { name } });
+  return data as GetCharactersQuery;
 }
 
 /** Fetch a character by id; returns raw Apollo data. */
-export async function getCharacterById(id: string) {
-  const { data } = await client.query({ query: GET_CHARACTER, variables: { id } });
-  return data;
+export async function getCharacterById(id: string): Promise<GetCharacterQuery> {
+  const { data } = await client.query({ query: GetCharacterDocument, variables: { id } });
+  return data as GetCharacterQuery;
 }
 
 /**
@@ -36,7 +46,7 @@ export async function getItemsForSlotApi(
   before?: string,
   last?: number,
 ): Promise<any> {
-  let query = GET_POCKET_ITEMS;
+  const query = GetPocketItemsDocument;
   const variables: any = {
     first: limit,
     after: after || undefined,
@@ -105,19 +115,20 @@ export async function getItemsForSlotApi(
   if (cached) return cached;
 
   const { data } = await client.query({ query, variables });
-  const connection = (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
+  const raw = (data as GetPocketItemsQuery).items;
+  const connection = adaptItemsConnection(raw);
   setInListCache(key, connection);
   warmIconCacheFromConnection(connection);
 
-  const endCursor = connection?.pageInfo?.endCursor;
-  const hasNext = connection?.pageInfo?.hasNextPage;
+  const endCursor = (connection as any).pageInfo?.endCursor;
+  const hasNext = (connection as any).pageInfo?.hasNextPage;
   if (endCursor && hasNext) {
     const nextVars = { ...variables, after: endCursor };
     delete (nextVars as any).before; delete (nextVars as any).last;
     const nextKey = makeListKey('items', nextVars);
     if (!getFromListCache(nextKey)) {
       client.query({ query, variables: nextVars }).then(({ data }) => {
-        const nextConn = (data as any).items || null;
+        const nextConn = adaptItemsConnection((data as GetPocketItemsQuery).items);
         if (nextConn) { setInListCache(nextKey, nextConn); warmIconCacheFromConnection(nextConn); }
       }).catch(() => {});
     }
@@ -169,20 +180,21 @@ export async function getTalismansForSlotApi(
   const cached = getFromListCache(key);
   if (cached) return cached;
 
-  const { data } = await client.query({ query: GET_TALISMANS, variables });
-  const connection = (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
+  const { data } = await client.query({ query: GetTalismansDocument, variables });
+  const raw = (data as GetTalismansQuery).items;
+  const connection = adaptItemsConnection(raw);
   setInListCache(key, connection);
   warmIconCacheFromConnection(connection);
 
-  const endCursor = connection?.pageInfo?.endCursor;
-  const hasNext = connection?.pageInfo?.hasNextPage;
+  const endCursor = (connection as any).pageInfo?.endCursor;
+  const hasNext = (connection as any).pageInfo?.hasNextPage;
   if (endCursor && hasNext) {
     const nextVars = { ...variables, after: endCursor };
     delete (nextVars as any).before; delete (nextVars as any).last;
     const nextKey = makeListKey('talismans', nextVars);
     if (!getFromListCache(nextKey)) {
-      client.query({ query: GET_TALISMANS, variables: nextVars }).then(({ data }) => {
-        const nextConn = (data as any).items || null;
+      client.query({ query: GetTalismansDocument, variables: nextVars }).then(({ data }) => {
+        const nextConn = adaptItemsConnection((data as GetTalismansQuery).items);
         if (nextConn) { setInListCache(nextKey, nextConn); warmIconCacheFromConnection(nextConn); }
       }).catch(() => {});
     }
@@ -231,21 +243,22 @@ export async function getTalismansForItemLevelApi(
   const cached = getFromListCache(key);
   if (cached) return cached;
 
-  const { data } = await client.query({ query: GET_TALISMANS, variables });
-  const connection = (data as any).items || { edges: [], nodes: [], pageInfo: {}, totalCount: 0 };
+  const { data } = await client.query({ query: GetTalismansDocument, variables });
+  const raw = (data as GetTalismansQuery).items;
+  const connection = adaptItemsConnection(raw);
   setInListCache(key, connection);
   warmIconCacheFromConnection(connection);
 
-  const endCursor = connection?.pageInfo?.endCursor;
-  const hasNext = connection?.pageInfo?.hasNextPage;
+  const endCursor = (connection as any).pageInfo?.endCursor;
+  const hasNext = (connection as any).pageInfo?.hasNextPage;
   if (endCursor && hasNext) {
     const nextVars = { ...variables, after: endCursor } as any;
     delete nextVars.before; delete nextVars.last;
     const nextKey = makeListKey('talismans', nextVars);
     if (!getFromListCache(nextKey)) {
-      client.query({ query: GET_TALISMANS, variables: nextVars }).then(({ data }) => {
-        const nextConn = (data as any).items || null;
-        if (nextConn) { setInListCache(nextKey, nextConn); warmIconCacheFromConnection(nextConn); }
+      client.query({ query: GetTalismansDocument, variables: nextVars }).then(({ data }) => {
+        const nextConn = (data as GetTalismansQuery).items || null;
+        if (nextConn) { setInListCache(nextKey, nextConn as any); warmIconCacheFromConnection(nextConn as any); }
       }).catch(() => {});
     }
   }
@@ -254,33 +267,6 @@ export async function getTalismansForItemLevelApi(
 
 /** Fetch full item details by id; relies on Apollo cache-first policy. */
 export async function getItemWithDetailsApi(itemId: string): Promise<Item | null> {
-  const query = gql`
-    query GetItem($id: ID!) {
-      item(id: $id) {
-        id
-        name
-        description
-        type
-        slot
-        rarity
-        armor
-        dps
-        speed
-        levelRequirement
-        renownRankRequirement
-        itemLevel
-        uniqueEquipped
-        stats { stat value percentage }
-        careerRestriction
-        raceRestriction
-        iconUrl
-        talismanSlots
-        itemSet { id name bonuses { itemsRequired bonus { __typename ... on ItemStat { stat value percentage } ... on Ability { name description } } } }
-        abilities { name description }
-        buffs { name description }
-      }
-    }
-  `;
-  const { data } = await client.query({ query, variables: { id: itemId }, fetchPolicy: 'cache-first' });
-  return (data as any).item || null;
+  const { data } = await client.query({ query: GetItemDocument, variables: { id: itemId }, fetchPolicy: 'cache-first' });
+  return (data as GetItemQuery).item as unknown as Item || null;
 }

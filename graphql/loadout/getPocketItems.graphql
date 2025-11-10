@@ -1,0 +1,35 @@
+query GetPocketItems($first: Int, $after: String, $last: Int, $before: String, $hasStats: [Stat!], $usableByCareer: Career, $where: ItemFilterInput) {
+  items(
+    where: $where,
+    hasStats: $hasStats,
+    usableByCareer: $usableByCareer,
+    first: $first,
+    after: $after,
+    last: $last,
+    before: $before,
+    order: [
+      { rarity: DESC },
+      { itemLevel: DESC },
+      { dps: DESC },
+      { name: ASC }
+    ]
+  ) {
+    pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
+    edges {
+      cursor
+      node {
+        id name type slot rarity armor dps speed levelRequirement renownRankRequirement itemLevel uniqueEquipped
+        stats { stat value percentage }
+        careerRestriction raceRestriction iconUrl talismanSlots
+        itemSet { id name }
+      }
+    }
+    nodes {
+      id name type slot rarity armor dps speed levelRequirement renownRankRequirement itemLevel uniqueEquipped
+      stats { stat value percentage }
+      careerRestriction raceRestriction iconUrl talismanSlots
+      itemSet { id name }
+    }
+    totalCount
+  }
+}

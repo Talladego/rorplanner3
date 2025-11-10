@@ -9,13 +9,28 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          apollo: ['@apollo/client', 'graphql'],
-        }
-      }
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            // Group core React libs
+            if (id.includes('react') || id.includes('react-dom')) return 'react-vendor';
+            // Apollo client & related internals
+            if (id.includes('@apollo/client') || id.includes('apollo')) return 'apollo';
+            // GraphQL parsing & utilities
+            if (id.includes('graphql')) return 'graphql';
+            // State management
+            if (id.includes('zustand')) return 'state';
+            // Tooltip lib
+            if (id.includes('react-tooltip')) return 'tooltip';
+            return 'vendor';
+          }
+          // Generated GraphQL documents/types
+          if (id.includes('/src/generated/')) return 'generated';
+          return undefined;
+        },
+      },
     },
   },
   base: '/',

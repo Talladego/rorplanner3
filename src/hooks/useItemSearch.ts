@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Career, EquipSlot, Item, ItemRarity, Stat } from '../types';
-import { loadoutService } from '../services/loadout/loadoutService';
+// loadoutService no longer needed after hook-based refactor
+import { GetPocketItemsDocument, GetTalismansDocument, type GetPocketItemsQueryVariables, type GetTalismansQueryVariables, type GetPocketItemsQuery, type GetTalismansQuery } from '../generated/graphql';
+import { useLazyQuery } from '@apollo/client/react';
 
 import { DEFAULT_PAGE_SIZE } from '../constants/ui';
 
@@ -49,6 +51,18 @@ export function useItemSearch({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageHistory, setPageHistory] = useState<string[]>([]);
   const wasOpenRef = useRef<boolean>(false);
+  const requestSeqRef = useRef(0);
+
+  const isAbortError = (err: unknown) => {
+    const anyErr = err as any;
+    const name = anyErr?.name || anyErr?.networkError?.name || anyErr?.cause?.name;
+    const message: string | undefined = anyErr?.message || anyErr?.networkError?.message;
+    return name === 'AbortError' || (typeof message === 'string' && /aborted/i.test(message));
+  };
+
+  // Lazily execute queries using generated typed documents
+  const [runPocketQuery] = useLazyQuery<GetPocketItemsQuery, GetPocketItemsQueryVariables>(GetPocketItemsDocument, { fetchPolicy: 'cache-first' });
+  const [runTalismanQuery] = useLazyQuery<GetTalismansQuery, GetTalismansQueryVariables>(GetTalismansDocument, { fetchPolicy: 'cache-first' });
 
   const fetchItems = useCallback(async (
     after?: string,
@@ -59,60 +73,93 @@ export function useItemSearch({
     isBackwards?: boolean,
     careerFilterEnabledOverride?: boolean
   ) => {
-    if (isTalismanMode) {
-      if (!holdingItemLevelReq) return;
-    }
-
+    if (isTalismanMode && !holdingItemLevelReq) return;
+    const reqId = ++requestSeqRef.current;
     setLoading(true);
     setError(null);
     try {
-      let connection: any;
       if (isTalismanMode) {
-        connection = await loadoutService.getTalismansForSlot(
-          slot,
-          holdingItemLevelReq!,
-          pageSize,
-          isBackwards ? undefined : after,
-          filter,
-          stats,
-          rarities,
-          isBackwards ? (beforeCursor ?? undefined) : undefined,
-          isBackwards ? pageSize : undefined
-        );
+        const vars: GetTalismansQueryVariables = {
+          first: isBackwards ? undefined : pageSize,
+          after: isBackwards ? undefined : after,
+          last: isBackwards ? pageSize : undefined,
+          before: isBackwards ? beforeCursor : undefined,
+          hasStats: stats && stats.length ? stats : undefined,
+          where: {
+            type: { eq: 'ENHANCEMENT' },
+            levelRequirement: { lte: holdingItemLevelReq! },
+            name: { contains: filter || '' },
+            // Talismans are enhancements and are not filtered by gear equip slot
+            ...(rarities && rarities.length ? { rarity: { in: rarities } } : {}),
+          } as any,
+        };
+  const { data } = await runTalismanQuery({ variables: vars });
+        // Drop stale responses
+        if (reqId !== requestSeqRef.current) return;
+        const conn = data?.items;
+        setPageData({
+          items: (conn?.nodes as Item[]) || [],
+          hasNextPage: !!conn?.pageInfo.hasNextPage,
+          hasPreviousPage: !!conn?.pageInfo.hasPreviousPage,
+          startCursor: conn?.pageInfo.startCursor || null,
+          endCursor: conn?.pageInfo.endCursor || null,
+          totalCount: conn?.totalCount || 0,
+        });
       } else {
         const careerFilterEnabled = careerFilterEnabledOverride ?? enableCareerFilter;
         const careerParam = careerFilterEnabled ? ((career || undefined) as Career | undefined) : undefined;
-        connection = await loadoutService.getItemsForSlot(
-          slot as EquipSlot,
-          careerParam,
-          pageSize,
-          isBackwards ? undefined : after,
-          effectiveLevel,
-          effectiveRenown,
-          filter,
-          stats,
-          rarities,
-          isBackwards ? (beforeCursor ?? undefined) : undefined,
-          isBackwards ? pageSize : undefined
-        );
+        const vars: GetPocketItemsQueryVariables = {
+          first: isBackwards ? undefined : pageSize,
+            after: isBackwards ? undefined : after,
+          last: isBackwards ? pageSize : undefined,
+          before: isBackwards ? beforeCursor : undefined,
+          hasStats: stats && stats.length ? stats : undefined,
+          usableByCareer: careerParam,
+          where: {
+            levelRequirement: { lte: effectiveLevel },
+            renownRankRequirement: { lte: effectiveRenown },
+            name: { contains: filter || '' },
+            ...(slot !== EquipSlot.POCKET1 && slot !== EquipSlot.POCKET2 ? { type: { neq: 'NONE' } } : {}),
+            slot: (slot == null || slot === EquipSlot.NONE)
+              ? { in: [
+                EquipSlot.MAIN_HAND, EquipSlot.OFF_HAND, EquipSlot.RANGED_WEAPON, EquipSlot.EITHER_HAND,
+                EquipSlot.HELM, EquipSlot.SHOULDER, EquipSlot.BODY, EquipSlot.GLOVES, EquipSlot.BOOTS, EquipSlot.BACK,
+                EquipSlot.BELT, EquipSlot.JEWELLERY1, EquipSlot.JEWELLERY2, EquipSlot.JEWELLERY3, EquipSlot.JEWELLERY4,
+                EquipSlot.POCKET1, EquipSlot.POCKET2,
+              ] }
+              : (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2)
+                ? { in: [EquipSlot.POCKET1, EquipSlot.POCKET2] }
+                : (slot === EquipSlot.MAIN_HAND || slot === EquipSlot.OFF_HAND)
+                  ? { in: [slot, EquipSlot.EITHER_HAND] }
+                  : (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4)
+                    ? { in: [slot, EquipSlot.JEWELLERY1] }
+                    : { eq: slot },
+            ...(rarities && rarities.length ? { rarity: { in: rarities } } : {}),
+          } as any,
+        };
+  const { data } = await runPocketQuery({ variables: vars });
+        if (reqId !== requestSeqRef.current) return;
+        const conn = data?.items;
+        setPageData({
+          items: (conn?.nodes as Item[]) || [],
+          hasNextPage: !!conn?.pageInfo.hasNextPage,
+          hasPreviousPage: !!conn?.pageInfo.hasPreviousPage,
+          startCursor: conn?.pageInfo.startCursor || null,
+          endCursor: conn?.pageInfo.endCursor || null,
+          totalCount: conn?.totalCount || 0,
+        });
       }
-
-      const nodes = connection.nodes || [];
-      setPageData({
-        items: nodes,
-        hasNextPage: connection.pageInfo?.hasNextPage || false,
-        hasPreviousPage: connection.pageInfo?.hasPreviousPage || false,
-        startCursor: connection.pageInfo?.startCursor || null,
-        endCursor: connection.pageInfo?.endCursor || null,
-        totalCount: connection.totalCount || 0,
-      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch items');
-      setPageData({ items: [], hasNextPage: false, hasPreviousPage: false, startCursor: null, endCursor: null, totalCount: 0 });
+      if (isAbortError(err)) {
+        // Ignore aborted requests (from rapid refetches or unmounts)
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch items');
+        setPageData({ items: [], hasNextPage: false, hasPreviousPage: false, startCursor: null, endCursor: null, totalCount: 0 });
+      }
     } finally {
       setLoading(false);
     }
-  }, [isTalismanMode, holdingItemLevelReq, enableCareerFilter, slot, career, effectiveLevel, effectiveRenown, pageSize]);
+  }, [isTalismanMode, holdingItemLevelReq, enableCareerFilter, slot, career, effectiveLevel, effectiveRenown, pageSize, runPocketQuery, runTalismanQuery]);
 
   const refetch = useCallback((filter?: string, stats?: Stat[], rarities?: ItemRarity[], careerFilterEnabledOverride?: boolean) => {
     setCurrentPage(1);

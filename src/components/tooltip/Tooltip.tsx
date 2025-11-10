@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Item, Loadout, EquipSlot, Career, CAREER_RACE_MAPPING } from '../../types';
+import { Item, Loadout, EquipSlot } from '../../types';
 import { formatItemTypeName, formatSlotName } from '../../utils/formatters';
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { useScale } from '../layout/ScaleContext';
@@ -10,8 +10,7 @@ import StatLines from './StatLines';
 import AbilitiesBuffsBlock from './AbilitiesBuffsBlock';
 import TalismanSlotsBlock from './TalismanSlotsBlock';
 import SetBonusesBlock from './SetBonusesBlock';
-import { getOffhandBlockReason, STAFF_ONLY_CAREERS, TWO_H_ONLY_CAREERS, CANNOT_USE_2H_MELEE } from '../../constants/careerWeaponRules';
-import { isTwoHandedWeapon } from '../../utils/items';
+// Eligibility rules handled by loadoutService now; remove local career/weapon rule imports
 
 interface TooltipProps {
   children: React.ReactNode;
@@ -54,31 +53,37 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
   };
 
 
-  const getEquippedSetItemsCountForLoadout = (setName: string): number => {
+  const getEquippedSetItemsCountForLoadout = (setId: string): number => {
     const lo = getEffectiveLoadout();
     if (!lo) return 0;
     let count = 0;
     Object.values(lo.items).forEach(loadoutItem => {
       const i = loadoutItem.item;
-      if (i && i.itemSet && i.itemSet.name === setName) {
+      if (i && i.itemSet) {
+        const id = String(i.itemSet.id || i.itemSet.name);
+        if (id === setId) {
         const levelEligible = !i.levelRequirement || i.levelRequirement <= lo.level;
         const renownEligible = !i.renownRankRequirement || i.renownRankRequirement <= lo.renownRank;
         if (levelEligible && renownEligible) count++;
+        }
       }
     });
     return count;
   };
 
   // Mirror helpers bound to a specific loadout
-  const getEquippedSetItemsCountForSpecificLoadout = (setName: string, lo: Loadout | null): number => {
+  const getEquippedSetItemsCountForSpecificLoadout = (setId: string, lo: Loadout | null): number => {
     if (!lo) return 0;
     let count = 0;
     Object.values(lo.items).forEach(loadoutItem => {
       const i = loadoutItem.item;
-      if (i && i.itemSet && i.itemSet.name === setName) {
+      if (i && i.itemSet) {
+        const id = String(i.itemSet.id || i.itemSet.name);
+        if (id === setId) {
         const levelEligible = !i.levelRequirement || i.levelRequirement <= lo.level;
         const renownEligible = !i.renownRankRequirement || i.renownRankRequirement <= lo.renownRank;
         if (levelEligible && renownEligible) count++;
+        }
       }
     });
     return count;
@@ -86,109 +91,11 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
 
 
   // Build invalid reasons list for an item against current loadout and slot
-  const getInvalidReasonsForItem = (lo: Loadout | null, it: Item | null, slot?: EquipSlot | null): string[] => {
-    const reasons: string[] = [];
-    if (!lo || !it) return reasons;
-    if (it.levelRequirement > 0 && it.levelRequirement > lo.level) {
-      reasons.push(`Requires level ${it.levelRequirement}`);
-    }
-    if (it.renownRankRequirement > 0 && it.renownRankRequirement > lo.renownRank) {
-      reasons.push(`Requires renown ${it.renownRankRequirement}`);
-    }
-    const career: Career | null = (lo.career as Career) || null;
-    if (career && Array.isArray(it.careerRestriction) && it.careerRestriction.length > 0 && !it.careerRestriction.includes(career)) {
-      reasons.push('Not usable by this career');
-    }
-    if (career && Array.isArray(it.raceRestriction) && it.raceRestriction.length > 0) {
-      const allowedRaces = CAREER_RACE_MAPPING[career] || [];
-      const ok = it.raceRestriction.some(r => allowedRaces.includes(r));
-      if (!ok) reasons.push('Not usable by this race');
-    }
-    // Slot compatibility mirror of selector rules
-    if (slot != null) {
-      if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
-        if (!(it.slot === EquipSlot.POCKET1 || it.slot === EquipSlot.POCKET2)) reasons.push('Not compatible with this slot');
-      } else if (slot === EquipSlot.MAIN_HAND) {
-        if (!(it.slot === EquipSlot.MAIN_HAND || it.slot === EquipSlot.EITHER_HAND)) reasons.push('Not compatible with this slot');
-      } else if (slot === EquipSlot.OFF_HAND) {
-        if (!(it.slot === EquipSlot.OFF_HAND || it.slot === EquipSlot.EITHER_HAND)) reasons.push('Not compatible with this slot');
-      } else if (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4) {
-        if (!(it.slot === slot || it.slot === EquipSlot.JEWELLERY1)) reasons.push('Not compatible with this slot');
-      } else {
-        if (it.slot !== slot) reasons.push('Not compatible with this slot');
-      }
-    }
-
-    if (slot === EquipSlot.OFF_HAND) {
-      const main = lo.items[EquipSlot.MAIN_HAND]?.item || null;
-      if (main && isTwoHandedWeapon(main)) {
-        reasons.push('Two-handed main-hand equipped');
-      }
-      if (career) {
-        const r = getOffhandBlockReason(career, it);
-        if (r) reasons.push(r);
-      }
-    }
-    if (slot === EquipSlot.MAIN_HAND && career) {
-      if (STAFF_ONLY_CAREERS.has(career) && it.type !== 'STAFF') {
-        reasons.push('This career must equip a two-handed staff in the main hand');
-      }
-      if (TWO_H_ONLY_CAREERS.has(career) && !isTwoHandedWeapon(it)) {
-        reasons.push('This career must equip a two-handed weapon in the main hand');
-      }
-      if (CANNOT_USE_2H_MELEE.has(career) && isTwoHandedWeapon(it)) {
-        reasons.push('This career cannot equip two-handed weapons');
-      }
-    }
-    // Unique-equipped duplicates: if the same unique item is already equipped in any other slot, mark as duplicate
-    if (it.uniqueEquipped) {
-      const foundElsewhere = Object.entries(lo.items).some(([k, v]) => {
-        const s = k as EquipSlot;
-        if (slot && s === slot) return false; // same slot
-        return v?.item?.id === it.id;
-      });
-      if (foundElsewhere) reasons.push('This unique item is already equipped');
-    }
-    return reasons;
-  };
-
-  const getInvalidReasonsForTalisman = (lo: Loadout | null, talisman: Item | null, slot?: EquipSlot | null, index?: number): string[] => {
-    const reasons: string[] = [];
-    if (!lo || !talisman) return reasons;
-    if (talisman.levelRequirement > 0 && talisman.levelRequirement > lo.level) {
-      reasons.push(`Requires level ${talisman.levelRequirement}`);
-    }
-    if (talisman.renownRankRequirement > 0 && talisman.renownRankRequirement > lo.renownRank) {
-      reasons.push(`Requires renown ${talisman.renownRankRequirement}`);
-    }
-    if (Array.isArray(talisman.raceRestriction) && talisman.raceRestriction.length > 0 && lo.career) {
-      const allowedRaces = CAREER_RACE_MAPPING[lo.career as Career] || [];
-      const ok = talisman.raceRestriction.some(r => allowedRaces.includes(r));
-      if (!ok) reasons.push('Not usable by this race');
-    }
-    // Duplicate talismans on the same item: later duplicates are invalid
-    if (slot && talisman.id) {
-      const list = lo.items[slot]?.talismans as (Item | null)[] | undefined;
-      if (list && list.length > 0) {
-        // Only mark as duplicate if a matching talisman occurs in an earlier index (slot order matters)
-        const currentIdx = typeof index === 'number' ? index : list.findIndex(t => t && t.id === talisman.id);
-        if (currentIdx > 0) {
-          for (let i = 0; i < currentIdx; i++) {
-            const t = list[i];
-            if (t && t.id === talisman.id) {
-              reasons.push('Duplicate talisman on this item');
-              break;
-            }
-          }
-        }
-      }
-    }
-    return reasons;
-  };
+  // Eligibility now delegated to service
 
   // Presentational blocks moved to separate components
 
-  const renderTooltipContent = (targetItem: Item, eligible: boolean, equippedCountGetter: (setName: string) => number) => (
+  const renderTooltipContent = (targetItem: Item, eligible: boolean, equippedCountGetter: (setId: string, setName: string) => number) => (
     <>
       {/* 1. Item Name */}
   <div className="mb-1"><ItemNameText item={targetItem} /></div>
@@ -211,21 +118,21 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
       </div>
 
       {/* 4. Item Stats (armor, dps, speed, stats) */}
-  <div className="mb-2"><StatLines item={targetItem} eligible={true} /></div>
-
-      {/* 4.5. Item Abilities and Buffs */}
-      <AbilitiesBuffsBlock item={targetItem} eligible={eligible} />
+      <div className="mb-2"><StatLines item={targetItem} eligible={true} /></div>
 
       {/* 5. Item Talismans */}
       {!isTalismanTooltip && (
         <TalismanSlotsBlock item={targetItem} />
       )}
 
-      {/* 6. Item Set and Set Bonuses */}
-  <SetBonusesBlock item={targetItem} eligible={true} getEquippedCount={equippedCountGetter} />
+      {/* 6. Requirements (moved directly after talismans) */}
+      <div className="mb-2"><RequirementsBlock item={targetItem} eligible={true} /></div>
 
-      {/* 7. Requirements */}
-  <div className="mb-1"><RequirementsBlock item={targetItem} eligible={true} /></div>
+      {/* 7. Item Set and Set Bonuses */}
+      <SetBonusesBlock item={targetItem} eligible={true} getEquippedCount={equippedCountGetter} />
+
+      {/* 8. Abilities and Buffs (moved after set section) */}
+      <AbilitiesBuffsBlock item={targetItem} eligible={eligible} />
       {/* Red summary removed; rule-specific reasons render below when present */}
     </>
   );
@@ -538,13 +445,13 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
     : otherItemBase;
   const otherLoadoutCtx = side ? loadoutService.getLoadoutForSide(side === 'A' ? 'B' : 'A') : null;
   const itemInvalidReasons = isTalismanTooltip
-    ? getInvalidReasonsForTalisman(getEffectiveLoadout(), displayItem, slot, talismanIndex)
-    : getInvalidReasonsForItem(getEffectiveLoadout(), displayItem, slot);
+    ? loadoutService.getTalismanEligibility(slot as EquipSlot, talismanIndex ?? 0, displayItem, getEffectiveLoadout()?.id).reasons
+    : loadoutService.getItemEligibility(slot as EquipSlot, displayItem, getEffectiveLoadout()?.id).reasons;
   const itemEligible = (itemInvalidReasons.length === 0);
 
   const otherInvalidReasons = isTalismanTooltip
-    ? getInvalidReasonsForTalisman(otherLoadoutCtx, otherDisplayItem, slot, talismanIndex)
-    : getInvalidReasonsForItem(otherLoadoutCtx, otherDisplayItem, slot);
+    ? loadoutService.getTalismanEligibility(slot as EquipSlot, talismanIndex ?? 0, otherDisplayItem, otherLoadoutCtx?.id).reasons
+    : loadoutService.getItemEligibility(slot as EquipSlot, otherDisplayItem, otherLoadoutCtx?.id).reasons;
   const otherEligible = (otherInvalidReasons.length === 0);
 
   // For item tooltips, filter duplicate talismans so later duplicates render as empty slots.
@@ -583,7 +490,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
         >
           {renderItemForTooltip && (
             <>
-              {renderTooltipContent(renderItemForTooltip, itemEligible, getEquippedSetItemsCountForLoadout)}
+              {renderTooltipContent(renderItemForTooltip, itemEligible, (setId: string) => getEquippedSetItemsCountForLoadout(setId))}
               {!itemEligible && itemInvalidReasons.length > 0 && (
                 <div className="mt-2 pt-1 border-t border-red-600/50 text-red-400 text-xs">
                   <div className="font-semibold mb-0.5">🛇 Invalid for current loadout</div>
@@ -605,9 +512,9 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           className={`fixed z-[10990] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 pointer-events-none`}
           style={{ left: mirrorPosition.x, top: mirrorPosition.y, width: TOOLTIP_WIDTH, maxWidth: TOOLTIP_WIDTH, transform: `scale(${uiScale})`, transformOrigin: 'top left' }}
         >
-          {renderTooltipContent(renderOtherItemForTooltip, otherEligible, (setName: string) => {
+          {renderTooltipContent(renderOtherItemForTooltip, otherEligible, (setId: string) => {
             const otherLoCtx = side ? loadoutService.getLoadoutForSide(side === 'A' ? 'B' : 'A') : null;
-            return getEquippedSetItemsCountForSpecificLoadout(setName, otherLoCtx);
+            return getEquippedSetItemsCountForSpecificLoadout(setId, otherLoCtx);
        })}
           {!otherEligible && otherInvalidReasons.length > 0 && (
             <div className="mt-2 pt-1 border-t border-red-600/50 text-red-400 text-xs">

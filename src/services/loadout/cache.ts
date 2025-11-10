@@ -19,6 +19,40 @@ export type ListConnection = {
   pageInfo?: PageInfo;
   totalCount?: number;
 } | null;
+
+// Adapter: normalize a generated ItemsConnection (readonly arrays, maybe-null values)
+// into our cache ListConnection shape with mutable arrays and defined pageInfo keys
+// Use a structural type to avoid importing generated types here
+type ItemsEdgeLike = { cursor: string; node: ConnectionNode };
+type ItemsConnectionLike = {
+  edges?: readonly ItemsEdgeLike[] | null;
+  nodes?: readonly ConnectionNode[] | null;
+  pageInfo?: {
+    hasNextPage?: boolean;
+    hasPreviousPage?: boolean;
+    startCursor?: string | null;
+    endCursor?: string | null;
+  } | null;
+  totalCount?: number | null;
+} | null | undefined;
+
+export function adaptItemsConnection(conn: ItemsConnectionLike): ListConnection {
+  if (!conn) return { nodes: [], edges: [], pageInfo: {}, totalCount: 0 };
+  const edges = Array.isArray(conn.edges) ? conn.edges.map((e) => ({ cursor: e.cursor, node: e.node })) : [];
+  let nodes = Array.isArray(conn.nodes) ? [...conn.nodes] : [];
+  // If nodes missing but edges present, derive nodes from edges for convenience
+  if ((nodes == null || nodes.length === 0) && edges.length > 0) {
+    nodes = edges.map((e) => e.node);
+  }
+  const pageInfo = conn.pageInfo ? {
+    hasNextPage: !!conn.pageInfo.hasNextPage,
+    hasPreviousPage: !!conn.pageInfo.hasPreviousPage,
+    startCursor: conn.pageInfo.startCursor ?? null,
+    endCursor: conn.pageInfo.endCursor ?? null,
+  } : {};
+  const totalCount = typeof conn.totalCount === 'number' ? conn.totalCount : 0;
+  return { edges, nodes, pageInfo, totalCount };
+}
 type ListValue = ListConnection; // alias for cache value
 const LIST_CACHE_LIMIT = 100; // keep recent combos/pages
 const listCache = new Map<ListKey, ListValue>();

@@ -130,7 +130,7 @@ export function computeStatsForLoadout(loadoutId: string, opts?: { includeRenown
       }
     });
   });
-  const setCounts: Record<string, { count: number; bonuses: any[] } > = {};
+  const setCounts: Record<string, { id: string; name: string; count: number; bonuses: any[] } > = {};
   const seenUniqueForSets = new Set<string>();
   SLOT_ORDER_UI.forEach((slot) => {
     const entry = loadout.items[slot];
@@ -141,9 +141,10 @@ export function computeStatsForLoadout(loadoutId: string, opts?: { includeRenown
       if (seenUniqueForSets.has(item.id)) itemEligible = false; else if (itemEligible) seenUniqueForSets.add(item.id);
     }
     if (item && item.itemSet && itemEligible) {
-      const name = item.itemSet.name;
-      if (!setCounts[name]) setCounts[name] = { count: 0, bonuses: item.itemSet.bonuses || [] };
-      setCounts[name].count += 1;
+      const setId = String(item.itemSet.id || item.itemSet.name);
+      const setName = item.itemSet.name;
+      if (!setCounts[setId]) setCounts[setId] = { id: setId, name: setName, count: 0, bonuses: item.itemSet.bonuses || [] };
+      setCounts[setId].count += 1;
     }
   });
   Object.values(setCounts).forEach(({ count, bonuses }) => {
@@ -326,7 +327,7 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
     });
   });
   const counts: Record<string, number> = {};
-  const bonusesMap: Record<string, any[]> = {};
+  const bonusesMap: Record<string, { name: string; bonuses: any[] }> = {};
   const seenUniqueForSets = new Set<string>();
   SLOT_ORDER_UI.forEach((slot) => {
     const entry = loadout.items[slot];
@@ -337,18 +338,21 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
       if (seenUniqueForSets.has(item.id)) itemEligible = false; else if (itemEligible) seenUniqueForSets.add(item.id);
     }
     if (item && item.itemSet && itemEligible) {
-      const name = item.itemSet.name;
-      counts[name] = (counts[name] || 0) + 1;
-      if (!bonusesMap[name]) bonusesMap[name] = item.itemSet.bonuses || [];
+      const setId = String(item.itemSet.id || item.itemSet.name);
+      const setName = item.itemSet.name;
+      counts[setId] = (counts[setId] || 0) + 1;
+      if (!bonusesMap[setId]) bonusesMap[setId] = { name: setName, bonuses: item.itemSet.bonuses || [] };
     }
   });
-  Object.entries(bonusesMap).forEach(([setName, bonuses]) => {
-    const pieces = counts[setName] || 0;
+  Object.entries(bonusesMap).forEach(([setId, meta]) => {
+    const pieces = counts[setId] || 0;
+    const setName = meta.name;
+    const bonuses = meta.bonuses || [];
     bonuses.forEach((b: any) => {
       if (pieces >= b.itemsRequired && b.bonus && 'stat' in b.bonus) {
         const s = b.bonus;
         if (s.stat === target) {
-          const key = setName + '|set|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
+          const key = setId + '|set|' + s.stat + '|' + (s.percentage ? 'pct' : 'val');
           const prev = res.get(key) || { name: setName, count: 1, totalValue: 0, percentage: !!s.percentage, color: '#4ade80' };
           prev.count = 1; prev.totalValue += Number(s.value) || 0; prev.percentage = !!s.percentage; res.set(key, prev);
         }

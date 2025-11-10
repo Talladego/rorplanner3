@@ -1,0 +1,13 @@
+query GetCharacters($name: String!) {
+  characters(where: { name: { eq: $name } }, first: 10) {
+    edges {
+      node {
+        id
+        name
+        career
+        level
+        renownRank
+      }
+    }
+  }
+}

@@ -6,12 +6,27 @@ import { urlService } from '../../services/loadout/urlService';
 import { setIncludeBaseStats as setBaseShared, setIncludeDerivedStats as setDerivedShared, setIncludeRenownStats as setRenownShared } from '../../services/ui/statsToggles';
 import StatRow from './StatRow';
 import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide } from '../../utils/statsCompareHelpers';
+import { computeAllDamageHealingBonuses } from '../../utils/damageHealingBonuses';
 
 // Per-UI helpers moved to formatters for reuse across components
 
 // Derived stats application constant imported from helpers
 
 export default function StatsComparePanel() {
+  const Chevron = ({ expanded, size = 12 }: { expanded: boolean; size?: number }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={`text-gray-200 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
   const [aId, setAId] = useState<string | null>(loadoutService.getSideLoadoutId('A'));
   const [bId, setBId] = useState<string | null>(loadoutService.getSideLoadoutId('B'));
   const [tick, setTick] = useState(0); // force rerender on stats updates
@@ -21,6 +36,21 @@ export default function StatsComparePanel() {
   const [includeBaseStats, setIncludeBaseStats] = useState(false);
   const [includeDerivedStats, setIncludeDerivedStats] = useState(false);
   const [includeRenownStats, setIncludeRenownStats] = useState(false);
+  const [collapsed, setCollapsed] = useState({
+    base: false,
+    defense: false,
+    offense: false,
+    healing: false,
+    other: false,
+  });
+  const [collapsedSubsections, setCollapsedSubsections] = useState({
+    melee: false,
+    ranged: false,
+    magic: false,
+  });
+
+  const toggle = (key: keyof typeof collapsed) => setCollapsed((c) => ({ ...c, [key]: !c[key] }));
+  const toggleSub = (key: keyof typeof collapsedSubsections) => setCollapsedSubsections((c) => ({ ...c, [key]: !c[key] }));
   // Client Lua does not apply DR when showing these derived defense chances; default off
   // Diminishing returns are always applied when computing derived stats
   // no external version tick needed; event updates of ids trigger rerender
@@ -131,16 +161,25 @@ export default function StatsComparePanel() {
   const rangedRows = makeRows(rowDefs.ranged);
   const magicRows = makeRows(rowDefs.magic);
   const healingRows = makeRows(rowDefs.healing);
+
+  // Derived Damage/Healing Bonuses (Lua formula: (primary/5)+(power/5))
+  const damageHealingA = useMemo(() => computeAllDamageHealingBonuses(statsA, { applyDR: false }), [statsA]);
+  const damageHealingB = useMemo(() => computeAllDamageHealingBonuses(statsB, { applyDR: false }), [statsB]);
+  const showMeleeDerived = includeDerivedStats && ((damageHealingA.meleeDamageBonus || 0) !== 0 || (damageHealingB.meleeDamageBonus || 0) !== 0);
+  const showRangedDerived = includeDerivedStats && ((damageHealingA.rangedDamageBonus || 0) !== 0 || (damageHealingB.rangedDamageBonus || 0) !== 0);
+  const showMagicDerived = includeDerivedStats && ((damageHealingA.magicDamageBonus || 0) !== 0 || (damageHealingB.magicDamageBonus || 0) !== 0);
+  const showHealingDerived = includeDerivedStats && ((damageHealingA.healingBonus || 0) !== 0 || (damageHealingB.healingBonus || 0) !== 0);
   const otherRows = makeRows(rowDefs.other);
   // Offense groups: common, then melee, ranged, magic
   const offenseGroups: Row[][] = [offenseRows, meleeRows, rangedRows, magicRows];
   const offenseAny = offenseGroups.some(g => g.length > 0);
+  const anyDerivedRequested = includeDerivedStats && (showMeleeDerived || showRangedDerived || showMagicDerived);
   // Determine if any section has rows; if none, hide the Tier 3 container entirely
   const showAnyStats = (
     baseRows.length > 0 ||
     defenseRows.length > 0 ||
-    offenseAny ||
-    healingRows.length > 0 ||
+    offenseAny || anyDerivedRequested ||
+    healingRows.length > 0 || showHealingDerived ||
     otherRows.length > 0
   );
   // Determine if any side has a selected career
@@ -180,12 +219,11 @@ export default function StatsComparePanel() {
         <div className="space-y-0.5">
           {rows.length > 0 ? (
             rows.map(r => {
-              const aContribRaw = aId ? loadoutService.getStatContributionsForLoadout(aId, r.key) : [];
-              const bContribRaw = bId ? loadoutService.getStatContributionsForLoadout(bId, r.key) : [];
               const needsUnitNormalization = r.key === 'range' || r.key === 'radius' || r.key === 'healthRegen';
-              const isPercentRow = isPercentSummaryKey(r.key, [...aContribRaw, ...bContribRaw]);
+              // Build full contributions (including derived extras) first so percent detection sees derived percentage entries
               const contribA = buildContributionsForKeyForSide('A', aId, r.key, statsA, includeBaseStats, includeDerivedStats, includeRenownStats);
               const contribB = buildContributionsForKeyForSide('B', bId, r.key, statsB, includeBaseStats, includeDerivedStats, includeRenownStats);
+              const isPercentRow = isPercentSummaryKey(r.key, [...contribA, ...contribB]);
 
               // For Outgoing Damage, display an effective multiplicative percent combining item OUTGOING_DAMAGE and renown OUTGOING_DAMAGE_PERCENT
               let displayA = r.a;
@@ -233,14 +271,11 @@ export default function StatsComparePanel() {
                   needsUnitNormalization={needsUnitNormalization}
                   contributionsA={contribA}
                   contributionsB={contribB}
+                  includeDerivedStats={includeDerivedStats}
                 />
               );
             })
-          ) : (
-            title === 'Primary Stats' ? null : (
-              <div className="text-xs text-muted italic">No {title.toLowerCase()} bonuses</div>
-            )
-          )}
+          ) : null}
         </div>
       </div>
     );
@@ -317,46 +352,183 @@ export default function StatsComparePanel() {
           {/* Primary Stats */}
           {baseRows.length > 0 && (
             <div className="stats-section">
-              {renderSection('Primary Stats', baseRows)}
+              <div className="stats-section">
+                <button type="button" onClick={() => toggle('base')} className="flex items-center gap-2 mb-1 group" aria-expanded={!collapsed.base} aria-controls="stats-base">
+                  <span className="inline-flex w-3 justify-center"><Chevron expanded={!collapsed.base} /></span>
+                  <h3 className="stats-section-title m-0">Primary Stats</h3>
+                </button>
+                <div id="stats-base" hidden={collapsed.base}>
+                  {renderSection('', baseRows, true, 'section', false)}
+                </div>
+              </div>
             </div>
           )}
 
           {/* Defense Stats */}
           {defenseRows.length > 0 && (
             <div className="stats-section">
-              {renderSection('Defense', defenseRows)}
+              <div className="stats-section">
+                <button type="button" onClick={() => toggle('defense')} className="flex items-center gap-2 mb-1 group" aria-expanded={!collapsed.defense} aria-controls="stats-defense">
+                  <span className="inline-flex w-3 justify-center"><Chevron expanded={!collapsed.defense} /></span>
+                  <h3 className="stats-section-title m-0">Defense</h3>
+                </button>
+                <div id="stats-defense" hidden={collapsed.defense}>
+                  {renderSection('', defenseRows, true, 'section', false)}
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Offense with thin separators between groups (common, melee, ranged, magic) */}
-          {offenseAny && (
+          {/* Offense with explicit subsections for Melee / Ranged / Magic */}
+          {(offenseAny || anyDerivedRequested) && (
             <div className="stats-section">
-              <h3 className="stats-section-title">Offense</h3>
-              <div className="my-1 h-px bg-gray-700 opacity-60" />
-              <div className="mt-1">
-                {offenseGroups.filter(g => g.length > 0).map((group, idx, arr) => (
-                  <div key={idx}>
-                    {renderSection('', group, false, 'subsection', false)}
-                    {idx < arr.length - 1 && (
-                      <div className="my-1 h-px bg-gray-700 opacity-60" />
-                    )}
-                  </div>
-                ))}
+              <div className="stats-section">
+                <button type="button" onClick={() => toggle('offense')} className="flex items-center gap-2 mb-1 group" aria-expanded={!collapsed.offense} aria-controls="stats-offense">
+                  <span className="inline-flex w-3 justify-center"><Chevron expanded={!collapsed.offense} /></span>
+                  <h3 className="stats-section-title m-0">Offense</h3>
+                </button>
+                <div id="stats-offense" hidden={collapsed.offense}>
+                  {renderSection('', offenseRows, true, 'section', false)}
+                  {(meleeRows.length > 0 || showMeleeDerived) && (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleSub('melee')}
+                        className="flex items-center gap-2 mb-1 group"
+                        aria-expanded={!collapsedSubsections.melee}
+                        aria-controls="stats-offense-melee"
+                      >
+                        <span className="inline-flex w-3 justify-center"><Chevron expanded={!collapsedSubsections.melee} size={10} /></span>
+                        <h4 className="stats-subsection-title m-0">Melee</h4>
+                      </button>
+                      <div id="stats-offense-melee" hidden={collapsedSubsections.melee}>
+                        {/* Melee Damage Bonus derived stat (top row) */}
+                        {showMeleeDerived && (
+                          <StatRow
+                            key="meleeDamageBonus"
+                            statKey="meleeDamageBonus"
+                            displayA={damageHealingA.meleeDamageBonus}
+                            displayB={damageHealingB.meleeDamageBonus}
+                            isPercentRow={false}
+                            needsUnitNormalization={false}
+                            forceOneDecimal
+                            includeDerivedStats={includeDerivedStats}
+                            contributionsA={[{ name: 'From Strength / 5 (Derived)', count: 1, totalValue: (statsA.strength || 0) / 5, percentage: false }, { name: 'From Melee Power / 5 (Derived)', count: 1, totalValue: (statsA.meleePower || 0) / 5, percentage: false }]}
+                            contributionsB={[{ name: 'From Strength / 5 (Derived)', count: 1, totalValue: (statsB.strength || 0) / 5, percentage: false }, { name: 'From Melee Power / 5 (Derived)', count: 1, totalValue: (statsB.meleePower || 0) / 5, percentage: false }]}
+                          />
+                        )}
+                        {renderSection('', meleeRows, true, 'subsection', false)}
+                      </div>
+                    </div>
+                  )}
+                  {(rangedRows.length > 0 || showRangedDerived) && (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleSub('ranged')}
+                        className="flex items-center gap-2 mb-1 group"
+                        aria-expanded={!collapsedSubsections.ranged}
+                        aria-controls="stats-offense-ranged"
+                      >
+                        <span className="inline-flex w-3 justify-center"><Chevron expanded={!collapsedSubsections.ranged} size={10} /></span>
+                        <h4 className="stats-subsection-title m-0">Ranged</h4>
+                      </button>
+                      <div id="stats-offense-ranged" hidden={collapsedSubsections.ranged}>
+                        {showRangedDerived && (
+                          <StatRow
+                            key="rangedDamageBonus"
+                            statKey="rangedDamageBonus"
+                            displayA={damageHealingA.rangedDamageBonus}
+                            displayB={damageHealingB.rangedDamageBonus}
+                            isPercentRow={false}
+                            needsUnitNormalization={false}
+                            forceOneDecimal
+                            includeDerivedStats={includeDerivedStats}
+                            contributionsA={[{ name: 'From Ballistic Skill / 5 (Derived)', count: 1, totalValue: (statsA.ballisticSkill || 0) / 5, percentage: false }, { name: 'From Ranged Power / 5 (Derived)', count: 1, totalValue: (statsA.rangedPower || 0) / 5, percentage: false }]}
+                            contributionsB={[{ name: 'From Ballistic Skill / 5 (Derived)', count: 1, totalValue: (statsB.ballisticSkill || 0) / 5, percentage: false }, { name: 'From Ranged Power / 5 (Derived)', count: 1, totalValue: (statsB.rangedPower || 0) / 5, percentage: false }]}
+                          />
+                        )}
+                        {renderSection('', rangedRows, true, 'subsection', false)}
+                      </div>
+                    </div>
+                  )}
+                  {(magicRows.length > 0 || showMagicDerived) && (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleSub('magic')}
+                        className="flex items-center gap-2 mb-1 group"
+                        aria-expanded={!collapsedSubsections.magic}
+                        aria-controls="stats-offense-magic"
+                      >
+                        <span className="inline-flex w-3 justify-center"><Chevron expanded={!collapsedSubsections.magic} size={10} /></span>
+                        <h4 className="stats-subsection-title m-0">Magic</h4>
+                      </button>
+                      <div id="stats-offense-magic" hidden={collapsedSubsections.magic}>
+                        {showMagicDerived && (
+                          <StatRow
+                            key="magicDamageBonus"
+                            statKey="magicDamageBonus"
+                            displayA={damageHealingA.magicDamageBonus}
+                            displayB={damageHealingB.magicDamageBonus}
+                            isPercentRow={false}
+                            needsUnitNormalization={false}
+                            forceOneDecimal
+                            includeDerivedStats={includeDerivedStats}
+                            contributionsA={[{ name: 'From Intelligence / 5 (Derived)', count: 1, totalValue: (statsA.intelligence || 0) / 5, percentage: false }, { name: 'From Magic Power / 5 (Derived)', count: 1, totalValue: (statsA.magicPower || 0) / 5, percentage: false }]}
+                            contributionsB={[{ name: 'From Intelligence / 5 (Derived)', count: 1, totalValue: (statsB.intelligence || 0) / 5, percentage: false }, { name: 'From Magic Power / 5 (Derived)', count: 1, totalValue: (statsB.magicPower || 0) / 5, percentage: false }]}
+                          />
+                        )}
+                        {renderSection('', magicRows, true, 'subsection', false)}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
           {/* Healing Stats */}
-          {healingRows.length > 0 && (
+          {(healingRows.length > 0 || showHealingDerived) && (
             <div className="stats-section">
-              {renderSection('Healing', healingRows)}
+              <div className="stats-section">
+                <button type="button" onClick={() => toggle('healing')} className="flex items-center gap-2 mb-1 group" aria-expanded={!collapsed.healing} aria-controls="stats-healing">
+                  <span className="inline-flex w-3 justify-center"><Chevron expanded={!collapsed.healing} /></span>
+                  <h3 className="stats-section-title m-0">Healing</h3>
+                </button>
+                <div id="stats-healing" hidden={collapsed.healing}>
+                  {showHealingDerived && (
+                    <StatRow
+                      key="healingBonus"
+                      statKey="healingBonus"
+                      displayA={damageHealingA.healingBonus}
+                      displayB={damageHealingB.healingBonus}
+                      isPercentRow={false}
+                      needsUnitNormalization={false}
+                      forceOneDecimal
+                      includeDerivedStats={includeDerivedStats}
+                      contributionsA={[{ name: 'From Willpower / 5 (Derived)', count: 1, totalValue: (statsA.willpower || 0) / 5, percentage: false }, { name: 'From Healing Power / 5 (Derived)', count: 1, totalValue: (statsA.healingPower || 0) / 5, percentage: false }]}
+                      contributionsB={[{ name: 'From Willpower / 5 (Derived)', count: 1, totalValue: (statsB.willpower || 0) / 5, percentage: false }, { name: 'From Healing Power / 5 (Derived)', count: 1, totalValue: (statsB.healingPower || 0) / 5, percentage: false }]}
+                    />
+                  )}
+                  {renderSection('', healingRows, true, 'section', false)}
+                </div>
+              </div>
             </div>
           )}
 
           {/* Other Stats */}
           {otherRows.length > 0 && (
             <div className="stats-section">
-              {renderSection('Other', otherRows)}
+              <div className="stats-section">
+                <button type="button" onClick={() => toggle('other')} className="flex items-center gap-2 mb-1 group" aria-expanded={!collapsed.other} aria-controls="stats-other">
+                  <span className="inline-flex w-3 justify-center"><Chevron expanded={!collapsed.other} /></span>
+                  <h3 className="stats-section-title m-0">Other</h3>
+                </button>
+                <div id="stats-other" hidden={collapsed.other}>
+                  {renderSection('', otherRows, true, 'section', false)}
+                </div>
+              </div>
             </div>
           )}
         </div>
