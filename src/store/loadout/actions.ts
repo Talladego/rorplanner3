@@ -1,10 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Career, EquipSlot, Item, Loadout, LoadoutSide, StatsSummary } from '../../types';
 import { createInitialLoadout, initialStats } from './state';
-import { mapStatToKey } from './utils';
+// Consolidated stats computation now lives in services/loadout/stats.
+// Store delegates to the shared function instead of duplicating logic here.
+import { computeStatsForLoadout } from '../../services/loadout/stats';
+// import { mapStatToKey } from './utils'; // no longer needed; stats computed via service
 import * as sel from './selectors';
 
 export function buildActions(set: any, get: any) {
+  // Ensure unique ids even for rapid successive creations within the same millisecond
+  let __loadoutSeq = 0;
   return {
     // Getters
     getCurrentLoadout: (): Loadout | null => sel.getCurrentLoadout(get()),
@@ -169,70 +174,18 @@ export function buildActions(set: any, get: any) {
       return { loadouts: state.loadouts.map((l: Loadout) => (l.id === current.id ? reset : l)) };
     }),
 
+    // Delegate to consolidated computeStatsForLoadout (single source of truth).
+    // This ensures set bonuses, unique-equipped rules, slot validation, shields, and renown are applied consistently.
     calculateStats: () => set((state: any) => {
       const current = state.getCurrentLoadout() as Loadout | null;
       if (!current) return { statsSummary: initialStats };
-      const stats: StatsSummary = { ...initialStats };
-
-      const isItemEligible = (item: Item | null): boolean => {
-        if (!item) return true;
-        const levelEligible = !item.levelRequirement || item.levelRequirement <= current.level;
-        const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= current.renownRank;
-        return levelEligible && renownEligible;
-      };
-
-      const addStatsFromArray = (arr?: Array<{ stat: string; value: number | string }>) => {
-        (arr || []).forEach(({ stat, value }) => {
-          const key = mapStatToKey(stat);
-          if (key && stats[key] !== undefined) {
-            stats[key] += Number(value);
-          }
-        });
-      };
-
-      const setItems: Record<string, { item: Item; set: NonNullable<Item['itemSet']> }[]> = {};
-
-      Object.values(current.items).forEach(({ item, talismans }) => {
-        if (item && isItemEligible(item)) {
-          if (item.armor && item.armor > 0) stats.armor += Number(item.armor);
-          addStatsFromArray(item.stats);
-          if (item.itemSet) {
-            const setName = item.itemSet.name;
-            if (!setItems[setName]) setItems[setName] = [];
-            setItems[setName].push({ item, set: item.itemSet });
-          }
-          (talismans || []).forEach((talisman) => {
-            if (talisman && isItemEligible(talisman)) {
-              if (talisman.armor && talisman.armor > 0) stats.armor += Number(talisman.armor);
-              addStatsFromArray(talisman.stats);
-            }
-          });
-        }
-      });
-
-      Object.values(setItems).forEach((items) => {
-        if (items.length > 0 && items[0].set.bonuses) {
-          const setBonuses = items[0].set.bonuses;
-          setBonuses.forEach((setBonus: any) => {
-            if (items.length >= setBonus.itemsRequired) {
-              if ('stat' in setBonus.bonus) {
-                const key = mapStatToKey(setBonus.bonus.stat);
-                if (key && stats[key] !== undefined) {
-                  const bonusValue = Number(setBonus.bonus.value);
-                  if (!isNaN(bonusValue)) stats[key] += bonusValue;
-                }
-              }
-            }
-          });
-        }
-      });
-
+      const stats: StatsSummary = computeStatsForLoadout(current.id, { includeRenown: true });
       return { statsSummary: stats };
     }),
 
     // Multi-loadout management
     createLoadout: (name: string, level: number = 40, renownRank: number = 80, isFromCharacter: boolean = false, characterName?: string): string => {
-      const id = `loadout-${Date.now()}`;
+      const id = `loadout-${Date.now()}-${++__loadoutSeq}`;
       set((state: any) => ({
         loadouts: [...state.loadouts, createInitialLoadout(id, name, level, renownRank, isFromCharacter, characterName)],
         currentLoadoutId: state.currentLoadoutId || id,

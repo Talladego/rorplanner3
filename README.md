@@ -1,55 +1,66 @@
 # RorPlanner
 
-A modern React application for planning character equipment and renown loadouts in Warhammer Online: Return of Reckoning, built with Vite, TypeScript, and Tailwind CSS.
+A modern, high‑performance planner for Warhammer Online: Return of Reckoning character equipment, talismans, renown abilities, and side‑by‑side stat comparison. Built with React 19, TypeScript 5, Vite 7, Tailwind CSS 4, Apollo Client 4, and GraphQL code generation.
 
 ## Features
 
-- ⚔️ Equipment planning for all character classes
-- ⭐ Renown planner with icons, tooltips, capped levels, and point budget
-- 🔁 Dual A/B loadout compare with side assignment
-- 🎨 Dark/Light theme support
-- 🔍 Interactive equipment selection
-- 📊 Real-time stat calculations (items, talismans, set bonuses, renown, derived)
-- 🎯 Responsive design
-- 🚀 Fast development with Vite
+- ⚔️ Equipment & talisman planning for all careers (eligibility + unique‑equipped enforcement)
+- ⭐ Renown planner with caps, per‑ability levels (0–5), packed share encoding
+- 🔁 Dual A/B compare with per‑side career mapping and provisional character import (no name flicker)
+- 📊 Real‑time stat aggregation (items, sets, talismans, renown, derived; multiplicative combinations for damage/healing modifiers)
+- 🪄 Collapsible stat sections and Offense subsections (Melee / Ranged / Magic) with chevron toggles
+- 🔍 Interactive equipment selector with pagination, filters, and LRU item details cache
+- 🧪 Typed GraphQL DocumentNodes via codegen – no manual `gql` strings in runtime code
+- 🚀 Lazy‑loaded heavy panels (StatsComparePanel, RenownPanel, EquipmentSelector, Summary modal)
+- 🧩 Manual vendor chunking for faster initial load (react‑vendor, apollo, graphql, zustand, tooltip)
+- � Tailwind layered UI (Tier 0–3 design system) with dark palette
+- �️ Race‑safe sequential character imports (slower prior import cannot override a faster later one)
+- 🧭 Optional URL auto‑sync and navigation handling (disabled by default; feature‑flagged)
 
 ## Tech Stack
 
-- **Frontend**: React 19 + TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **State Management**: Zustand
+- React 19 + TypeScript 5
+- Vite 7 (custom manualChunks)
+- Tailwind CSS 4
+- Zustand 5 + service façade + event emitter
+- Apollo Client 4 + GraphQL 16 + Codegen (typed‑document‑node)
+- Vitest 2 (unit tests & regression guards)
+- ESLint 9 + TypeScript ESLint + React Hooks plugin
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
-- npm or yarn
+- npm
 
 ### Installation
 
-1. Clone the repository
+1) Clone and install
+
 ```bash
 git clone <repository-url>
 cd rorplanner3
-```
-
-2. Install dependencies
-```bash
 npm install
 ```
 
-3. Start the development server
+2) Generate typed GraphQL documents (needed after adding/modifying `.graphql` files)
+
+```bash
+npm run codegen
+```
+
+3) Start the dev server
+
 ```bash
 npm run dev -- --host
 ```
 
-4. Open [http://localhost:3001](http://localhost:3001) in your browser
+Open http://localhost:3001
 
 Notes:
-- The app uses a hash router. Deep-link parameters appear after the `#`.
-- URL auto-update and navigation parsing are feature-flagged and off by default (see `urlService` in `App.tsx`).
+- HashRouter is used; state lives after `#/?`.
+- URL auto‑update and back/forward parsing are disabled by default. You can enable them via `urlService.setAutoUpdateEnabled(true)` and `urlService.setNavigationHandlingEnabled(true)`.
 
 ### Build for Production
 
@@ -57,57 +68,44 @@ Notes:
 npm run build
 ```
 
-Project layout (key paths):
+## Project Layout (key paths)
 
-src/
-├── components/                      # React UI (panels, selectors, stats, summary, toolbar, tooltip)
-├── constants/                       # Local constants (base stats, icons, stat maps)
-├── hooks/                           # Presentation hooks
-├── lib/                             # Apollo Client configuration
-├── providers/                       # ApolloProvider, ErrorBoundary, etc.
-├── services/
-│   └── loadout/                     # Service layer (domain façade + integration + events)
-│       ├── loadoutService.ts        # Main façade (business rules, URL updates, events)
-│       ├── loadoutEventEmitter.ts   # Typed pub/sub (internal)
-│       ├── urlService.ts            # URL encode/decode for dual compare (includes renown)
-│       ├── urlSync.ts               # Guarded URL auto-update helper
-│       ├── queries.ts               # Centralized GraphQL documents
-│       ├── mutations.ts             # Store mutations used by the façade
-│       ├── api.ts                   # Data fetchers (items, talismans, details)
-│       ├── cache.ts                 # Lightweight LRU/in-flight cache
-│       ├── stats.ts                 # Compute totals + contribution breakdowns
-│       ├── selectors.ts             # Service-level selectors
-│       ├── filters.ts               # Allowed stat filters + sanitizers for queries
-│       └── renownConfig.ts          # Renown ability metadata (labels, caps, icons, totals)
-├── store/
-│   └── loadout/                     # Zustand store and adapter
-│       ├── state.ts                 # Initial state and factories
-│       ├── actions.ts               # Mutators and calculations
-│       ├── selectors.ts             # Pure selectors
-│       ├── loadoutStore.ts          # Store composition
-│       └── loadoutStoreAdapter.ts   # Thin adapter used by Service
-├── types/                           # TypeScript types and events
-└── App.tsx                          # Main application component
+```
+graphql/                # Source GraphQL operation documents (.graphql)
+src/generated/          # Auto-generated TS + typed DocumentNodes (via codegen)
+src/components/         # UI (panels, selectors, stats, summary modal, toolbar, tooltip blocks)
+src/constants/          # Career base stats, icons, weapon rules, stat maps, UI constants
+src/services/loadout/   # Domain façade + integration + events + URL + stats
+src/store/loadout/      # Zustand store, actions, selectors, adapter (pure state layer)
+src/utils/              # Derived stats, formatting, comparison helpers
+src/types/              # Core application & event types
+vite.config.ts          # Build + chunk strategy
+codegen.ts              # GraphQL codegen configuration
+```
 
 ## Available Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-- Dev probes (optional):
-	- `npm run probe:jewellery3-talismans`
-	- `npm run probe:item`
-	- `npm run probe:item-buffs`
-	- `npm run probe:ability`
-	- `npm run probe:items-by-name`
-	- `npm run probe:items-outgoing-damage`
-	- `npm run probe:items-outgoing-damage-any`
+| Script | Purpose |
+|--------|---------|
+| `dev` | Start Vite dev server (port 3001) |
+| `build` | Production build (code‑split + optimized chunks) |
+| `preview` | Preview the production build locally |
+| `lint` / `lint:fix` | ESLint analysis / auto‑fix |
+| `typecheck` | TypeScript project check (no emit) |
+| `check` | Combined lint + typecheck gate |
+| `test` / `test:watch` | Run Vitest suite |
+| `codegen` | Regenerate typed GraphQL docs from `graphql/**/*.graphql` |
+| `generate:base-stats` | Rebuild career base stats generated file |
+| `probe:*` | One‑off debug scripts for item/talisman investigation |
 
-## Contributing
-## License
+### Testing
 
-This project is licensed under the MIT License.
+```bash
+npm test              # run once
+npm run test:watch    # watch mode
+npm run check && npm test
+```
+
 ## Deploying to Cloudflare Pages
 
 Cloudflare Pages is a fast, free static hosting platform with a global CDN. This project is preconfigured for it:
@@ -115,148 +113,109 @@ Cloudflare Pages is a fast, free static hosting platform with a global CDN. This
 - Build command: `npm run build`
 - Output directory: `dist`
 
-Setup steps:
+Setup:
 
 1. Push your repository to GitHub.
-2. In Cloudflare Dashboard → Pages → Create a project → Connect to GitHub → select this repo.
-4. Build command: `npm run build`
-5. Output directory: `dist`
-6. Save and deploy.
+2. Cloudflare Dashboard → Pages → Create a project → Connect to GitHub → select this repo.
+3. Build command: `npm run build`
+4. Output directory: `dist`
+5. Save and deploy.
 
 Custom domain: Add your domain in Pages → Custom domains and follow DNS prompts. SSL is automatic.
 
 ## Architecture
 
+### Layer Overview
 
-- Presentation (React components and hooks)
-	- Location: `src/components`, `src/hooks`
-	- Responsibilities: Render UI, handle user interactions, subscribe to domain events, and call Service methods.
-	- Must not import the store or event emitter directly. Use `loadoutService` as the façade.
-- Service (Domain orchestration, integration, events)
-	- Responsibilities: Orchestrate domain operations, apply business rules (eligibility, unique-equipped, set bonuses, stat calc), fetch data via GraphQL, encode/decode URL state, and emit typed events.
-	- Location: `src/services/loadout/*`
-	- Submodules:
-		- `queries.ts`: All GraphQL documents.
-		- `api.ts`: Fetchers (items, talismans, details) with caching and prefetch.
-		- `stats.ts`: Compute totals and per-stat contribution breakdowns.
-		- `events.ts`: Subscribe to single/all event types.
-		- `urlService.ts`: URL encode/decode, including renown ability levels in share links.
-		- `urlSync.ts`: Guarded URL auto-update helper.
-		- `renownConfig.ts`: Renown metadata and caps used by UI and stats.
-	- Talks to Data via `loadoutStoreAdapter` (no React imports here) and emits events using `loadoutEventEmitter`.
+| Layer | Location | Responsibilities | Forbidden |
+|-------|----------|------------------|-----------|
+| Presentation | `src/components`, `src/hooks` | Render UI, call façade, subscribe to typed events | Direct store/event emitter imports |
+| Service Façade | `src/services/loadout/*` | Business rules (eligibility, unique‑equipped, set bonuses, stat aggregation), GraphQL fetching, URL encode/decode, events | React imports |
+| Store (Data) | `src/store/loadout/*` | Pure state container & sync mutations | Network, URL, business orchestration |
+| Generated GraphQL | `graphql/**/*.graphql` → `src/generated/graphql.ts` | Strongly typed operations & documents | Manual `gql` strings elsewhere |
+| Types | `src/types/*` | Shared enums/interfaces + event contracts | Business logic |
 
-- Data (State and pure data transforms)
-	- Location: `src/store/loadout`
-	- Responsibilities: Hold and mutate state using Zustand; expose a thin adapter `loadoutStoreAdapter` to decouple the store from the Service/Presentation layers.
-	- Must not import from Service. The adapter is called by the Service; components must not call the store directly.
+### Notable Behaviors
 
-- Types and Events
-	- Location: `src/types` and `src/types/events.ts`
-	- Responsibilities: Centralize TypeScript enums, interfaces, and the typed event contracts the Service emits.
+- Provisional loadout created immediately on character import to avoid name flicker; final details populate in place.
+- Race‑safe character import: stale completion will not hijack current side mapping.
+- Unique‑equipped enforcement blocks duplicates across slots in the same loadout.
+- Stat rows compute effective multiplicative percentages for outgoing/incoming damage and outgoing healing.
+- Collapsible sections & subsections (Offense) with Chevron icons; spacing consistent with section headers.
 
-### Event-driven flow
+### Key Modules
 
-1) A component invokes a Service method (e.g., `loadoutService.updateItem(...)`).
-2) The Service updates state via the adapter (`loadoutStoreAdapter.setItem(...)`) and emits domain events (e.g., `ITEM_UPDATED`, `STATS_UPDATED`).
-3) Components subscribe via `loadoutService.subscribeToEvents` or `subscribeToAllEvents` and re-render accordingly.
+- `loadoutService.ts` – façade & orchestration
+- `urlService.ts` – hash param parsing, compact encoding, packed renown abilities
+- `stats.ts` – aggregate + contribution breakdown
+- `api.ts` / `cache.ts` – item/talisman fetch + LRU + in‑flight dedupe
+- `mutations.ts` – thin mutation wrappers separating event emission from per‑loadout updates
+- `loadoutEventEmitter.ts` – minimal pub/sub bus
+- `loadoutStoreAdapter.ts` – decouples façade from Zustand implementation
+- `statMaps.ts` – enum→summary key mapping
+- `generated/graphql.ts` – typed DocumentNodes
+ - `equipmentValidation.ts` – centralized item & talisman eligibility (level, renown, race, duplicates, slot rules) + validation guards
+ - `loadoutMutations.ts` – per‑loadout setters (career, level, renown rank, name, character status) kept pure; façade emits events
+ - `characterImport.ts` – sequential, race‑safe character import flow (provisional loadout creation, stale import protection)
+ - `statsFacade.ts` – higher‑level stat recomputation + event emission + bulk apply handling (wraps lower‑level `stats.ts` aggregation)
 
-This keeps UI reactive without coupling components to the store internals.
+### Event‑driven Flow
 
-### Key files
+1. Component calls façade (e.g. `loadoutService.updateItem(slot, item)`).
+2. Façade validates and mutates store via adapter, emits domain events.
+3. Subscribers update (e.g., `StatsComparePanel` recomputes on `STATS_UPDATED`).
 
-- `src/services/loadout/loadoutService.ts`: Main façade for domain ops and event emissions.
-- `src/services/loadout/loadoutEventEmitter.ts`: Minimal pub/sub used internally by the Service.
-- `src/services/loadout/queries.ts`: Centralized GraphQL documents.
-- `src/services/loadout/api.ts`: Data fetchers for items/talismans/item details.
-- `src/services/loadout/cache.ts`: LRU list cache and icon pre-warm.
-- `src/services/loadout/stats.ts`: Stats aggregation and contribution logic.
-- `src/services/loadout/events.ts`: Event subscription helpers for components.
-- `src/services/loadout/urlService.ts`: URL encode/decode for dual-compare, including renown; feature flags for auto-update and navigation parsing.
-- `src/services/loadout/urlSync.ts`: Guarded URL auto-update helper.
-- `src/services/loadout/renownConfig.ts`: Renown ability metadata used by UI and stats.
-- `src/constants/statMaps.ts`: Mapping between GraphQL stat enums and summary keys.
-- `src/store/loadout/loadoutStore.ts`: Zustand store composition.
-- `src/store/loadout/loadoutStoreAdapter.ts`: Adapter the Service uses to read/write store state.
-- `src/lib/apollo-client.ts`: Apollo client setup for GraphQL.
+### Performance & Bundling
 
-### UI tiering (design system)
+- Manual vendor chunking in `vite.config.ts` groups react‑vendor, apollo, graphql, zustand, tooltip, plus a generic vendor chunk.
+- Generated GraphQL documents isolated into a `generated` chunk.
+- Heavy UI panels lazy‑loaded to shrink initial `index` bundle (~130 kB at time of writing).
+- LRU caching + in‑flight dedupe reduce duplicate item/talisman fetches.
 
-- Tier 0: App background, black (`--background`)
-- Tier 1: Panels with colored outer frame, dark panel background (`.panel-container` + `.panel-border-*`)
-- Tier 2: Dashed inner containers with medium grey background (`.field-group`)
-- Tier 3: Detail elements with solid borders and dark grey background (`.equipment-slot`, `.talisman-slot`, `.icon-frame`)
+### URL Share Format (Hash Params)
 
-Conventions:
-- Equipment selector modal is a Tier 1 panel with blue border containing a Tier 2 group; item rows are Tier 3.
-- Equipment side panels (A/B) are Tier 1; inner content is a single Tier 2 container; slots and renown rows are Tier 3.
-- Compare Stats panel: Tier 1 (blue) with a single Tier 2 container; no inner Tier 1.
+| Param | Meaning |
+|-------|---------|
+| `a.*` / `b.*` | Side A/B loadout encoded values |
+| `a.c` / `b.c` | Career (base‑36 index) |
+| `a.l` / `b.l` | Level |
+| `a.r` / `b.r` | Renown Rank |
+| `a.ra` / `b.ra` | Packed renown abilities (3 bits/ability) |
+| `a.i.<slot>` | Item id equipped in slot (slot monikers like `mh`, `bd`, `j3`) |
+| `a.t.<slot>.<n>` | Talisman id in slot position n |
+| `s` | Stats bitmask: bit0=Career stats, bit1=Renown stats, bit2=Derived stats |
 
-### Boundary rules (do/don't)
+Trophy slots are omitted from encoding.
 
-- Components:
-	- Do call `loadoutService` methods and subscribe with `loadoutService.subscribeToEvents`.
-	- Don’t import `useLoadoutStore` or `loadoutEventEmitter` directly.
+## Contributing
 
-- Service:
-	- Do call `loadoutStoreAdapter` for state reads/writes and emit typed events.
-	- Don’t import React or hooks; don’t render UI.
+1. Create a branch.
+2. If you add/modify GraphQL operations, run `npm run codegen`.
+3. Implement changes (put orchestration/validation in `src/services/loadout/`; keep store mutations pure).
+4. Add/adjust tests for new logic or regressions (Vitest).
+5. Run `npm run check && npm test`.
+6. Ensure README and comments reflect any architectural changes.
 
-- Store:
-	- Do keep state and pure transformations (no network, no URL, no business orchestration).
-	- Don’t import Service; no cyclic deps.
+Boundary guardrails:
 
-### Typical interaction example
+- Components never import the raw store or event emitter—only the façade (`loadoutService`).
+- Store is pure (no network, URL, or React imports).
+- Service may orchestrate, fetch, compute, and emit, but must not import React.
+- GraphQL queries live only in `graphql/` (codegen produces `src/generated/graphql.ts`).
 
-- Selecting an item in the UI:
-	- `EquipmentSelector` → `loadoutService.getItemWithDetails(id)` → `services/loadout/api.getItemWithDetailsApi` via the façade (LRU/in-flight dedupe wrapper).
-	- `loadoutService.updateItem(slot, item)` → `loadoutStoreAdapter.setItem(...)` → emit `ITEM_UPDATED` → recompute → emit `STATS_UPDATED`.
-	- `StatsComparePanel` listens via Service subscription helpers to update its view.
+## License
 
-### Contributor checklist to preserve boundaries
+MIT
 
-## Housekeeping
+## Tablet Roadmap (Future Work / Not Implemented)
 
-- Prefer `src/services/loadout/queries.ts` as the single source for GraphQL documents. Avoid scattering `gql` outside this module unless strictly scoped to a local API call.
+Target: optional tablet‑friendly mode for iPad/Android tablets; desktop remains the primary target.
 
-- URL feature flags (in `urlService`):
-	- `setAutoUpdateEnabled(boolean)`: Enable/disable mutation of the URL in response to state changes.
-	- `setNavigationHandlingEnabled(boolean)`: Enable/disable parsing the URL on navigation changes after initial load.
-	- `setNavigateCallback(fn)`: Injected from React Router to perform updates.
+- Viewport/breakpoints: tablet at ~1024–1280px; consider `ScaleToFit` on tablet widths.
+- Layout: tabs for dual compare (A|B); single‑column equipment grid with sticky header; collapsible sections in stats.
+- Touch: min 44px touch targets; replace hover‑only tooltips with tap/expand blocks.
+- Overlays: selector as full‑screen sheet; ensure portals avoid scroll‑jank.
+- Performance: defer icon preloads on cellular; lazy‑load heavy panels; memoize rows.
+- QA: iPad Safari/Chrome and Android Chrome across orientations.
 
-- Share links include renown ability levels: `a.renown.<ability>=<level>` and `b.renown.<ability>=<level>`. These are applied when loading from the URL.
-
-- When adding a feature:
-	- Put domain logic in the Service (and its submodules).
-	- Keep the Store focused on state shape and pure calculations only.
-	- Subscribe to changes via Service; never from components to the store directly.
-	- Emit/handle typed events defined in `src/types/events.ts`.
-
-## Tablet roadmap (future work)
-
-Target: optional tablet-friendly mode for iPad/Android tablets; desktop remains the primary target. No current commitment; captured here for future work.
-
-- Viewport and breakpoints
-	- Add tablet breakpoints around 1024–1280px. Consider enabling `ScaleToFit` only on tablet widths to avoid layout reflow.
-	- Maintain 1440 desktop canvas; tablet uses single-column or stacked sections as needed.
-
-- Layout adaptations
-	- Dual compare (A/B): switch to tabs on tablet (A | B) instead of side-by-side panels.
-	- Equipment grid: single column with sticky header; Tier 2 containers continue to flex-fill vertically.
-	- Stats panel: collapsible sections to reduce scroll; keep the outer Tier 1 + inner Tier 2 contract.
-
-- Touch ergonomics
-	- Minimum touch target 44px; increase spacing for filters, pagination, and A/B toggles.
-	- Replace hover-only tooltips with tap-hold or inline expandable info blocks using the existing `HoverTooltip` API with a touch trigger.
-
-- Modals and overlays
-	- Equipment selector becomes a full-screen sheet on tablet; avoid viewport overflow. Keep Tier 1 (blue) wrapper with a single Tier 2 content group.
-	- Ensure portals for tooltips/menus use fixed positioning and avoid scroll-jank.
-
-- Performance considerations
-	- Defer preloading of large icon sets on cellular. Lazy-load heavy panels; memoize list rows (virtualization optional if needed).
-	- Ensure GraphQL requests batch and cache effectively on slower networks.
-
-- QA matrix
-	- iPad (10/11/12.9) Safari/Chrome, Android tablets (Chrome). Verify orientation changes, fixed headers, and overlay stacking.
-
-This roadmap is documentation-only; no code changes are included at this time.
+This roadmap documents potential enhancements only; no implementation is currently planned.

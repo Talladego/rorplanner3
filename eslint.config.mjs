@@ -72,4 +72,65 @@ export default [
       ],
     },
   },
+  // Components must not import the store adapter directly; enforce boundary only for components
+  {
+    files: ['src/components/**/*.{ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+      parser: tsparser,
+    },
+    plugins: { '@typescript-eslint': tseslint },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/store/loadout/loadoutStoreAdapter'],
+              message: 'Components must not import the store adapter directly; use loadoutService instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Tests: enable vitest-style globals and relax restrictions
+  {
+    files: ['src/__tests__/**/*.{ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        vi: 'readonly',
+      },
+      parser: tsparser,
+    },
+    plugins: { '@typescript-eslint': tseslint },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      'no-restricted-imports': 'off',
+      'no-undef': 'off',
+    },
+  },
+  // Generated GraphQL types: allow any in generated file to avoid noisy linting
+  {
+    files: ['src/generated/**/*.ts'],
+    languageOptions: { parser: tsparser },
+    plugins: { '@typescript-eslint': tseslint },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      // Allow duplicate exports / pattern collisions produced by multiple plugins (typed-document-node + react-apollo)
+      'no-redeclare': 'off',
+      // Allow Apollo imports inside generated file (rule is only to steer manual code)
+      'no-restricted-imports': 'off',
+    },
+  },
 ]

@@ -1,0 +1,25 @@
+query GetItem($id: ID!) {
+  item(id: $id) {
+    id
+    name
+    description
+    type
+    slot
+    rarity
+    armor
+    dps
+    speed
+    levelRequirement
+    renownRankRequirement
+    itemLevel
+    uniqueEquipped
+    stats { stat value percentage }
+    careerRestriction
+    raceRestriction
+    iconUrl
+    talismanSlots
+    itemSet { id name bonuses { itemsRequired bonus { __typename ... on ItemStat { stat value percentage } ... on Ability { name description } } } }
+    abilities { name description }
+    buffs { name description }
+  }
+}

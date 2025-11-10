@@ -1,5 +1,6 @@
 import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 import type { LoadoutSide } from '../../types';
+import { Career } from '../../types';
 
 export function getActiveSide(): LoadoutSide {
   return loadoutStoreAdapter.getActiveSide();
@@ -11,6 +12,18 @@ export function getSideLoadoutId(side: LoadoutSide): string | null {
 
 export function getLoadoutForSide(side: LoadoutSide) {
   return loadoutStoreAdapter.getLoadoutForSide(side);
+}
+
+// Return the per-career loadout id mapping for a side (shallow copy for safety)
+export function getSideCareerLoadoutIds(side: LoadoutSide): Partial<Record<Career, string>> {
+  // The adapter doesn't expose a direct getter; enumerate careers and ask per career
+  const careers = Object.values(Career) as Career[];
+  const map: Partial<Record<Career, string>> = {};
+  careers.forEach((c) => {
+    const id = loadoutStoreAdapter.getSideCareerLoadoutId(side, c);
+    if (id) map[c] = id;
+  });
+  return map;
 }
 
 export function getCurrentLoadout() {

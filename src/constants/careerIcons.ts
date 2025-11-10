@@ -1,6 +1,7 @@
 import { Career } from '../types';
 
-const BASE = 'https://killboard.returnofreckoning.com/images/icons';
+// Local static assets, fetched via scripts/fetchIcons.ts and served from /public/icons/careers
+const BASE = '/icons/careers';
 
 export const CAREER_ICON_URL: Record<Career, string> = {
   [Career.BRIGHT_WIZARD]: `${BASE}/bright-wizard.png`,

@@ -14,6 +14,8 @@ function SideToolbar({ side }: SideToolbarProps) {
   const [level, setLevel] = useState(40);
   const [renownRank, setRenownRank] = useState(80);
   const [characterName, setCharacterName] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   // Track pending name during async character load to suppress store-driven reversions
   const pendingNameRef = useRef<string | null>(null);
   const [, setLoadout] = useState<Loadout | null>(loadoutService.getLoadoutForSide(side));
@@ -42,7 +44,8 @@ function SideToolbar({ side }: SideToolbarProps) {
           if (ev.type === 'CHARACTER_LOADED' || ev.type === 'CHARACTER_LOADED_FROM_URL') {
             setCharacterName(lo.characterName || pendingNameRef.current || '');
             pendingNameRef.current = null;
-          } else if (!pendingNameRef.current) {
+            setLoadError(null);
+          } else if (pendingNameRef.current === null) {
             setCharacterName(lo.characterName || '');
           }
         }
@@ -97,31 +100,43 @@ function SideToolbar({ side }: SideToolbarProps) {
   const onResetSide = async () => {
     await loadoutService.selectSideForEdit(side);
     await loadoutService.resetCurrentLoadout();
+    // Always clear local UI state immediately
+    pendingNameRef.current = null;
+    setCharacterName('');
+    setLoadError(null);
   };
 
   const onLoadCharacter = async () => {
     if (!characterName) return;
-    await loadoutService.selectSideForEdit(side);
     try {
-  pendingNameRef.current = characterName;
+      setLoadError(null);
+      // Mark load as pending BEFORE any service events (like LOADOUT_SWITCHED) can fire
+      pendingNameRef.current = characterName; // use null vs non-null to indicate pending, even if empty string
+      setIsLoading(true);
+      await loadoutService.selectSideForEdit(side);
       await loadoutService.loadFromNamedCharacter(characterName);
     } catch (_err) {
-      // swallow per-side errors; global error UI handled in parent Toolbar before
-      // Optionally, we could surface a tiny side-local message; omitted for now
-      // console.warn(e);
-      void _err;
+      const err = _err as Error;
+      setLoadError(err?.message || 'Failed to load character');
     } finally {
-      // no-op; pendingNameRef cleared on character loaded event
+      setIsLoading(false);
+      // pendingNameRef cleared on character loaded event
     }
   };
 
   return (
     <div className={`panel-container ${side === 'A' ? 'panel-border-green-600' : 'panel-border-red-600'}`}>
-      <h2 className="panel-heading font-brand flex items-center gap-2">
+      {/* Error banner fixed height to avoid layout shift */}
+      <div className="min-h-[16px] mb-1 flex items-center">
+        {loadError && (
+          <div className="text-[11px] text-red-600 leading-snug w-full truncate" title={loadError}>{loadError}</div>
+        )}
+      </div>
+      <h2 className="panel-heading font-brand flex items-center gap-2 mt-0">
         <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${side === 'A' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{side}</span>
         <span>Character</span>
       </h2>
-  <div className="grid grid-cols-12 gap-x-1 gap-y-1 items-stretch">
+      <div className="grid grid-cols-12 gap-x-1 gap-y-1 items-stretch">
         {/* Group 1: Career + Lvl + RR + Reset */}
         <div className="col-span-7 h-full">
           <div className="field-group h-full">
@@ -184,7 +199,7 @@ function SideToolbar({ side }: SideToolbarProps) {
                 />
               </div>
               <div className="flex items-end">
-                <button onClick={onLoadCharacter} className="btn btn-primary text-xs py-0.5 px-2 whitespace-nowrap">Load</button>
+                <button onClick={onLoadCharacter} disabled={isLoading} className={`btn btn-primary text-xs py-0.5 px-2 whitespace-nowrap ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}>{isLoading ? 'Loading…' : 'Load'}</button>
               </div>
             </div>
           </div>

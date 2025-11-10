@@ -1,19 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */ // GraphQL results are untyped at the boundary
 
 import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
-import client from '../../lib/apollo-client';
-// GraphQL operations come from centralized documents in ./queries
-import { EquipSlot, Item, Career, LoadoutItem, Stat, ItemRarity, LoadoutSide } from '../../types';
+// GraphQL operations imported from generated typed documents
+import { EquipSlot, Item, Career, Stat, ItemRarity, LoadoutSide } from '../../types';
 import { loadoutEventEmitter } from './loadoutEventEmitter';
 import { subscribeToEvents as subscribeToEventsHelper, subscribeToAllEvents as subscribeToAllEventsHelper } from './events';
 import { urlService } from './urlService';
 import { updateUrlIfAuto } from './urlSync';
 import { LoadoutEvents } from '../../types/events';
-import { SEARCH_CHARACTERS, GET_CHARACTER } from './queries';
+// (Removed direct character GraphQL queries from service; handled in characterImport module)
+// Character import extracted to separate module
+import { loadFromNamedCharacter as loadFromNamedCharacterExternal, importFromCharacter as importFromCharacterExternal } from './characterImport';
 import { getItemsForSlotApi, getTalismansForItemLevelApi, getItemWithDetailsApi } from './api';
-import { computeStatsForLoadout as computeStatsForLoadoutExternal, getStatContributionsForLoadout as getStatContributionsForLoadoutExternal } from './stats';
-import { isTwoHandedWeapon } from '../../utils/items';
-import { getOffhandBlockReason, STAFF_ONLY_CAREERS, TWO_H_ONLY_CAREERS, CANNOT_USE_2H_MELEE } from '../../constants/careerWeaponRules';
+import * as statsFacade from './statsFacade';
+// Validation helpers handled in equipmentValidation module
+import { getItemEligibility as getItemEligibilityShared, getTalismanEligibility as getTalismanEligibilityShared, validateItemForCurrentLoadout, validateItemForLoadout } from './equipmentValidation';
 import { sanitizeHasStats, getAllowedFilterStats } from './filters';
 import { getBlockInvalidItems } from '../ui/selectorPrefs';
 import * as selectors from './selectors';
@@ -22,11 +23,6 @@ import {
   setCareer as setCareerMutation,
   setLevel as setLevelMutation,
   setRenownRank as setRenownRankMutation,
-  setCareerForLoadout as setCareerForLoadoutMutation,
-  setLevelForLoadout as setLevelForLoadoutMutation,
-  setRenownForLoadout as setRenownForLoadoutMutation,
-  setLoadoutNameForLoadout as setLoadoutNameForLoadoutMutation,
-  setCharacterStatusForLoadout as setCharacterStatusForLoadoutMutation,
   updateItem as updateItemMutation,
   updateItemForLoadout as updateItemForLoadoutMutation,
   updateTalisman as updateTalismanMutation,
@@ -35,12 +31,22 @@ import {
   assignSideLoadout as assignSideLoadoutMutation,
   switchLoadout as switchLoadoutMutation,
 } from './mutations';
+import * as loadoutMutations from './loadoutMutations';
 export const loadoutService = {
   getActiveSide(): LoadoutSide {
-    // Filters/selectors/mutations are split into submodules for maintainability
     return selectors.getActiveSide();
   },
-  // Renown ability updates
+  // Wrapper delegating to shared module
+  getItemEligibility(slot: EquipSlot, item: Item | null, loadoutId?: string): { eligible: boolean; reasons: string[] } {
+    return getItemEligibilityShared(slot, item, loadoutId);
+  },
+  /** Determine talisman eligibility for a slot+index on current or specific loadout.
+   * Checks level, renown, race restrictions and duplicate talisman earlier in the same item.
+   */
+  getTalismanEligibility(slot: EquipSlot, index: number, talisman: Item | null, loadoutId?: string): { eligible: boolean; reasons: string[] } {
+    return getTalismanEligibilityShared(slot, index, talisman, loadoutId);
+  },
+  // Renown ability updates (emit STATS_UPDATED after mutation so UI stays in sync)
   setRenownAbilityLevel(ability: keyof NonNullable<import('../../types').Loadout['renownAbilities']>, level: number) {
     loadoutStoreAdapter.setRenownAbilityLevel(ability as any, level);
     const stats = this.getStatsSummary();
@@ -61,7 +67,7 @@ export const loadoutService = {
     const stats = this.getStatsSummary();
     loadoutEventEmitter.emit({ type: 'STATS_UPDATED', payload: { stats }, timestamp: Date.now() });
   },
-  // Missing setter: update active side in the store and emit an event for UI to react
+  // Active side setter: update adapter and emit event for UI reaction
   setActiveSide(side: LoadoutSide) {
     loadoutStoreAdapter.setActiveSide(side);
     loadoutEventEmitter.emit({
@@ -71,7 +77,7 @@ export const loadoutService = {
     });
   },
   assignSideLoadout(side: LoadoutSide, loadoutId: string | null) {
-    // Dual-only: ensure A and B don't point to the same loadout id
+    // Ensure sides don't share the same loadout id; clone if collision detected.
     if (loadoutId) {
       const otherSide: LoadoutSide = side === 'A' ? 'B' : 'A';
       const otherId = loadoutStoreAdapter.getSideLoadoutId(otherSide);
@@ -100,7 +106,22 @@ export const loadoutService = {
     return selectors.getLoadoutForSide(side);
   },
 
-  // Ensure a side has a loadout assigned, creating one if necessary
+  /** Return an array of careers that have a mapped loadout on the given side and that loadout currently has at least one equipped item. */
+  getNonEmptyCareersForSide(side: LoadoutSide): Career[] {
+    const mapped = selectors.getSideCareerLoadoutIds(side); // need selector helper
+    const loadouts = loadoutStoreAdapter.getLoadouts();
+    const careers: Career[] = [];
+    Object.entries(mapped || {}).forEach(([career, loadoutId]) => {
+      if (!loadoutId) return;
+      const lo = loadouts.find(l => l.id === loadoutId);
+      if (!lo) return;
+      const hasItem = Object.values(lo.items).some(entry => entry?.item);
+      if (hasItem) careers.push(career as Career);
+    });
+    return careers;
+  },
+
+  // Ensure a side has a loadout assigned, creating one if necessary; clones if both sides point to same id.
   ensureSideLoadout(side: LoadoutSide): string {
     const assigned = loadoutStoreAdapter.getSideLoadoutId(side);
     if (assigned) {
@@ -131,7 +152,7 @@ export const loadoutService = {
     return newId;
   },
 
-  // Helper: pick a side to edit, ensure it exists, and switch to it (dual-only app)
+  // Pick a side to edit, ensure its loadout exists, then make it current.
   async selectSideForEdit(side: LoadoutSide): Promise<string> {
     this.setActiveSide(side);
     // Prefer existing assignment; only create if truly missing
@@ -146,7 +167,7 @@ export const loadoutService = {
   _itemDetailsCache: new Map<string, Item | null>(),
   _itemDetailsInflight: new Map<string, Promise<Item | null>>(),
   _itemDetailsCacheLimit: 200,
-  // Guard to indicate character import is in progress
+  // Guard to indicate character import / bulk apply in progress
   _isCharacterLoading: false as boolean,
   // Internal helper: if the referenced loadout was loaded from a character, mark it as modified
   _maybeMarkLoadoutAsModified(loadoutId?: string) {
@@ -170,40 +191,13 @@ export const loadoutService = {
     this._isCharacterLoading = false;
   },
 
-  // 1. Load data from named character
+  // 1. Load data from named character (provisional loadout created immediately to update UI name promptly)
   async loadFromNamedCharacter(characterName: string) {
-    try {
-      const { data } = await client.query({
-        query: SEARCH_CHARACTERS,
-        variables: { name: characterName },
-      });
-      const characters = (data as any).characters.edges.map((e: any) => e.node);
-      if (characters.length === 0) throw new Error(`Character "${characterName}" not found. Please check the spelling and try again.`);
-      const character = characters[0]; // Take the first match
-      // Ensure we are operating on the active side for clarity
-      const side = this.getActiveSide();
-      this.ensureSideLoadout(side);
-      // Call import with explicit target side to avoid races
-      await this.importFromCharacter(character.id, side);
-
-      // Emit event that character was loaded
-      loadoutEventEmitter.emit({
-        type: 'CHARACTER_LOADED',
-        payload: {
-          characterName,
-          characterId: character.id,
-        },
-        timestamp: Date.now(),
-      });
-
-      return character.id;
-    } catch (error) {
-      console.error('Failed to load from named character:', error);
-      throw error;
-    }
+    // Delegate to external module providing only the required context methods
+    return await loadFromNamedCharacterExternal(this._characterImportContext(), characterName);
   },
 
-  // 2. Add/update specific item/talisman slots
+  // 2. Item / talisman slot mutations
   // Check if a unique-equipped item is already equipped in a specific loadout
   isUniqueItemAlreadyEquippedInLoadout(itemId: string, loadoutId?: string): boolean {
     return selectors.isUniqueItemAlreadyEquippedInLoadout(itemId, loadoutId);
@@ -226,65 +220,8 @@ export const loadoutService = {
   async updateItem(slot: EquipSlot, item: Item | null) {
     // When importing a character OR when the UI toggle allows invalid selections, bypass validations
     const shouldValidate = !this._isCharacterLoading && getBlockInvalidItems();
-    if (shouldValidate) {
-      // Validate unique-equipped constraints
-      if (item) {
-        const validation = this.canEquipUniqueItem(item);
-        if (!validation.canEquip) {
-          throw new Error(validation.reason || 'Cannot equip this unique item');
-        }
-      }
-
-      // Enforce two-handed vs off-hand exclusivity on current loadout
-      const beforeLoadout = loadoutStoreAdapter.getCurrentLoadout();
-      if (beforeLoadout) {
-        const main = beforeLoadout.items[EquipSlot.MAIN_HAND]?.item || null;
-        const off = beforeLoadout.items[EquipSlot.OFF_HAND]?.item || null;
-        const career = beforeLoadout.career || null;
-        if (slot === EquipSlot.MAIN_HAND && item && isTwoHandedWeapon(item) && off) {
-          throw new Error('Cannot equip a two-handed weapon while an off-hand is equipped');
-        }
-        if (slot === EquipSlot.OFF_HAND && item && main && isTwoHandedWeapon(main)) {
-          throw new Error('Cannot equip an off-hand while a two-handed weapon is equipped in the main hand');
-        }
-        if (slot === EquipSlot.OFF_HAND && item && career) {
-          const reason = getOffhandBlockReason(career, item);
-          if (reason) throw new Error(reason);
-        }
-        // Slot compatibility (mirror selector rules)
-        if (item) {
-          if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
-            if (!(item.slot === EquipSlot.POCKET1 || item.slot === EquipSlot.POCKET2)) throw new Error('Not compatible with this slot');
-          } else if (slot === EquipSlot.MAIN_HAND) {
-            if (!(item.slot === EquipSlot.MAIN_HAND || item.slot === EquipSlot.EITHER_HAND)) throw new Error('Not compatible with this slot');
-          } else if (slot === EquipSlot.OFF_HAND) {
-            if (!(item.slot === EquipSlot.OFF_HAND || item.slot === EquipSlot.EITHER_HAND)) throw new Error('Not compatible with this slot');
-          } else if (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4) {
-            if (!(item.slot === slot || item.slot === EquipSlot.JEWELLERY1)) throw new Error('Not compatible with this slot');
-          } else {
-            if (item.slot !== slot) throw new Error('Not compatible with this slot');
-          }
-        }
-
-        if (slot === EquipSlot.MAIN_HAND && item && career) {
-          // Staff-only careers: must equip STAFF in main hand; no off-hand permitted
-          if (STAFF_ONLY_CAREERS.has(career as any)) {
-            if (item.type !== 'STAFF') {
-              throw new Error('This career must equip a two-handed staff in the main hand');
-            }
-          }
-          if (TWO_H_ONLY_CAREERS.has(career as any)) {
-            if (!isTwoHandedWeapon(item)) {
-              throw new Error('This career must equip a two-handed weapon in the main hand');
-            }
-          }
-          if (CANNOT_USE_2H_MELEE.has(career as any)) {
-            if (isTwoHandedWeapon(item)) {
-              throw new Error('This career cannot equip two-handed weapons');
-            }
-          }
-        }
-      }
+    if (shouldValidate && item) {
+      validateItemForCurrentLoadout(slot, item);
     }
 
     updateItemMutation(slot, item);
@@ -298,70 +235,14 @@ export const loadoutService = {
     // Automatically recalculate stats after item update
     this.getStatsSummary();
 
-    // Update URL with current loadout state
-  updateUrlIfAuto(this._isCharacterLoading);
+    // Update URL with current loadout state (standard helper)
+    updateUrlIfAuto(this._isCharacterLoading);
   },
 
   async updateItemForLoadout(loadoutId: string, slot: EquipSlot, item: Item | null) {
-  const shouldValidate = !this._isCharacterLoading && getBlockInvalidItems();
-  if (shouldValidate) {
-      // Validate unique-equipped only within that loadout
-      if (item) {
-        const validation = this.canEquipUniqueItem(item, loadoutId);
-        if (!validation.canEquip) {
-          throw new Error(validation.reason || 'Cannot equip this unique item');
-        }
-      }
-
-      // Enforce two-handed vs off-hand exclusivity on the specified loadout
-      const target = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
-      if (target) {
-        const main = target.items[EquipSlot.MAIN_HAND]?.item || null;
-        const off = target.items[EquipSlot.OFF_HAND]?.item || null;
-        const career = target.career || null;
-        if (slot === EquipSlot.MAIN_HAND && item && isTwoHandedWeapon(item) && off) {
-          throw new Error('Cannot equip a two-handed weapon while an off-hand is equipped');
-        }
-        if (slot === EquipSlot.OFF_HAND && item && main && isTwoHandedWeapon(main)) {
-          throw new Error('Cannot equip an off-hand while a two-handed weapon is equipped in the main hand');
-        }
-        if (slot === EquipSlot.OFF_HAND && item && career) {
-          const reason = getOffhandBlockReason(career, item);
-          if (reason) throw new Error(reason);
-        }
-        // Slot compatibility (mirror selector rules)
-        if (item) {
-          if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
-            if (!(item.slot === EquipSlot.POCKET1 || item.slot === EquipSlot.POCKET2)) throw new Error('Not compatible with this slot');
-          } else if (slot === EquipSlot.MAIN_HAND) {
-            if (!(item.slot === EquipSlot.MAIN_HAND || item.slot === EquipSlot.EITHER_HAND)) throw new Error('Not compatible with this slot');
-          } else if (slot === EquipSlot.OFF_HAND) {
-            if (!(item.slot === EquipSlot.OFF_HAND || item.slot === EquipSlot.EITHER_HAND)) throw new Error('Not compatible with this slot');
-          } else if (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4) {
-            if (!(item.slot === slot || item.slot === EquipSlot.JEWELLERY1)) throw new Error('Not compatible with this slot');
-          } else {
-            if (item.slot !== slot) throw new Error('Not compatible with this slot');
-          }
-        }
-
-        if (slot === EquipSlot.MAIN_HAND && item && career) {
-          if (STAFF_ONLY_CAREERS.has(career as any)) {
-            if (item.type !== 'STAFF') {
-              throw new Error('This career must equip a two-handed staff in the main hand');
-            }
-          }
-          if (TWO_H_ONLY_CAREERS.has(career as any)) {
-            if (!isTwoHandedWeapon(item)) {
-              throw new Error('This career must equip a two-handed weapon in the main hand');
-            }
-          }
-          if (CANNOT_USE_2H_MELEE.has(career as any)) {
-            if (isTwoHandedWeapon(item)) {
-              throw new Error('This career cannot equip two-handed weapons');
-            }
-          }
-        }
-      }
+    const shouldValidate = !this._isCharacterLoading && getBlockInvalidItems();
+    if (shouldValidate && item) {
+      validateItemForLoadout(loadoutId, slot, item);
     }
 
     updateItemForLoadoutMutation(loadoutId, slot, item);
@@ -425,7 +306,7 @@ export const loadoutService = {
     }
   },
 
-  // Helper method for single slot queries
+  // Helper method for single slot queries (compat alias)
   async getItemsForSingleSlot(slot: EquipSlot | null, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
     // Preserve method for compatibility, but delegate to API implementation
     return await getItemsForSlotApi(
@@ -443,8 +324,7 @@ export const loadoutService = {
     );
   },
 
-  // 3.5. Fetch talismans for holding item's level requirement
-  // Rule (from in-game testing): talisman.levelRequirement ≤ holdingItem.levelRequirement
+  // 3.5. Fetch talismans for holding item's level requirement (rule: talisman.levelRequirement ≤ holding item.levelRequirement)
   /**
    * Fetch talismans whose level requirement is <= the holding item's level.
    * Cache-first + LRU; prefetch next page and warm icons.
@@ -475,33 +355,31 @@ export const loadoutService = {
   },
 
   // 3.7. Get talismans for a specific slot (no special cases)
-  /** Alias to getTalismansForItemLevel; slot param is unused (compat). */
+  /** Alias to getTalismansForItemLevel; slot param unused for compatibility. */
   async getTalismansForSlot(_slot: EquipSlot, holdingLevelRequirement: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
     return await this.getTalismansForItemLevel(holdingLevelRequirement, limit, after, nameFilter, hasStats, hasRarities, before, last);
   },
 
-  // Removed legendary talisman special-case as the required info cannot be reliably extracted from the schema
+  // Legendary talisman special-case removed (schema lacks reliable indicators)
 
   // 3. Retrieve stats summary
   /** Recompute and emit the aggregate stats summary for the current loadout. */
   getStatsSummary() {
-    loadoutStoreAdapter.calculateStats();
-    const stats = loadoutStoreAdapter.getStatsSummary();
-    loadoutEventEmitter.emit({
-      type: 'STATS_UPDATED',
-      payload: { stats },
-      timestamp: Date.now(),
-    });
-    return stats;
+    return statsFacade.getStatsSummary({ isBulk: this._isCharacterLoading });
   },
 
-  // Additional utilities
+  // Additional utilities / selectors pass-through
   getCurrentLoadout() {
     return selectors.getCurrentLoadout();
   },
 
   getAllLoadouts() {
     return selectors.getAllLoadouts();
+  },
+
+  /** Return the mapped loadout id for a side+career combination (facade for adapter). */
+  getSideCareerLoadoutId(side: LoadoutSide, career: Career) {
+    return loadoutStoreAdapter.getSideCareerLoadoutId(side, career);
   },
 
   getCurrentLoadoutId() {
@@ -547,7 +425,7 @@ export const loadoutService = {
       loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
     }
 
-    // Emit stats updated event since level changes affect item eligibility
+  // Emit stats updated event since level changes affect item eligibility
     this.getStatsSummary();
 
     // Update URL with current loadout state
@@ -564,7 +442,7 @@ export const loadoutService = {
       loadoutStoreAdapter.markLoadoutAsModified(currentLoadout.id);
     }
 
-    // Emit stats updated event since renown changes affect item eligibility
+  // Emit stats updated event since renown changes affect item eligibility
     this.getStatsSummary();
 
     // Update URL with current loadout state
@@ -590,7 +468,7 @@ export const loadoutService = {
       payload: { loadoutId: id },
       timestamp: Date.now(),
     });
-    // Dual-only: if the active side isn't assigned, assign it implicitly to the active side
+  // If active side has no mapping yet, assign this switched loadout.
     if (this.getSideLoadoutId(this.getActiveSide()) == null) {
       this.assignSideLoadout(this.getActiveSide(), id);
     }
@@ -598,11 +476,11 @@ export const loadoutService = {
     this.getStatsSummary();
 
     // Update URL with the new loadout state
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+  updateUrlIfAuto(this._isCharacterLoading);
   },
 
   async resetCurrentLoadout() {
-    // Reset the current loadout to default state
+  // Reset the current loadout to default state
     const current = loadoutStoreAdapter.getCurrentLoadout();
     if (current) {
       // Use per-loadout reset to also normalize Side A/B names if assigned
@@ -659,7 +537,7 @@ export const loadoutService = {
       return mappedId;
     }
 
-    // 2) No mapping yet: try to find an existing loadout for this career not used by the other side mapping
+  // 2) Try existing loadout for this career not used by the other side mapping
     const loadouts = loadoutStoreAdapter.getLoadouts();
     const otherMapped = loadoutStoreAdapter.getSideCareerLoadoutId(otherSide, career);
     const candidate = loadouts.find(l => l.career === career && l.id !== otherMapped);
@@ -671,7 +549,7 @@ export const loadoutService = {
       return mappedId;
     }
 
-    // 3) Create a brand new loadout for this side+career
+  // 3) Create a brand new loadout for this side+career
     const currentLoadout = this.getCurrentLoadout();
     const currentLevel = currentLoadout?.level ?? 40;
     const currentRenown = currentLoadout?.renownRank ?? 80;
@@ -684,169 +562,26 @@ export const loadoutService = {
     return newId;
   },
 
-  // 4. Import character data and create loadout
-  async importFromCharacter(characterId: string, side?: LoadoutSide): Promise<string> {
-    try {
-      this._isCharacterLoading = true;
-      const targetSide = side ?? this.getActiveSide();
-      const { data } = await client.query({
-        query: GET_CHARACTER,
-        variables: { id: characterId },
-      });
-      const character = (data as any).character;
-      if (!character) throw new Error('Character not found');
+  // 4. Import character data and create loadout (supports provisional loadout to prevent flicker)
+  async importFromCharacter(characterId: string, side?: LoadoutSide, opts?: { preCreatedLoadoutId?: string }): Promise<string> {
+    return await importFromCharacterExternal(this._characterImportContext(), characterId, side, opts);
+  },
 
-      // Transform character data into loadout format
-      const items: Record<EquipSlot, LoadoutItem> = Object.values(EquipSlot).reduce((acc, slot) => {
-        acc[slot] = { item: null, talismans: [] };
-        return acc;
-      }, {} as Record<EquipSlot, LoadoutItem>);
-
-      // Safely iterate over character items if they exist
-      if (character.items && Array.isArray(character.items)) {
-        character.items.forEach(({ equipSlot, item, talismans }: any) => {
-          // Skip any trophy slots entirely
-          if (typeof equipSlot === 'string' && equipSlot.startsWith('TROPHY')) return;
-          if (item) {
-            items[equipSlot as EquipSlot] = {
-              item: {
-                id: item.id,
-                name: item.name,
-                description: item.description,
-                type: item.type,
-                slot: item.slot,
-                rarity: item.rarity,
-                armor: item.armor,
-                dps: item.dps,
-                speed: item.speed,
-                levelRequirement: item.levelRequirement,
-                renownRankRequirement: item.renownRankRequirement,
-                itemLevel: item.itemLevel,
-                uniqueEquipped: item.uniqueEquipped,
-                stats: item.stats ? item.stats.map((s: any) => ({ stat: s.stat, value: s.value, percentage: s.percentage })) : [],
-                careerRestriction: item.careerRestriction,
-                raceRestriction: item.raceRestriction,
-                iconUrl: item.iconUrl,
-                talismanSlots: item.talismanSlots,
-                itemSet: item.itemSet,
-                abilities: item.abilities,
-                buffs: item.buffs,
-              },
-              talismans: talismans && Array.isArray(talismans) ? talismans.map((t: any) => t ? {
-                id: t.id,
-                name: t.name,
-                description: t.description,
-                type: t.type,
-                slot: t.slot,
-                rarity: t.rarity,
-                armor: t.armor,
-                dps: t.dps,
-                speed: t.speed,
-                levelRequirement: t.levelRequirement,
-                renownRankRequirement: t.renownRankRequirement,
-                itemLevel: t.itemLevel,
-                uniqueEquipped: t.uniqueEquipped,
-                stats: t.stats ? t.stats.map((s: any) => ({ stat: s.stat, value: s.value, percentage: s.percentage })) : [],
-                careerRestriction: t.careerRestriction,
-                raceRestriction: t.raceRestriction,
-                iconUrl: t.iconUrl,
-                talismanSlots: t.talismanSlots,
-                itemSet: t.itemSet,
-                abilities: t.abilities || [],
-                buffs: t.buffs || [],
-              } : null) : [],
-            };
-          }
-        });
-      }
-
-      // Create the loadout using the service (this emits LOADOUT_CREATED event)
-      const loadoutId = loadoutService.createLoadout(`Imported from ${character.name}`, character.level, character.renownRank, true, character.name);
-      // Assign it to the captured side mapping (single or dual)
-      this.assignSideLoadout(targetSide, loadoutId);
-      // Ensure subsequent updates target the correct current loadout
-      await this.switchLoadout(loadoutId);
-      await this.setCareer(character.career);
-      // Level and renown already set in createLoadout
-
-  // Clear any existing renown allocation explicitly for imported characters
-  // (defensive: new loadouts start at 0, but keep this to satisfy UX expectations)
-  this.resetRenownAbilitiesForLoadout(loadoutId);
-
-      // Set all the items (skip trophy slots). Be resilient: skip incompatible slots instead of aborting.
-      const skipped: Array<{ slot: string; itemId?: string; reason: string }> = [];
-      for (const [slot, loadoutItem] of Object.entries(items)) {
-        if (slot.startsWith('TROPHY')) continue;
-        try {
-          if (loadoutItem.item) {
-            await this.updateItem(slot as EquipSlot, loadoutItem.item);
-          }
-          // Only attempt talismans if the base item was applied
-          if (loadoutItem.item && loadoutItem.talismans && Array.isArray(loadoutItem.talismans)) {
-            for (let index = 0; index < loadoutItem.talismans.length; index++) {
-              const talisman = loadoutItem.talismans[index];
-              if (talisman) {
-                await this.updateTalisman(slot as EquipSlot, index, talisman);
-              }
-            }
-          }
-        } catch (e: unknown) {
-          const reason = (e && (e as Error).message) ? (e as Error).message : 'Unknown error';
-          skipped.push({ slot, itemId: loadoutItem.item?.id, reason });
-          // Continue importing remaining slots
-          console.warn(`[importFromCharacter] Skipping slot ${slot} item ${loadoutItem.item?.id ?? 'n/a'}: ${reason}`);
-        }
-      }
-      if (skipped.length > 0) {
-        console.info('[importFromCharacter] Completed with skipped slots:', skipped);
-      }
-
-      // Mark as loaded from character and ensure side mapping
-      loadoutStoreAdapter.updateLoadoutCharacterStatus(loadoutId, true, character.name);
-      loadoutStoreAdapter.setSideCareerLoadoutId(targetSide, character.career, loadoutId);
-      return loadoutId;
-    } catch (error) {
-      console.error('Failed to import character:', error);
-      throw error;
-    } finally {
-      // End import guard and update URL once
-      this._isCharacterLoading = false;
-  if (urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
-    }},
-
-  // Per-loadout setters used by compare flows
+  // Per-loadout setters used by compare flows (emit update + recalc stats + URL sync)
   setCareerForLoadout(loadoutId: string, career: Career | null) {
-    setCareerForLoadoutMutation(loadoutId, career);
-    this._maybeMarkLoadoutAsModified(loadoutId);
-    loadoutEventEmitter.emit({ type: 'CAREER_CHANGED', payload: { career }, timestamp: Date.now() });
-    this.getStatsSummary();
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+    loadoutMutations.setCareerForLoadout(this._mutationsContext(), loadoutId, career);
   },
   setLevelForLoadout(loadoutId: string, level: number) {
-    setLevelForLoadoutMutation(loadoutId, level);
-    this._maybeMarkLoadoutAsModified(loadoutId);
-    loadoutEventEmitter.emit({ type: 'LEVEL_CHANGED', payload: { level }, timestamp: Date.now() });
-    this.getStatsSummary();
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+    loadoutMutations.setLevelForLoadout(this._mutationsContext(), loadoutId, level);
   },
   setRenownForLoadout(loadoutId: string, renownRank: number) {
-    setRenownForLoadoutMutation(loadoutId, renownRank);
-    this._maybeMarkLoadoutAsModified(loadoutId);
-    loadoutEventEmitter.emit({ type: 'RENOWN_RANK_CHANGED', payload: { renownRank }, timestamp: Date.now() });
-    this.getStatsSummary();
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+    loadoutMutations.setRenownForLoadout(this._mutationsContext(), loadoutId, renownRank);
   },
   setLoadoutNameForLoadout(loadoutId: string, name: string) {
-    setLoadoutNameForLoadoutMutation(loadoutId, name);
-    // Renaming should also exit character mode
-    this._maybeMarkLoadoutAsModified(loadoutId);
-    loadoutEventEmitter.emit({ type: 'LOADOUT_SWITCHED', payload: { loadoutId }, timestamp: Date.now() });
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+    loadoutMutations.setLoadoutNameForLoadout(this._mutationsContext(), loadoutId, name);
   },
   setCharacterStatusForLoadout(loadoutId: string, isFromCharacter: boolean, characterName?: string) {
-    setCharacterStatusForLoadoutMutation(loadoutId, isFromCharacter, characterName);
-    loadoutEventEmitter.emit({ type: 'LOADOUT_SWITCHED', payload: { loadoutId }, timestamp: Date.now() });
-  if (!this._isCharacterLoading && urlService.isAutoUpdateEnabled()) urlService.updateUrlForCurrentLoadout();
+    loadoutMutations.setCharacterStatusForLoadout(this._mutationsContext(), loadoutId, isFromCharacter, characterName);
   },
 
   // Clone an existing loadout to a new id
@@ -854,16 +589,28 @@ export const loadoutService = {
     return cloneLoadoutMutation(sourceId, name);
   },
 
-  // Detailed stats computation for an arbitrary loadout id (delegated)
+  // Detailed stats for arbitrary loadout id (delegated)
   computeStatsForLoadout(loadoutId: string, opts?: { includeRenown?: boolean }) {
-    return computeStatsForLoadoutExternal(loadoutId, opts);
+    return statsFacade.computeStatsForLoadout(loadoutId, opts);
   },
 
   getStatContributionsForLoadout(loadoutId: string, statKey: keyof import('../../types').StatsSummary | string, opts?: { includeRenown?: boolean }) {
-    return getStatContributionsForLoadoutExternal(loadoutId, statKey as any, opts as any);
+    return statsFacade.getStatContributionsForLoadout(loadoutId, statKey as any, opts as any);
   },
 
-  // Item details fetcher with caching
+  /** Renown spend cap rule: CR < 40 => min(renownRank, careerRank); CR >= 40 => renownRank; clamped to [0,80]. */
+  getRenownSpendCap(loadoutId?: string): number {
+    const loadout = loadoutId
+      ? loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId) || null
+      : loadoutStoreAdapter.getCurrentLoadout();
+    if (!loadout) return 0;
+    const cr = loadout.level || 0;
+    const rr = loadout.renownRank || 0;
+    const rawCap = cr < 40 ? Math.min(rr, cr) : rr;
+    return Math.max(0, Math.min(80, rawCap));
+  },
+
+  // Item details fetcher with caching (LRU + in-flight dedupe)
   /** Fetch a single item with full details, with LRU + in-flight dedupe. */
   async getItemWithDetails(itemId: string): Promise<Item | null> {
     try {
@@ -897,6 +644,36 @@ export const loadoutService = {
   },
   isTalismanAlreadySlottedInItemForLoadout(loadoutId: string, talismanId: string, slot: EquipSlot, excludeIndex?: number): boolean {
     return selectors.isTalismanAlreadySlottedInItemForLoadout(loadoutId, talismanId, slot, excludeIndex);
+  },
+
+  // Internal: provide the context required by character import module
+  _characterImportContext() {
+    return {
+      getActiveSide: () => this.getActiveSide(),
+      ensureSideLoadout: (side: LoadoutSide) => this.ensureSideLoadout(side),
+      createLoadout: (name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string) => this.createLoadout(name, level, renownRank, isFromCharacter, characterName),
+      assignSideLoadout: (side: LoadoutSide, loadoutId: string | null) => this.assignSideLoadout(side, loadoutId),
+      switchLoadout: (id: string) => this.switchLoadout(id),
+      setLevelForLoadout: (id: string, level: number) => this.setLevelForLoadout(id, level),
+      setRenownForLoadout: (id: string, renown: number) => this.setRenownForLoadout(id, renown),
+      setLoadoutNameForLoadout: (id: string, name: string) => this.setLoadoutNameForLoadout(id, name),
+      setCareerForLoadout: (id: string, career: Career | null) => this.setCareerForLoadout(id, career),
+      resetRenownAbilitiesForLoadout: (id: string) => this.resetRenownAbilitiesForLoadout(id),
+      updateItemForLoadout: (id: string, slot: EquipSlot, item: Item | null) => this.updateItemForLoadout(id, slot, item),
+      updateItem: (slot: EquipSlot, item: Item | null) => this.updateItem(slot, item),
+      updateTalismanForLoadout: (id: string, slot: EquipSlot, index: number, talisman: Item | null) => this.updateTalismanForLoadout(id, slot, index, talisman),
+      updateTalisman: (slot: EquipSlot, index: number, talisman: Item | null) => this.updateTalisman(slot, index, talisman),
+      beginBulkApply: () => this.beginBulkApply(),
+      endBulkApply: () => this.endBulkApply(),
+    } as import('./characterImport').CharacterImportContext;
+  },
+  // Internal: provide context for loadout mutation helpers
+  _mutationsContext() {
+    return {
+      isBulk: this._isCharacterLoading,
+      maybeMarkModified: (id?: string) => this._maybeMarkLoadoutAsModified(id),
+      recalcStats: () => { this.getStatsSummary(); },
+    } as import('./loadoutMutations').LoadoutMutationsContext;
   },
 
 };

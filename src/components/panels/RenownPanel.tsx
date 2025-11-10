@@ -40,7 +40,7 @@ function LevelSelect({ value, onChange, maxLevel, statName, percent, totalsOverr
 export default memo(function RenownPanel({ loadoutId, embedded = false }: { loadoutId: string | null; embedded?: boolean }) {
   const { loadout } = useLoadoutById(loadoutId);
   const ra = loadout?.renownAbilities || {};
-  const rr = loadout?.renownRank || 0;
+  const cr = loadout?.level || 0; // Career Rank
   const spent = useMemo(() => {
     const ra = (loadout?.renownAbilities || {}) as NonNullable<typeof loadout>['renownAbilities'];
     let sum = 0;
@@ -51,7 +51,8 @@ export default memo(function RenownPanel({ loadoutId, embedded = false }: { load
     });
     return sum;
   }, [loadout]);
-  const cap = Math.min(rr || 0, 80);
+  // Centralized rule: use service to determine renown spend cap
+  const cap = loadoutService.getRenownSpendCap(loadoutId || undefined);
   const remaining = Math.max(0, cap - spent);
 
   const renderAbilityTooltip = (ab: (typeof ABILITIES)[number], level: number) => {
@@ -116,7 +117,12 @@ export default memo(function RenownPanel({ loadoutId, embedded = false }: { load
   // Outer: Tier 1 only when not embedded; in embedded mode, parent supplies Tier 1/2
   return (
     <div className={embedded ? 'relative' : 'lg:col-span-2 panel-container relative'}>
-      <div className="text-[11px] text-muted mb-1">Renown points: {spent}/{cap} (Remaining: {remaining})</div>
+      <div className="text-[11px] text-muted mb-1">
+        Renown points: {spent}/{cap} (Remaining: {remaining})
+        {cr > 0 && cr < 40 ? (
+          <span className="ml-2 italic opacity-80">Capped by Career Rank {cr} until CR40</span>
+        ) : null}
+      </div>
   {/* Tier 3 container holds all ability rows */}
   <div className="equipment-slot">
         <div className="grid grid-cols-1 gap-1">

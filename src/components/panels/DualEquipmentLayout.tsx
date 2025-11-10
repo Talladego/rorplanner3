@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import EquipmentPanel from './EquipmentPanel';
-import StatsComparePanel from './StatsComparePanel';
-import RenownPanel from './RenownPanel';
+import React, { Suspense } from 'react';
+const StatsComparePanel = React.lazy(() => import('./StatsComparePanel'));
+const RenownPanel = React.lazy(() => import('./RenownPanel'));
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { Loadout, EquipSlot } from '../../types';
-import React, { Suspense } from 'react';
 const LoadoutSummaryModal = React.lazy(() => import('../summary/LoadoutSummaryModal'));
 
 export default function DualEquipmentLayout() {
@@ -233,7 +233,9 @@ export default function DualEquipmentLayout() {
           <div className="field-group flex-1 min-h-0">
             {buttonsRow('A')}
             {showRenownA ? (
-              <RenownPanel loadoutId={sideA?.id || null} embedded />
+              <Suspense fallback={null}>
+                <RenownPanel loadoutId={sideA?.id || null} embedded />
+              </Suspense>
             ) : (
               <EquipmentPanel side="A" selectedCareer={sideA?.career || ''} loadoutId={sideA?.id || null} iconOnly hideHeading compact />
             )}
@@ -245,7 +247,9 @@ export default function DualEquipmentLayout() {
       <div className="col-span-1">
         <div className="panel-container panel-border-blue-500 h-full flex flex-col">
           <h2 className="panel-heading font-brand">Compare Stats</h2>
-          <StatsComparePanel />
+          <Suspense fallback={<div className="text-xs text-muted p-2">Loading stats…</div>}>
+            <StatsComparePanel />
+          </Suspense>
         </div>
       </div>
 
@@ -256,7 +260,9 @@ export default function DualEquipmentLayout() {
           <div className="field-group flex-1 min-h-0">
             {buttonsRow('B')}
             {showRenownB ? (
-              <RenownPanel loadoutId={sideB?.id || null} embedded />
+              <Suspense fallback={null}>
+                <RenownPanel loadoutId={sideB?.id || null} embedded />
+              </Suspense>
             ) : (
               <EquipmentPanel side="B" selectedCareer={sideB?.career || ''} loadoutId={sideB?.id || null} iconOnly hideHeading compact />
             )}

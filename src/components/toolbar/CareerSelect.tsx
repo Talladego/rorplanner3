@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Career, LoadoutSide } from '../../types';
 import { formatCareerName } from '../../utils/formatters';
 import { getCareerIconUrl } from '../../constants/careerIcons';
-import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 import { loadoutService } from '../../services/loadout/loadoutService';
 
 type Size = 'sm' | 'md';
@@ -38,24 +37,21 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
   // Panel should match the control's width and alignment
 
   // Determine which careers are non-empty for THIS side only
-  const recomputeNonEmptyCareers = () => {
+  const recomputeNonEmptyCareers = useCallback(() => {
     const result: Partial<Record<Career, boolean>> = {};
-    const loadouts = loadoutStoreAdapter.getLoadouts();
+    const loadouts = loadoutService.getAllLoadouts();
     for (const career of careers) {
-      const mappedId = loadoutStoreAdapter.getSideCareerLoadoutId(side, career as Career);
+      const mappedId = loadoutService.getSideCareerLoadoutId(side, career as Career);
       if (!mappedId) continue;
       const l = loadouts.find((lo) => lo.id === mappedId);
       if (!l) continue;
-      // Non-empty heuristic: any equipped item or any non-null talisman or any renown points
       const hasItem = Object.values(l.items || {}).some((entry) => !!entry?.item);
       const hasTalis = Object.values(l.items || {}).some((entry) => (entry?.talismans || []).some((t) => !!t));
       const hasRenown = l.renownAbilities && Object.values(l.renownAbilities).some((v) => (Number(v) || 0) > 0);
-      if (hasItem || hasTalis || hasRenown) {
-        result[career as Career] = true;
-      }
+      if (hasItem || hasTalis || hasRenown) result[career as Career] = true;
     }
     setNonEmptyCareers(result);
-  };
+  }, [careers, side]);
 
   useEffect(() => {
     // Initial compute
@@ -89,7 +85,7 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
       document.removeEventListener('mousedown', onDocClick);
       unsub();
     };
-  }, [open, side, careers.length]);
+  }, [open, side, careers.length, recomputeNonEmptyCareers]);
 
   const openMenu = () => {
     setOpen(true);
