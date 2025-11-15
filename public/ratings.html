@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Character Ratings | RoR Planner</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji"; margin: 0; padding: 2rem; line-height: 1.4; }
+    .container { max-width: 980px; margin: 0 auto; }
+    h1 { margin: 0 0 1rem; font-size: 1.6rem; }
+    form { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    input[type="text"] { flex: 1 1 280px; padding: .6rem .7rem; font-size: 1rem; border-radius: .5rem; border: 1px solid #9999; }
+    button { padding: .6rem 1rem; font-size: 1rem; border-radius: .5rem; border: 1px solid #5558; background: #2563eb; color: white; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: default; }
+    .muted { opacity: .8; font-size: .95rem; }
+    .error { color: #b00020; margin: .5rem 0 0; }
+    .grid { display: grid; gap: .75rem; grid-template-columns: 1fr; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid #9994; border-radius: .5rem; overflow: hidden; }
+    thead { background: #f4f4f8; color: #111; }
+    :root[data-theme="dark"] thead { background: #1f2937; color: #e5e7eb; }
+    th, td { padding: .6rem .7rem; border-bottom: 1px solid #9993; text-align: left; font-variant-numeric: tabular-nums; }
+    th { font-weight: 600; }
+    tbody tr:hover { background: #00000008; }
+    .chip { display: inline-block; font-size: .85rem; padding: .15rem .5rem; border-radius: 999px; border: 1px solid #9995; }
+    .small { font-size: .9rem; }
+    .row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+    .spacer { flex: 1; }
+    .alt-list { margin-top: .5rem; }
+    code.k { padding: .1rem .3rem; border: 1px solid #9995; border-radius: .35rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Character Ratings</h1>
+    <form id="searchForm">
+      <input id="nameInput" type="text" name="name" placeholder="Character name (exact)" required />
+      <button id="submitBtn" type="submit">Search</button>
+      <span id="status" class="muted"></span>
+    </form>
+
+    <div class="grid">
+      <div id="characterHeader" class="row muted" style="display:none">
+        <div id="charSummary"></div>
+        <div class="spacer"></div>
+        <div id="altMatches" class="small"></div>
+      </div>
+
+      <div id="errorBox" class="error" style="display:none"></div>
+
+      <div id="tableWrap" style="display:none">
+        <table>
+          <thead>
+            <tr>
+              <th>Season</th>
+              <th>Type</th>
+              <th title="TrueSkill μ">Mu</th>
+              <th title="TrueSkill σ">Sigma</th>
+              <th>Rating</th>
+            </tr>
+          </thead>
+          <tbody id="ratingsBody"></tbody>
+        </table>
+        <div class="muted small" style="margin-top:.5rem;">Sorted by season (desc), then type. Values are from server and may reflect TrueSkill-like estimates.</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function(){
+      const endpoint = 'https://production-api.waremu.com/graphql/';
+
+      const qs = new URLSearchParams(location.search);
+      const nameInput = document.getElementById('nameInput');
+      const form = document.getElementById('searchForm');
+      const status = document.getElementById('status');
+      const errorBox = document.getElementById('errorBox');
+      const tableWrap = document.getElementById('tableWrap');
+      const tbody = document.getElementById('ratingsBody');
+      const header = document.getElementById('characterHeader');
+      const charSummary = document.getElementById('charSummary');
+      const altMatches = document.getElementById('altMatches');
+      const submitBtn = document.getElementById('submitBtn');
+
+      const rTypeLabel = (t) => ({
+        CASUAL: 'Casual',
+        RANKED_SOLO: 'Ranked (Solo)',
+        RANKED_GROUP: 'Ranked (Group)',
+        CITY: 'City'
+      }[t] || t);
+
+      function setBusy(b){ submitBtn.disabled = b; nameInput.disabled = b; status.textContent = b ? 'Loading…' : ''; }
+      function showError(msg){ errorBox.style.display='block'; errorBox.textContent = msg; }
+      function clearError(){ errorBox.style.display='none'; errorBox.textContent=''; }
+
+      async function gql(query, variables){
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ query, variables })
+        });
+        if(!res.ok){ throw new Error('Network error ' + res.status); }
+        const json = await res.json();
+        if(json.errors){ throw new Error(json.errors.map(e=>e.message).join('; ')); }
+        return json.data;
+      }
+
+      const QUERY = `
+        query GetCharacterRatingsByName($name: String!, $first: Int = 10) {
+          characters(first: $first, where: { name: { eq: $name } }) {
+            nodes {
+              id
+              name
+              level
+              renownRank
+              careerLine
+              ratings {
+                seasonId
+                ratingType
+                mu
+                sigma
+                rating
+              }
+            }
+          }
+        }
+      `;
+
+      function render(alternatives, picked){
+        // Header
+        header.style.display = 'flex';
+        const c = picked;
+        charSummary.textContent = `${c.name} — L${c.level} RR${c.renownRank} · ${c.careerLine}`;
+
+        // Alternatives
+        if(alternatives.length > 1){
+          altMatches.innerHTML = 'Other matches: ' + alternatives.filter(x => x.id !== c.id)
+            .map(x => `<span class="chip" title="L${x.level} RR${x.renownRank}">${x.name} · ${x.careerLine}</span>`)
+            .join(' ');
+        } else {
+          altMatches.textContent = '';
+        }
+
+        // Ratings table
+        tbody.innerHTML = '';
+        const list = (c.ratings || []).slice().sort((a,b) => {
+          // season desc, then type, then mu desc
+          const sa = (''+a.seasonId); const sb = (''+b.seasonId);
+          if(sa !== sb) return sb.localeCompare(sa, undefined, { numeric: true });
+          if(a.ratingType !== b.ratingType) return a.ratingType.localeCompare(b.ratingType);
+          return (b.mu ?? 0) - (a.mu ?? 0);
+        });
+        for(const r of list){
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${r.seasonId}</td>
+            <td>${rTypeLabel(r.ratingType)}</td>
+            <td>${(r.mu ?? 0).toFixed(2)}</td>
+            <td>${(r.sigma ?? 0).toFixed(2)}</td>
+            <td>${(r.rating ?? 0).toFixed(1)}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+        tableWrap.style.display = list.length ? 'block' : 'none';
+      }
+
+      async function onSubmit(ev){
+        ev?.preventDefault();
+        clearError();
+        const name = nameInput.value.trim();
+        if(!name){ showError('Please enter a character name.'); return; }
+        setBusy(true);
+        try{
+          const data = await gql(QUERY, { name, first: 5 });
+          const nodes = data?.characters?.nodes || [];
+          if(nodes.length === 0){ showError('No character found with that exact name.'); tableWrap.style.display='none'; header.style.display='none'; return; }
+          const picked = nodes[0];
+          render(nodes, picked);
+          // push state for sharing
+          const u = new URL(location.href);
+          u.searchParams.set('name', name);
+          history.replaceState(null, '', u);
+        }catch(e){
+          showError(String(e.message || e));
+        }finally{ setBusy(false); }
+      }
+
+      form.addEventListener('submit', onSubmit);
+      const initial = qs.get('name');
+      if(initial){ nameInput.value = initial; onSubmit(); }
+    })();
+  </script>
+</body>
+</html>
