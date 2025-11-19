@@ -28,6 +28,10 @@
     .spacer { flex: 1; }
     .alt-list { margin-top: .5rem; }
     code.k { padding: .1rem .3rem; border: 1px solid #9995; border-radius: .35rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: .85rem; }
+  /* Bottom-right fetching/loading status */
+  #status { position: fixed; bottom: 10px; right: 14px; font-size:.8rem; background:rgba(0,0,0,.55); color:#fff; padding:.35rem .55rem; border-radius:.4rem; z-index:100; }
+  :root[data-theme="light"] #status { background:rgba(0,0,0,.55); }
+  :root[data-theme="dark"] #status { background:rgba(0,0,0,.55); }
   </style>
 </head>
 <body>
@@ -35,6 +39,11 @@
     <h1>Character Ratings</h1>
     <form id="searchForm">
       <input id="nameInput" type="text" name="name" placeholder="Character name (exact)" required />
+      <input id="fromInput" type="date" required />
+      <input id="toInput" type="date" required />
+      <label class="small" style="display:inline-flex;align-items:center;gap:.4rem;">
+        <input id="allInput" type="checkbox" /> All time
+      </label>
       <button id="submitBtn" type="submit">Search</button>
       <span id="status" class="muted"></span>
     </form>
@@ -48,20 +57,63 @@
 
       <div id="errorBox" class="error" style="display:none"></div>
 
-      <div id="tableWrap" style="display:none">
-        <table>
-          <thead>
-            <tr>
-              <th>Season</th>
-              <th>Type</th>
-              <th title="TrueSkill μ">Mu</th>
-              <th title="TrueSkill σ">Sigma</th>
-              <th>Rating</th>
-            </tr>
-          </thead>
-          <tbody id="ratingsBody"></tbody>
-        </table>
-        <div class="muted small" style="margin-top:.5rem;">Sorted by season (desc), then type. Values are from server and may reflect TrueSkill-like estimates.</div>
+      <div id="kdWrap" style="display:none;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start" class="grid" >
+        <div id="summary" class="small" style="border:1px solid #9994;border-radius:.5rem;padding:.5rem .7rem;">
+          <strong>Summary:</strong>
+          <span id="sumKills" class="chip">Kills: 0</span>
+          <span id="sumDeaths" class="chip">Deaths: 0</span>
+          <span id="sumKD" class="chip">K/D: 0.00</span>
+        </div>
+        <div>
+          <h3 style="margin:.5rem 0">Recent Kills</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Victim</th>
+                <th>Context</th>
+              </tr>
+            </thead>
+            <tbody id="killsBody"></tbody>
+          </table>
+        </div>
+        <div>
+          <h3 style="margin:.5rem 0">Recent Deaths</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Killer</th>
+                <th>Context</th>
+              </tr>
+            </thead>
+            <tbody id="deathsBody"></tbody>
+          </table>
+        </div>
+        <div>
+          <h3 style="margin:.5rem 0">Top Victims</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Victim</th>
+                <th>Count</th>
+              </tr>
+            </thead>
+            <tbody id="topVictimsBody"></tbody>
+          </table>
+        </div>
+        <div>
+          <h3 style="margin:.5rem 0">Top Killers</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Killer</th>
+                <th>Count</th>
+              </tr>
+            </thead>
+            <tbody id="topKillersBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -74,12 +126,21 @@
       const form = document.getElementById('searchForm');
       const status = document.getElementById('status');
       const errorBox = document.getElementById('errorBox');
-      const tableWrap = document.getElementById('tableWrap');
-      const tbody = document.getElementById('ratingsBody');
+  const kdWrap = document.getElementById('kdWrap');
+  const killsBody = document.getElementById('killsBody');
+  const deathsBody = document.getElementById('deathsBody');
+  const topVictimsBody = document.getElementById('topVictimsBody');
+  const topKillersBody = document.getElementById('topKillersBody');
       const header = document.getElementById('characterHeader');
       const charSummary = document.getElementById('charSummary');
       const altMatches = document.getElementById('altMatches');
-      const submitBtn = document.getElementById('submitBtn');
+    const submitBtn = document.getElementById('submitBtn');
+  const fromInput = document.getElementById('fromInput');
+  const toInput = document.getElementById('toInput');
+  const allInput = document.getElementById('allInput');
+  const sumKills = document.getElementById('sumKills');
+  const sumDeaths = document.getElementById('sumDeaths');
+  const sumKD = document.getElementById('sumKD');
 
       const rTypeLabel = (t) => ({
         CASUAL: 'Casual',
@@ -87,10 +148,13 @@
         RANKED_GROUP: 'Ranked (Group)',
         CITY: 'City'
       }[t] || t);
+      const careerLabel = (s) => (s || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 
       function setBusy(b){ submitBtn.disabled = b; nameInput.disabled = b; status.textContent = b ? 'Loading…' : ''; }
       function showError(msg){ errorBox.style.display='block'; errorBox.textContent = msg; }
       function clearError(){ errorBox.style.display='none'; errorBox.textContent=''; }
+  function toUTCSeconds(d){ return Math.floor(d.getTime() / 1000); }
+  function fmtDate(ts){ const d = new Date(ts*1000); return d.toLocaleString(); }
 
       async function gql(query, variables){
         const res = await fetch(endpoint, {
@@ -98,69 +162,104 @@
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ query, variables })
         });
-        if(!res.ok){ throw new Error('Network error ' + res.status); }
+        if(!res.ok){
+          // Try to parse GraphQL errors for better visibility
+          let bodyText = await res.text();
+          try {
+            const parsed = JSON.parse(bodyText);
+            if(parsed && parsed.errors){
+              throw new Error(parsed.errors.map(e=>e.message).join('; '));
+            }
+          } catch { /* ignore parse error */ }
+          throw new Error('Network error ' + res.status + (bodyText ? ': ' + bodyText.slice(0,200) : ''));
+        }
         const json = await res.json();
         if(json.errors){ throw new Error(json.errors.map(e=>e.message).join('; ')); }
         return json.data;
       }
 
       const QUERY = `
-        query GetCharacterRatingsByName($name: String!, $first: Int = 10) {
+        query GetCharacterByName($name: String!, $first: Int = 5) {
           characters(first: $first, where: { name: { eq: $name } }) {
             nodes {
               id
               name
               level
               renownRank
-              careerLine
-              ratings {
-                seasonId
-                ratingType
-                mu
-                sigma
-                rating
-              }
+              career
             }
           }
         }
       `;
 
-      function render(alternatives, picked){
+      const KILLS_QUERY_RANGED = `
+        query GetRecentKillsAndDeaths($characterId: UnsignedInt!, $from: Int!, $to: Int!, $first: Int = 20) {
+          killsRecent: kills(first: $first, where: { time: { gte: $from, lte: $to }, killerCharacterId: { eq: $characterId } }) {
+            totalCount
+            nodes {
+              id
+              time
+              scenario { name }
+              instance { scenario { name } }
+              victim { level renownRank character { id name career } }
+              deathblow { id name }
+            }
+          }
+          deathsRecent: kills(first: $first, where: { time: { gte: $from, lte: $to }, victimCharacterId: { eq: $characterId } }) {
+            totalCount
+            nodes {
+              id
+              time
+              scenario { name }
+              instance { scenario { name } }
+              deathblow { id name career }
+            }
+          }
+        }
+      `;
+
+      const KILLS_QUERY_ALL = `
+        query GetRecentKillsAndDeathsAll($characterId: UnsignedInt!, $first: Int = 20) {
+          killsRecent: kills(first: $first, where: { killerCharacterId: { eq: $characterId } }) {
+            totalCount
+            nodes {
+              id
+              time
+              scenario { name }
+              instance { scenario { name } }
+              victim { level renownRank character { id name career } }
+              deathblow { id name }
+            }
+          }
+          deathsRecent: kills(first: $first, where: { victimCharacterId: { eq: $characterId } }) {
+            totalCount
+            nodes {
+              id
+              time
+              scenario { name }
+              instance { scenario { name } }
+              deathblow { id name career }
+            }
+          }
+        }
+      `;
+
+      function renderRatingsSummary(alternatives, picked){
         // Header
         header.style.display = 'flex';
         const c = picked;
-        charSummary.textContent = `${c.name} — L${c.level} RR${c.renownRank} · ${c.careerLine}`;
+  charSummary.textContent = `${c.name} — L${c.level} RR${c.renownRank} · ${careerLabel(c.career)}`;
 
         // Alternatives
         if(alternatives.length > 1){
           altMatches.innerHTML = 'Other matches: ' + alternatives.filter(x => x.id !== c.id)
-            .map(x => `<span class="chip" title="L${x.level} RR${x.renownRank}">${x.name} · ${x.careerLine}</span>`)
+            .map(x => `<span class=\"chip\" title=\"L${x.level} RR${x.renownRank}\">${x.name} · ${careerLabel(x.career)}</span>`)
             .join(' ');
         } else {
           altMatches.textContent = '';
         }
 
-        // Ratings table
-        tbody.innerHTML = '';
-        const list = (c.ratings || []).slice().sort((a,b) => {
-          // season desc, then type, then mu desc
-          const sa = (''+a.seasonId); const sb = (''+b.seasonId);
-          if(sa !== sb) return sb.localeCompare(sa, undefined, { numeric: true });
-          if(a.ratingType !== b.ratingType) return a.ratingType.localeCompare(b.ratingType);
-          return (b.mu ?? 0) - (a.mu ?? 0);
-        });
-        for(const r of list){
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${r.seasonId}</td>
-            <td>${rTypeLabel(r.ratingType)}</td>
-            <td>${(r.mu ?? 0).toFixed(2)}</td>
-            <td>${(r.sigma ?? 0).toFixed(2)}</td>
-            <td>${(r.rating ?? 0).toFixed(1)}</td>
-          `;
-          tbody.appendChild(tr);
-        }
-        tableWrap.style.display = list.length ? 'block' : 'none';
+        // We no longer show ratings table by default; K/D tables render separately.
       }
 
       async function onSubmit(ev){
@@ -168,16 +267,135 @@
         clearError();
         const name = nameInput.value.trim();
         if(!name){ showError('Please enter a character name.'); return; }
+        // read dates or handle all-time
+        let fromDate = null, toDate = null;
+        const all = !!allInput.checked;
+        if(!all){
+          try{
+            fromDate = new Date(fromInput.value);
+            toDate = new Date(toInput.value);
+            if(!(fromDate instanceof Date) || isNaN(fromDate) || !(toDate instanceof Date) || isNaN(toDate)){
+              showError('Please pick a valid From/To date or check All time.'); return;
+            }
+            // include entire end day by adding 23:59:59
+            toDate.setHours(23,59,59,999);
+          }catch(_e){ showError('Please pick a valid From/To date or check All time.'); return; }
+        }
         setBusy(true);
         try{
           const data = await gql(QUERY, { name, first: 5 });
           const nodes = data?.characters?.nodes || [];
-          if(nodes.length === 0){ showError('No character found with that exact name.'); tableWrap.style.display='none'; header.style.display='none'; return; }
+          if(nodes.length === 0){ showError('No character found with that exact name.'); kdWrap.style.display='none'; header.style.display='none'; return; }
           const picked = nodes[0];
-          render(nodes, picked);
+          renderRatingsSummary(nodes, picked);
+          // Fetch recent kills/deaths within range or all-time
+          const numericId = Number(picked.id);
+          if(!Number.isFinite(numericId)) { throw new Error('Character id is not numeric; cannot query kills.'); }
+          // Fetch with safe pagination and automatic fallback if server limit is exceeded
+          async function fetchKDWithFallback(){
+            const sizes = [50, 25, 10];
+            let lastErr = null;
+            for(const size of sizes){
+              try{
+                if(all){
+                  return await gql(KILLS_QUERY_ALL, { characterId: numericId, first: size });
+                } else {
+                  const from = toUTCSeconds(fromDate);
+                  const to = toUTCSeconds(toDate);
+                  return await gql(KILLS_QUERY_RANGED, { characterId: numericId, from, to, first: size });
+                }
+              }catch(e){
+                const msg = String(e && (e.message || e)).toLowerCase();
+                if(msg.includes('maximum allowed items per page')){ lastErr = e; continue; }
+                throw e; // other errors propagate
+              }
+            }
+            throw lastErr || new Error('Unable to fetch kills/deaths with permitted page size.');
+          }
+          const kd = await fetchKDWithFallback();
+          const kills = kd?.killsRecent?.nodes || [];
+          const deaths = kd?.deathsRecent?.nodes || [];
+          const killsTotal = kd?.killsRecent?.totalCount ?? kills.length;
+          const deathsTotal = kd?.deathsRecent?.totalCount ?? deaths.length;
+          const kdRatio = deathsTotal > 0 ? (killsTotal / deathsTotal) : killsTotal;
+          // Render tables
+          killsBody.innerHTML = '';
+          deathsBody.innerHTML = '';
+          topVictimsBody.innerHTML = '';
+          topKillersBody.innerHTML = '';
+          const ctx = (k) => (k?.instance?.scenario?.name || k?.scenario?.name || 'Open World');
+          // Sort by time desc just in case
+          kills.sort((a,b)=> b.time - a.time).slice(0,20).forEach(k => {
+            const v = k.victim?.character;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${fmtDate(k.time)}</td>
+              <td>${v ? `${v.name} · ${careerLabel(v.career)}` : 'Unknown'}</td>
+              <td>${ctx(k)}</td>
+            `;
+            killsBody.appendChild(tr);
+          });
+          deaths.sort((a,b)=> b.time - a.time).slice(0,20).forEach(k => {
+            const killer = k.deathblow;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${fmtDate(k.time)}</td>
+              <td>${killer ? `${killer.name}${killer.career ? ' · ' + careerLabel(killer.career) : ''}` : 'Unknown'}</td>
+              <td>${ctx(k)}</td>
+            `;
+            deathsBody.appendChild(tr);
+          });
+          // Compute Top Victims
+          const victimCounts = new Map();
+          for(const k of kills){
+            const vc = k?.victim?.character; if(!vc) continue;
+            const key = vc.id;
+            const cur = victimCounts.get(key) || { id: vc.id, name: vc.name, career: vc.career, count: 0 };
+            cur.count += 1; victimCounts.set(key, cur);
+          }
+          const topVictims = Array.from(victimCounts.values()).sort((a,b)=> b.count - a.count).slice(0,10);
+          topVictims.forEach(v => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${v.name} · ${careerLabel(v.career)}</td>
+              <td>${v.count}</td>
+            `;
+            topVictimsBody.appendChild(tr);
+          });
+          // Compute Top Killers
+          const killerCounts = new Map();
+          for(const k of deaths){
+            const kb = k?.deathblow; if(!kb) continue;
+            const key = kb.id;
+            const cur = killerCounts.get(key) || { id: kb.id, name: kb.name, career: kb.career, count: 0 };
+            cur.count += 1; killerCounts.set(key, cur);
+          }
+          const topKillers = Array.from(killerCounts.values()).sort((a,b)=> b.count - a.count).slice(0,10);
+          topKillers.forEach(x => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${x.name}${x.career ? ' · ' + careerLabel(x.career) : ''}</td>
+              <td>${x.count}</td>
+            `;
+            topKillersBody.appendChild(tr);
+          });
+          // summary
+          sumKills.textContent = `Kills: ${killsTotal}`;
+          sumDeaths.textContent = `Deaths: ${deathsTotal}`;
+          sumKD.textContent = `K/D: ${kdRatio.toFixed(2)}`;
+          kdWrap.style.display = (kills.length + deaths.length) ? 'block' : 'none';
           // push state for sharing
           const u = new URL(location.href);
           u.searchParams.set('name', name);
+          if(all){
+            u.searchParams.set('all', '1');
+            u.searchParams.delete('from');
+            u.searchParams.delete('to');
+          } else {
+            u.searchParams.delete('all');
+            u.searchParams.set('from', fromInput.value);
+            u.searchParams.set('to', toInput.value);
+          }
           history.replaceState(null, '', u);
         }catch(e){
           showError(String(e.message || e));
@@ -185,6 +403,22 @@
       }
 
       form.addEventListener('submit', onSubmit);
+      // Initialize date inputs to last 7 days
+      const today = new Date();
+      const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+      const end = new Date(start); end.setUTCDate(end.getUTCDate());
+      const start7 = new Date(start); start7.setUTCDate(start7.getUTCDate() - 7);
+      const pad = (n) => String(n).padStart(2,'0');
+      const toYMD = (d) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+      const isAll = qs.get('all') === '1';
+      fromInput.value = qs.get('from') || toYMD(start7);
+      toInput.value = qs.get('to') || toYMD(end);
+      allInput.checked = isAll;
+      fromInput.disabled = isAll; toInput.disabled = isAll;
+      allInput.addEventListener('change', () => {
+        const a = allInput.checked;
+        fromInput.disabled = a; toInput.disabled = a;
+      });
       const initial = qs.get('name');
       if(initial){ nameInput.value = initial; onSubmit(); }
     })();

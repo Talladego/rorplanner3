@@ -112,6 +112,14 @@ function App() {
               <header className="relative text-center mb-8">
                 <h1 className="text-4xl font-bold text-primary font-brand">RorPlanner</h1>
                 <a
+                  href="https://rorleaderboard.pages.dev/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute left-0 top-0 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
+                >
+                  Leaderboard
+                </a>
+                <a
                   href="https://discord.com/users/316636548353490944"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -127,6 +135,14 @@ function App() {
             <div className="mx-auto" style={{ width: 1440, minWidth: 1440 }}>
               <header className="relative text-center mb-8">
                 <h1 className="text-4xl font-bold text-primary font-brand">RorPlanner</h1>
+                <a
+                  href="https://rorleaderboard.pages.dev/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute left-0 top-0 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
+                >
+                  Leaderboard
+                </a>
                 <a
                   href="https://discord.com/users/316636548353490944"
                   target="_blank"
