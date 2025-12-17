@@ -37,7 +37,8 @@ export const RENOWN_ABILITIES: RenownAbilityDef[] = [
   // Reflexes: Parry%
   { key: 'reflexes', label: 'Reflexes', stat: 'Parry', iconUrl: icon(22264), percent: true, customTotals: [0, 3, 7, 12, 18, 18], capLevel: 4, costTotals: [0, 1, 4, 10, 20, 20] },
   // Defender: Block%
-  { key: 'defender', label: 'Defender', stat: 'Block', iconUrl: icon(22274), percent: true, customTotals: [0, 3, 7, 12, 18, 18], capLevel: 4, costTotals: [0, 1, 4, 10, 20, 20] },
+  // Spec totals aligned with cumulative cost levels: I=1, II=3, III=6, IV=10
+  { key: 'defender', label: 'Defender', stat: 'Block', iconUrl: icon(22274), percent: true, customTotals: [0, 1, 3, 6, 10, 10], capLevel: 4, costTotals: [0, 1, 4, 10, 20, 20] },
   // Deft Defender: Dodge/Disrupt%
   { key: 'deftDefender', label: 'Deft Defender', stat: 'Dodge / Disrupt', iconUrl: icon(22276), percent: true, customTotals: [0, 3, 7, 12, 18, 18], capLevel: 4, costTotals: [0, 1, 4, 10, 20, 20] },
   // Hardy Concession: Incoming/Outgoing Damage

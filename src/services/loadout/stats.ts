@@ -189,8 +189,9 @@ export function computeStatsForLoadout(loadoutId: string, opts?: { includeRenown
   (result.healthRegen as number) += regen;
   // Reflexes (Parry%), Defender (Block%), Deft Defender (Dodge/Disrupt%)
   const defTable = [0, 3, 7, 12, 18, 18];
+  const defenderTable = [0, 1, 3, 6, 10, 10];
   const rfx = defTable[Math.max(0, Math.min(5, Math.trunc(ra.reflexes || 0)))];
-  const dfn = defTable[Math.max(0, Math.min(5, Math.trunc(ra.defender || 0)))];
+  const dfn = defenderTable[Math.max(0, Math.min(5, Math.trunc(ra.defender || 0)))];
   const dd = defTable[Math.max(0, Math.min(5, Math.trunc(ra.deftDefender || 0)))];
   (result.parry as number) += rfx;
   (result.block as number) += dfn;
@@ -449,7 +450,8 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
     }
     // Defender (Block%)
   const defLvlDfn = Math.max(0, Math.min(5, Math.trunc(ra.defender || 0)));
-  const dfn = defTable[defLvlDfn];
+  const defenderTable = [0, 1, 3, 6, 10, 10];
+  const dfn = defenderTable[defLvlDfn];
     if (dfn) {
       if (String(statKey) === 'block' || target === 'BLOCK') {
         const k = 'RENOWN|DEFENDER|BLOCK';
