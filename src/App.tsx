@@ -123,7 +123,7 @@ function App() {
                   href="https://discord.com/users/316636548353490944"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="absolute right-0 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
+                  className="absolute right-0 top-0 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
                 >
                   Feedback
                 </a>
@@ -147,7 +147,7 @@ function App() {
                   href="https://discord.com/users/316636548353490944"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="absolute right-0 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
+                  className="absolute right-0 top-0 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
                 >
                   Feedback
                 </a>
