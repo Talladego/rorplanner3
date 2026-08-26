@@ -47,11 +47,20 @@
   }
 }
 
-/* Ensure the page background always fills beyond app containers */
+/* Ensure the page background always fills beyond app containers.
+   scrollbar-gutter keeps clientWidth stable when the vertical bar appears so
+   ScaleToFit does not oscillate; overflow-x clips any remaining subpixel bleed. */
+html {
+  scrollbar-gutter: stable;
+  overflow-x: hidden;
+}
 html, body {
   height: 100%;
   background-color: var(--background);
   color: var(--text-primary);
+}
+body {
+  overflow-x: hidden;
 }
 
 /* Custom Component Styles */

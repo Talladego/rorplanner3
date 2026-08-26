@@ -386,7 +386,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           if (y + tipRect.height > window.innerHeight) y = window.innerHeight - tipRect.height - m;
           if (x < m) x = m;
           if (y < m) y = m;
-          setPosition({ x, y });
+          setPosition((prev) => (Math.abs(prev.x - x) < 0.5 && Math.abs(prev.y - y) < 0.5 ? prev : { x, y }));
         }
         if (mirrorVisible && mirrorTooltipRef.current && side && slot) {
           const otherSide = side === 'A' ? 'B' : 'A';
@@ -402,7 +402,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
             if (my + mtRect.height > window.innerHeight) my = window.innerHeight - mtRect.height - m2;
             if (mx < m2) mx = m2;
             if (my < m2) my = m2;
-            setMirrorPosition({ x: mx, y: my });
+            setMirrorPosition((prev) => (Math.abs(prev.x - mx) < 0.5 && Math.abs(prev.y - my) < 0.5 ? prev : { x: mx, y: my }));
           }
         }
       } catch {

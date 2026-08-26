@@ -114,7 +114,7 @@ export default function HoverTooltip({ content, children, placement = 'right', c
       if (y + tipRect.height > window.innerHeight) y = window.innerHeight - tipRect.height - margin;
       if (x < margin) x = margin;
       if (y < margin) y = margin;
-      setPos({ x, y });
+      setPos((prev) => (Math.abs(prev.x - x) < 0.5 && Math.abs(prev.y - y) < 0.5 ? prev : { x, y }));
     };
     window.addEventListener('scroll', update, true);
     window.addEventListener('resize', update);

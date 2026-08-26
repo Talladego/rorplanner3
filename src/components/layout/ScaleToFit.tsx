@@ -1,71 +1,105 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { ScaleContext } from './ScaleContext';
+import { computeFitScale } from '../../utils/fitScale';
 
 interface ScaleToFitProps {
   children: React.ReactNode;
   /** The unscaled design width (px) that the inner content is laid out for */
   designWidth: number;
-  /** Smallest scale to allow (0..1). Default 0.8 */
+  /** Smallest scale to allow (0..1). Default 0.25 */
   minScale?: number;
   /** Largest scale to allow (>1 enables upscale). Default 1 */
   maxScale?: number;
 }
 
 /**
- * Scales its children down with CSS transform so a fixed-width layout can fit smaller windows.
- * - Sets the inner content to a fixed pixel width (designWidth), preventing wrap.
- * - Computes a scale factor = min(1, availableWidth / designWidth), clamped by minScale.
- * - Uses a ResizeObserver on the inner content to reserve scaled height in layout.
+ * Scales its children with CSS transform so a fixed-width layout can fit smaller windows.
+ *
+ * Flicker this replaces: ResizeObserver on width + transform height reservation used to fight
+ * the vertical scrollbar. When scaled height crossed the viewport, the scrollbar toggled,
+ * clientWidth jumped ~15px, scale changed, height crossed back, and the loop painted as flicker.
+ *
+ * Stability:
+ * - Outer is width:100% with overflow:hidden so the unscaled 1440px inner box never creates
+ *   a horizontal page scrollbar (transforms do not affect layout).
+ * - Height is reserved as innerHeight * scale; width-driven scale updates ignore height-only
+ *   observer callbacks.
+ * - Scale is quantized (see computeFitScale) and only committed when it actually changes.
+ * - html { scrollbar-gutter: stable } keeps clientWidth stable when a vertical bar appears.
  */
-export default function ScaleToFit({ children, designWidth, minScale = 0.8, maxScale = 1 }: ScaleToFitProps) {
+export default function ScaleToFit({ children, designWidth, minScale = 0.25, maxScale = 1 }: ScaleToFitProps) {
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const [innerHeight, setInnerHeight] = useState<number>(0);
+  const [innerHeight, setInnerHeight] = useState(0);
+  const scaleRef = useRef(1);
+  const heightRef = useRef(0);
+  const widthRef = useRef(-1);
 
-  // Measure available width and compute scale
   useLayoutEffect(() => {
-    const el = outerRef.current;
-    if (!el) return;
-    const update = () => {
-      const available = el.clientWidth;
-      // Subtract a tiny cushion to avoid fractional overflow that can trigger horizontal scrollbars
-      const cushion = 2; // px
-      const desired = (available - cushion) / designWidth;
-      const s = Math.max(minScale, Math.min(maxScale, desired));
-      setScale(s);
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return;
+
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      const available = outer.clientWidth;
+      // Ignore subpixel width noise; real scrollbar jumps are handled by scrollbar-gutter.
+      if (Math.abs(available - widthRef.current) >= 0.5) {
+        widthRef.current = available;
+        const nextScale = computeFitScale(available, designWidth, minScale, maxScale);
+        if (nextScale !== scaleRef.current) {
+          scaleRef.current = nextScale;
+          setScale(nextScale);
+        }
+      }
+      const nextHeight = inner.offsetHeight;
+      if (Math.abs(nextHeight - heightRef.current) >= 1) {
+        heightRef.current = nextHeight;
+        setInnerHeight(nextHeight);
+      }
     };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    window.addEventListener('resize', update);
+
+    const schedule = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(apply);
+    };
+
+    apply();
+
+    const ro = new ResizeObserver(schedule);
+    ro.observe(outer);
+    ro.observe(inner);
+    window.addEventListener('resize', schedule);
     return () => {
       ro.disconnect();
-      window.removeEventListener('resize', update);
+      window.removeEventListener('resize', schedule);
+      if (raf) cancelAnimationFrame(raf);
     };
   }, [designWidth, minScale, maxScale]);
 
-  // Track natural inner height to reserve space (transforms don't affect layout)
-  useEffect(() => {
-    const inner = innerRef.current;
-    if (!inner) return;
-    const updateHeight = () => setInnerHeight(inner.scrollHeight);
-    updateHeight();
-    const ro = new ResizeObserver(updateHeight);
-    ro.observe(inner);
-    return () => ro.disconnect();
-  }, []);
-
   return (
     <ScaleContext.Provider value={scale}>
-      <div ref={outerRef} style={{ position: 'relative', height: innerHeight * scale }}>
+      <div
+        ref={outerRef}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: innerHeight * scale,
+          overflow: 'hidden',
+        }}
+      >
         <div
           ref={innerRef}
           style={{
             width: designWidth,
+            position: 'absolute',
+            left: '50%',
+            top: 0,
+            marginLeft: -designWidth / 2,
             transform: `scale(${scale})`,
             transformOrigin: 'top center',
-            margin: '0 auto',
           }}
         >
           {children}
