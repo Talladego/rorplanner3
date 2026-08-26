@@ -134,7 +134,7 @@ export function ResultsList({
 
         const blocked = blockInvalidItems && isDisabled;
         return (
-          <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode} loadoutId={effectiveLoadoutId || undefined}>
+          <Tooltip key={item.id} item={item as Item} isTalismanTooltip={isTalismanMode} loadoutId={effectiveLoadoutId || undefined} interaction="none">
             <div
               className={`equipment-slot p-1.5 h-12 flex items-center rounded ${
                 blocked

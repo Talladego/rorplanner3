@@ -11,3 +11,15 @@ export const DESIGN_WIDTH = 1440;
 export const SCALE_MIN = 0.25;
 /** Never upscale: 1920 should match the current centered 1440 desktop layout. */
 export const SCALE_MAX = 1;
+
+/**
+ * Tablet mode never shrinks the 1440 canvas below this. If it cannot fit,
+ * the shell reflows (tabs) instead of scaling to a postage stamp.
+ */
+export const TABLET_SCALE_FLOOR = 0.8;
+/** ~1152px: 0.8 × 1440. Viewports narrower than this cannot fit the canvas at the floor. */
+export const TABLET_WIDTH_THRESHOLD = DESIGN_WIDTH * TABLET_SCALE_FLOOR;
+/** localStorage key for an explicit desktop/tablet layout override. */
+export const LAYOUT_OVERRIDE_STORAGE_KEY = 'ui.layoutMode.override';
+/** Minimum tap target (CSS px) for primary tablet controls. */
+export const TABLET_TAP_MIN_PX = 44;

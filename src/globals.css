@@ -597,3 +597,66 @@ body {
 
 /* Tooltip position helper */
 .tooltip-shift-down { transform: translateY(100%); }
+
+/* Tablet layout: reflow instead of shrinking below ~0.8, and keep tap targets usable. */
+html[data-layout="tablet"] {
+  touch-action: manipulation;
+}
+
+html[data-layout="tablet"] .btn,
+html[data-layout="tablet"] .btn-sm,
+html[data-layout="tablet"] .layout-mode-toggle,
+html[data-layout="tablet"] .header-link,
+html[data-layout="tablet"] .equipment-icon,
+html[data-layout="tablet"] .talisman-slot,
+html[data-layout="tablet"] button.form-input,
+html[data-layout="tablet"] .control-compact,
+html[data-layout="tablet"] .form-input.control-compact,
+html[data-layout="tablet"] .tablet-tab {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+html[data-layout="tablet"] .talisman-slot {
+  width: 44px;
+  height: 44px;
+}
+
+html[data-layout="tablet"] .equipment-icon {
+  width: 3rem;
+  height: 3rem;
+}
+
+html[data-layout="tablet"] header a,
+html[data-layout="tablet"] .layout-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
+}
+
+html[data-layout="tablet"] [role="option"] {
+  min-height: 44px;
+}
+
+html[data-layout="tablet"] .modal-close-btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.tablet-tab-bar {
+  background-color: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.tablet-tab {
+  border-radius: 0.375rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+.tablet-tab-active {
+  background-color: var(--element);
+  color: var(--text-primary);
+}

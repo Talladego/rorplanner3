@@ -209,7 +209,14 @@ function SideToolbar({ side }: SideToolbarProps) {
   );
 }
 
-export default function DualToolbar() {
+export default function DualToolbar({ sides = 'both' }: { sides?: 'A' | 'B' | 'both' }) {
+  if (sides === 'A' || sides === 'B') {
+    return (
+      <div className="mb-4">
+        <SideToolbar side={sides} />
+      </div>
+    );
+  }
   return (
     <div className="grid grid-cols-2 gap-4 mb-4">
       <SideToolbar side="A" />
