@@ -361,7 +361,8 @@ body {
 /* Brighter outline on hover for primary/secondary paired highlight */
 /* Items: thicker and more rounded */
 .hover-bright .icon-frame,
-.hover-bright.icon-frame {
+.hover-bright.icon-frame,
+.equipment-icon:hover .icon-frame {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.65);
   border-color: #fff !important;
   border-width: 2px;
@@ -451,12 +452,14 @@ body {
 
 /* When invalid, switch hover highlight to red for both items and talismans */
 .invalid.hover-bright .icon-frame,
-.invalid.hover-bright.icon-frame {
+.invalid.hover-bright.icon-frame,
+.equipment-icon.invalid:hover .icon-frame {
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.7); /* red-500 */
   border-color: rgb(239 68 68) !important;
 }
 
-.invalid.hover-bright.talisman-slot {
+.invalid.hover-bright.talisman-slot,
+.talisman-slot.invalid:hover {
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.7);
   border-color: rgb(239 68 68) !important;
 }
