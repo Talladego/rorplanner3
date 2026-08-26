@@ -163,9 +163,14 @@ function isLit(el: ClassListHost | null | undefined): boolean {
   return false;
 }
 
+function asClosestHost(value: EventTarget | Node | null | undefined): ClassListHost | null {
+  if (!value || typeof (value as unknown as { closest?: unknown }).closest !== 'function') return null;
+  return value as unknown as ClassListHost;
+}
+
 function relatedTargetIsSlot(relatedTarget: EventTarget | null | undefined): boolean {
-  const related = relatedTarget instanceof Element ? relatedTarget : null;
-  return !!(related && typeof related.closest === 'function' && related.closest('[data-anchor-key]'));
+  const related = asClosestHost(relatedTarget);
+  return !!(related?.closest?.('[data-anchor-key]'));
 }
 
 /**
@@ -219,12 +224,10 @@ function alreadySlotHighlighted(anchor: ClassListHost): boolean {
 
 function onDocumentPointerOver(event: Event): void {
   const raw = event.target;
-  const target = raw instanceof Element ? raw : (raw as Node | null)?.parentElement;
+  const target = asClosestHost(raw) ?? asClosestHost((raw as Node | null)?.parentElement ?? null);
   if (!target) return;
 
-  const anchor = typeof target.closest === 'function'
-    ? target.closest('[data-anchor-key]')
-    : null;
+  const anchor = target.closest?.('[data-anchor-key]') ?? null;
   if (anchor) {
     if (!alreadySlotHighlighted(anchor)) {
       applySlotHoverBrightFromAnchor(anchor);
@@ -232,7 +235,7 @@ function onDocumentPointerOver(event: Event): void {
     return;
   }
 
-  if (nodeInsideCurrentTargets(target)) return;
+  if (raw && nodeInsideCurrentTargets(raw as Node)) return;
   forceClearSlotHoverBright();
 }
 

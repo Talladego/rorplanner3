@@ -7,6 +7,7 @@ import { useScale } from '../layout/ScaleContext';
 import {
   applySlotHoverBright,
   collectPairedHoverTargets,
+  clearSlotHoverBright,
   ensureSlotHoverBrightPointerGuard,
   releaseSlotHoverBright,
 } from '../../utils/hoverBright';
@@ -337,7 +338,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
     ensureSlotHoverBrightPointerGuard();
     const owner = hoverOwnerRef.current;
     return () => {
-      releaseSlotHoverBright(owner, triggerRef.current);
+      clearSlotHoverBright(owner);
     };
   }, []);
 
