@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Career, EquipSlot, Item, ItemRarity, Stat } from '../types';
 // loadoutService no longer needed after hook-based refactor
 import { GetPocketItemsDocument, GetTalismansDocument, type GetPocketItemsQueryVariables, type GetTalismansQueryVariables, type GetPocketItemsQuery, type GetTalismansQuery } from '../generated/graphql';
@@ -184,11 +184,13 @@ export function useItemSearch({
   }, [pageData, fetchItems, nameFilter, statsFilter, rarityFilter]);
 
   // Initialize when modal opens (transition closed -> open)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isOpen && !wasOpenRef.current) {
       setCurrentPage(1);
       setPageHistory([]);
       setPageData({ items: [], hasNextPage: false, hasPreviousPage: false, startCursor: null, endCursor: null, totalCount: 0 });
+      setLoading(true);
+      setError(null);
       fetchItems(undefined, nameFilter, statsFilter, rarityFilter);
     }
     wasOpenRef.current = isOpen;

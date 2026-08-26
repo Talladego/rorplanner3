@@ -68,13 +68,29 @@ export default function ScaleToFit({ children, designWidth, minScale = 0.25, max
 
     apply();
 
+    const scheduleForce = () => {
+      widthRef.current = -1;
+      schedule();
+    };
+
+    const onOrientation = () => {
+      // iOS reports stale clientWidth on the orientationchange event itself.
+      scheduleForce();
+      window.setTimeout(scheduleForce, 100);
+      window.setTimeout(scheduleForce, 350);
+    };
+
     const ro = new ResizeObserver(schedule);
     ro.observe(outer);
     ro.observe(inner);
     window.addEventListener('resize', schedule);
+    window.addEventListener('orientationchange', onOrientation);
+    window.visualViewport?.addEventListener('resize', scheduleForce);
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', schedule);
+      window.removeEventListener('orientationchange', onOrientation);
+      window.visualViewport?.removeEventListener('resize', scheduleForce);
       if (raf) cancelAnimationFrame(raf);
     };
   }, [designWidth, minScale, maxScale]);

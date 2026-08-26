@@ -6,13 +6,19 @@ const RenownPanel = React.lazy(() => import('./RenownPanel'));
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { Loadout, EquipSlot } from '../../types';
 const LoadoutSummaryModal = React.lazy(() => import('../summary/LoadoutSummaryModal'));
+import DualToolbar from '../toolbar/DualToolbar';
+import TabletTabBar from '../layout/TabletTabBar';
+import { useLayoutMode } from '../../hooks/useLayoutMode';
+import type { TabletTab } from '../../utils/layoutMode';
 
 export default function DualEquipmentLayout() {
+  const { useTabs } = useLayoutMode();
   const [sideA, setSideA] = useState<Loadout | null>(loadoutService.getLoadoutForSide('A'));
   const [sideB, setSideB] = useState<Loadout | null>(loadoutService.getLoadoutForSide('B'));
   const [summaryOpenFor, setSummaryOpenFor] = useState<'A' | 'B' | null>(null);
   const [showRenownA, setShowRenownA] = useState(false);
   const [showRenownB, setShowRenownB] = useState(false);
+  const [tabletTab, setTabletTab] = useState<TabletTab>('A');
 
   useEffect(() => {
     // Ensure both sides exist only if no URL params are present
@@ -162,7 +168,7 @@ export default function DualEquipmentLayout() {
   const otherRenownEmpty = !other?.renownAbilities || Object.values(other.renownAbilities).every((lvl) => !lvl);
   const nothingToCopy = otherEmpty && otherRenownEmpty;
     return (
-      <div className="flex items-center justify-between gap-1 mb-2 min-w-0 whitespace-nowrap">
+      <div className={`flex items-center justify-between gap-1 mb-2 min-w-0 ${useTabs ? 'flex-wrap' : 'whitespace-nowrap'}`}>
           {/* Renown toggler first; disabled if no career selected */}
           <button
             onClick={() => (label === 'A' ? setShowRenownA(v => !v) : setShowRenownB(v => !v))}
@@ -224,62 +230,79 @@ export default function DualEquipmentLayout() {
     );
   };
 
+  const loadoutColumn = (label: 'A' | 'B') => {
+    const showRenown = label === 'A' ? showRenownA : showRenownB;
+    const side = label === 'A' ? sideA : sideB;
+    const border = label === 'A' ? 'panel-border-green-600' : 'panel-border-red-600';
+    return (
+      <div className={useTabs ? '' : 'col-span-1'}>
+        <div className={`panel-container ${border} h-full flex flex-col`}>
+          {sideIndicator(label)}
+          <div className="field-group flex-1 min-h-0">
+            {buttonsRow(label)}
+            {showRenown ? (
+              <Suspense fallback={null}>
+                <RenownPanel loadoutId={side?.id || null} embedded />
+              </Suspense>
+            ) : (
+              <EquipmentPanel side={label} selectedCareer={side?.career || ''} loadoutId={side?.id || null} iconOnly hideHeading compact />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const compareColumn = (
+    <div className={useTabs ? '' : 'col-span-1'}>
+      <div className="panel-container panel-border-blue-500 h-full flex flex-col">
+        <h2 className="panel-heading font-brand">Compare Stats</h2>
+        <Suspense fallback={<div className="text-xs text-muted p-2">Loading stats…</div>}>
+          <StatsComparePanel />
+        </Suspense>
+      </div>
+    </div>
+  );
+
+  const summaryModal = summaryOpenFor ? (
+    <Suspense fallback={null}>
+      <LoadoutSummaryModal
+        open={true}
+        onClose={() => setSummaryOpenFor(null)}
+        loadout={summaryOpenFor === 'A' ? sideA : sideB}
+        sideLabel={summaryOpenFor}
+      />
+    </Suspense>
+  ) : null;
+
+  if (useTabs) {
+    return (
+      <div>
+        <TabletTabBar value={tabletTab} onChange={setTabletTab} />
+        {tabletTab === 'A' && (
+          <>
+            <DualToolbar sides="A" />
+            {loadoutColumn('A')}
+          </>
+        )}
+        {tabletTab === 'compare' && compareColumn}
+        {tabletTab === 'B' && (
+          <>
+            <DualToolbar sides="B" />
+            {loadoutColumn('B')}
+          </>
+        )}
+        {summaryModal}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-3 gap-4">
-      {/* Left panel: Equipment A or Renown */}
-      <div className="col-span-1">
-        <div className="panel-container panel-border-green-600 h-full flex flex-col">
-          {sideIndicator('A')}
-          <div className="field-group flex-1 min-h-0">
-            {buttonsRow('A')}
-            {showRenownA ? (
-              <Suspense fallback={null}>
-                <RenownPanel loadoutId={sideA?.id || null} embedded />
-              </Suspense>
-            ) : (
-              <EquipmentPanel side="A" selectedCareer={sideA?.career || ''} loadoutId={sideA?.id || null} iconOnly hideHeading compact />
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Middle panel: Stats compare */}
-      <div className="col-span-1">
-        <div className="panel-container panel-border-blue-500 h-full flex flex-col">
-          <h2 className="panel-heading font-brand">Compare Stats</h2>
-          <Suspense fallback={<div className="text-xs text-muted p-2">Loading stats…</div>}>
-            <StatsComparePanel />
-          </Suspense>
-        </div>
-      </div>
-
-      {/* Right panel: Equipment B or Renown */}
-      <div className="col-span-1">
-        <div className="panel-container panel-border-red-600 h-full flex flex-col">
-          {sideIndicator('B')}
-          <div className="field-group flex-1 min-h-0">
-            {buttonsRow('B')}
-            {showRenownB ? (
-              <Suspense fallback={null}>
-                <RenownPanel loadoutId={sideB?.id || null} embedded />
-              </Suspense>
-            ) : (
-              <EquipmentPanel side="B" selectedCareer={sideB?.career || ''} loadoutId={sideB?.id || null} iconOnly hideHeading compact />
-            )}
-          </div>
-        </div>
-      </div>
-      {/* Summary Modal */}
-      {summaryOpenFor && (
-        <Suspense fallback={null}>
-          <LoadoutSummaryModal
-          open={true}
-          onClose={() => setSummaryOpenFor(null)}
-          loadout={summaryOpenFor === 'A' ? sideA : sideB}
-          sideLabel={summaryOpenFor}
-          />
-        </Suspense>
-      )}
+      {loadoutColumn('A')}
+      {compareColumn}
+      {loadoutColumn('B')}
+      {summaryModal}
     </div>
   );
 }

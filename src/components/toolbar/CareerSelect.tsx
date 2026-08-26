@@ -178,6 +178,7 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
           ref={listRef}
           role="listbox"
           className="z-[10000] rounded-md border border-gray-600 bg-gray-800 text-white shadow-lg max-h-60 overflow-auto"
+          data-layout-menu="career"
           style={{ position: 'fixed', left: menuPos.left, top: menuPos.top, width: menuPos.width, marginTop: 4 }}
         >
           {careers.map((career, idx) => {
