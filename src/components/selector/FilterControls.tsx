@@ -79,7 +79,7 @@ export function FilterControls({
       <div className={`col-[4/5] flex items-center w-[5.5rem] shrink-0`}>
         <button
           onClick={onReset}
-          className="px-3 py-1.5 text-sm bg-gray-500 hover:bg-gray-600 text-white rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 w-full"
+          className="btn btn-primary text-sm w-full"
           title="Reset filters"
         >
           Reset

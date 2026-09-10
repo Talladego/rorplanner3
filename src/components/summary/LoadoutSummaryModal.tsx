@@ -361,7 +361,7 @@ export default function LoadoutSummaryModal({ open, onClose, loadout }: LoadoutS
               <button className="btn btn-primary btn-sm" onClick={handleCopy}>{copied ? 'Copied' : 'Copy'}</button>
               <button 
                 onClick={onClose} 
-                className="modal-close-btn hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+                className="modal-close-btn rounded-full w-8 h-8 flex items-center justify-center transition-colors"
                 aria-label="Close"
               >
                 ✕
@@ -370,15 +370,15 @@ export default function LoadoutSummaryModal({ open, onClose, loadout }: LoadoutS
           </div>
           <div className="field-group">
             <div className="flex items-center gap-4 mb-2">
-          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+          <label className="inline-flex items-center gap-2 text-xs select-none text-primary">
             <input type="checkbox" className="form-checkbox h-3 w-3" checked={showItems} onChange={(e) => setShowItems(e.currentTarget.checked)} />
             Items
           </label>
-          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+          <label className="inline-flex items-center gap-2 text-xs select-none text-primary">
             <input type="checkbox" className="form-checkbox h-3 w-3" checked={showRenown} onChange={(e) => setShowRenown(e.currentTarget.checked)} />
             Renown
           </label>
-          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+          <label className="inline-flex items-center gap-2 text-xs select-none text-primary">
             <input type="checkbox" className="form-checkbox h-3 w-3" checked={showStats} onChange={(e) => setShowStats(e.currentTarget.checked)} />
             Stats
           </label>

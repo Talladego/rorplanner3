@@ -163,7 +163,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
             </h2>
             <div className="flex items-center gap-3">
               {!isTalismanMode && (
-                <div className="inline-flex items-center gap-2 text-xs select-none text-gray-900 dark:text-gray-100">
+                <div className="inline-flex items-center gap-2 text-xs select-none text-primary">
                   <label className="inline-flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -186,7 +186,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                   </HoverTooltip>
                 </div>
               )}
-                <div className="inline-flex items-center gap-2 text-xs select-none text-gray-900 dark:text-gray-100">
+                <div className="inline-flex items-center gap-2 text-xs select-none text-primary">
                   <label className="inline-flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -202,7 +202,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                 </div>
               <button 
                 onClick={onClose} 
-                className="modal-close-btn hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+                className="modal-close-btn rounded-full w-8 h-8 flex items-center justify-center transition-colors"
                 aria-label="Close"
               >
                 ✕
