@@ -152,7 +152,7 @@ export default function HoverTooltip({ content, children, placement = 'right', c
       {open && createPortal(
         <span
           ref={tooltipRef}
-          className={`fixed z-[11000] rounded-lg bg-gray-900 dark:bg-gray-800 p-2 text-xs leading-snug text-white shadow-lg border border-gray-700 dark:border-gray-600 ${tapMode ? 'pointer-events-auto' : 'pointer-events-none'} whitespace-normal`}
+          className={`tooltip-surface fixed z-[11000] rounded-lg bg-gray-900 dark:bg-gray-800 p-2 text-xs leading-snug text-white shadow-lg border border-gray-700 dark:border-gray-600 ${tapMode ? 'pointer-events-auto' : 'pointer-events-none'} whitespace-normal`}
           style={{ left: pos.x, top: pos.y, width: fixedWidth ?? undefined, maxWidth: fixedWidth ?? 360, transform: `scale(${uiScale})`, transformOrigin: 'top left' }}
           role="tooltip"
         >

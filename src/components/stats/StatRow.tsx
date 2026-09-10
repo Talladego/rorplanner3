@@ -78,7 +78,7 @@ export default function StatRow({
   const sortedB = [...filteredB].sort((a, b) => sortValue(b) - sortValue(a));
 
   return (
-    <div className="stats-row rounded px-1 -mx-1 hover:bg-gray-800/60 hover:ring-1 hover:ring-gray-700 transition-colors">
+    <div className="stats-row row-hover rounded px-1 -mx-1">
       <span className="text-xs">{label}:</span>
       <span className="stats-label font-medium text-xs">
         <div className="grid grid-cols-[5rem_5rem] gap-3 justify-end">

@@ -8,7 +8,7 @@ export const RARITY_COLORS: Record<ItemRarity, string> = {
   [ItemRarity.VERY_RARE]: '#9238d0',
   [ItemRarity.RARE]: '#0064c3',
   [ItemRarity.UNCOMMON]: '#18f000',
-  [ItemRarity.COMMON]: '#fff',
+  [ItemRarity.COMMON]: 'var(--item-color-common)',
   [ItemRarity.UTILITY]: '#969696',
 };
 
@@ -23,7 +23,7 @@ export const SET_ITEM_COLOR = '#f0be28';
  * @returns The hex color code for the rarity
  */
 export const getRarityColor = (rarity: ItemRarity): string => {
-  return RARITY_COLORS[rarity] || '#fff';
+  return RARITY_COLORS[rarity] || 'var(--item-color-common)';
 };
 
 /**

@@ -164,7 +164,7 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
           ) : (
             <div className={`${iconSize}`} />
           )}
-          <span className={`${value ? (nonEmptyCareers[value as Career] ? 'text-white' : 'text-gray-400') : ''} truncate`}>
+          <span className={`${value ? (nonEmptyCareers[value as Career] ? 'text-primary' : 'text-muted') : ''} truncate`}>
             {selectedLabel}
           </span>
         </span>
@@ -177,7 +177,7 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
         <div
           ref={listRef}
           role="listbox"
-          className="z-[10000] rounded-md border border-gray-600 bg-gray-800 text-white shadow-lg max-h-60 overflow-auto"
+          className="z-[10000] rounded-md border border-[var(--border)] bg-[var(--panel)] text-primary shadow-lg max-h-60 overflow-auto"
           data-layout-menu="career"
           style={{ position: 'fixed', left: menuPos.left, top: menuPos.top, width: menuPos.width, marginTop: 4 }}
         >
@@ -191,12 +191,12 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
                 role="option"
                 aria-selected={selected}
                 tabIndex={-1}
-                className={`${itemPadding} flex items-center gap-2 cursor-pointer ${selected ? 'bg-gray-700' : active ? 'bg-gray-700/60' : 'hover:bg-gray-700/40'}`}
+                className={`${itemPadding} flex items-center gap-2 cursor-pointer ${selected ? 'bg-[var(--element)]' : active ? 'bg-[var(--element-hover)]' : 'hover:bg-[var(--panel-hover)]'}`}
                 onMouseEnter={() => setActiveIndex(idx)}
                 onClick={() => selectIndex(idx)}
               >
                 <img src={getCareerIconUrl(career)} alt={label} className={`${iconSize} rounded`} />
-                <span className={`${nonEmptyCareers[career] ? 'text-white' : 'text-gray-400'} truncate`}>{label}</span>
+                <span className={`${nonEmptyCareers[career] ? 'text-primary' : 'text-muted'} truncate`}>{label}</span>
               </div>
             );
           })}

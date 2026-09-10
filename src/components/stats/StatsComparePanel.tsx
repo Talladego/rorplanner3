@@ -20,7 +20,7 @@ export default function StatsComparePanel() {
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={`text-gray-200 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+      className={`text-secondary transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
       aria-hidden="true"
       focusable="false"
     >
@@ -214,7 +214,7 @@ export default function StatsComparePanel() {
           )
         )}
         {showHeader && (
-          <div className="my-1 h-px bg-gray-700 opacity-60" />
+          <div className="my-1 h-px bg-[var(--border)] opacity-80" />
         )}
         <div className="space-y-0.5">
           {rows.length > 0 ? (
@@ -294,7 +294,7 @@ export default function StatsComparePanel() {
       <div className="flex items-center justify-between mb-2">
         {/* Global toggles row (left) */}
         <div className="flex items-center gap-6">
-          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+          <label className="inline-flex items-center gap-2 text-xs select-none text-primary">
             <input
               type="checkbox"
               className="form-checkbox h-3 w-3"
@@ -303,7 +303,7 @@ export default function StatsComparePanel() {
             />
             Career Stats
           </label>
-          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+          <label className="inline-flex items-center gap-2 text-xs select-none text-primary">
             <input
               type="checkbox"
               className="form-checkbox h-3 w-3"
@@ -312,7 +312,7 @@ export default function StatsComparePanel() {
             />
             Renown Stats
           </label>
-          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+          <label className="inline-flex items-center gap-2 text-xs select-none text-primary">
             <input
               type="checkbox"
               className="form-checkbox h-3 w-3"
@@ -564,7 +564,7 @@ export default function StatsComparePanel() {
                 >Copy</button>
                 <button 
                   onClick={() => setShareOpen(false)} 
-                  className="modal-close-btn hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+                  className="modal-close-btn rounded-full w-8 h-8 flex items-center justify-center transition-colors"
                   aria-label="Close"
                 >
                   ✕

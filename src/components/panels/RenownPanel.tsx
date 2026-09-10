@@ -144,16 +144,16 @@ export default memo(function RenownPanel({ loadoutId, embedded = false }: { load
           return (
           <div
             key={ab.key}
-            className="flex items-center justify-between gap-1 rounded px-1 -mx-1 hover:bg-gray-800/60 hover:ring-1 hover:ring-gray-700 transition-colors"
+            className="row-hover flex items-center justify-between gap-1 rounded px-1 -mx-1"
           >
             <HoverTooltip content={renderAbilityTooltip(ab, clamped)}>
               <div className="flex items-center gap-1 min-w-0">
                 {/* Icon placeholder; will use ab.iconUrl when provided */}
-                <div className="w-5 h-5 rounded-sm bg-gray-700/70 overflow-hidden flex items-center justify-center flex-none">
+                <div className="w-5 h-5 rounded-sm bg-[var(--element)] overflow-hidden flex items-center justify-center flex-none">
                   {ab.iconUrl ? (
                     <img src={ab.iconUrl} alt="" className="w-5 h-5 object-cover" draggable={false} />
                   ) : (
-                    <div className="w-4 h-4 bg-gray-600 rounded-sm" />
+                    <div className="w-4 h-4 bg-[var(--border)] rounded-sm" />
                   )}
                 </div>
                 <div className="min-w-0">

@@ -503,7 +503,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
       {isVisible && createPortal(
         <div
           ref={tooltipRef}
-          className={`fixed z-[11000] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 ${tapMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          className={`tooltip-surface fixed z-[11000] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 ${tapMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
           style={tapMode ? {
             left: '50%',
             top: '50%',
@@ -570,7 +570,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
       {isVisible && showMirror && mirrorVisible && renderOtherItemForTooltip && createPortal(
         <div
           ref={mirrorTooltipRef}
-          className={`fixed z-[10990] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 pointer-events-none`}
+          className={`tooltip-surface fixed z-[10990] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 pointer-events-none`}
           style={{ left: mirrorPosition.x, top: mirrorPosition.y, width: TOOLTIP_WIDTH, maxWidth: TOOLTIP_WIDTH, transform: `scale(${uiScale})`, transformOrigin: 'top left' }}
         >
           {renderTooltipContent(renderOtherItemForTooltip, otherEligible, (setId: string) => {

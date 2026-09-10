@@ -62,7 +62,7 @@ function renderItemInfo(item: Item, filteredStats?: Stat[]): ReactNode {
   }).join(' / ');
   return (
     <>
-      {baseNode}, <span className="text-gray-900 dark:text-gray-100 font-medium">{rendered}</span>
+      {baseNode}, <span className="text-primary font-medium">{rendered}</span>
     </>
   );
 }
@@ -139,7 +139,7 @@ export function ResultsList({
               className={`equipment-slot p-1.5 h-12 flex items-center rounded ${
                 blocked
                   ? 'cursor-not-allowed'
-                  : 'cursor-pointer hover-bright hover:bg-[var(--panel-hover)] hover:ring-2 hover:ring-white/30 hover:brightness-110'
+                  : 'cursor-pointer hover-bright hover:bg-[var(--panel-hover)] hover:ring-2 hover:ring-[color:var(--hover-list-ring)] hover:brightness-110'
               } transition`}
               onClick={() => !blocked && onSelect(item as Item)}
             >
