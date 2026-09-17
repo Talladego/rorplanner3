@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loadout, EquipSlot, StatsSummary } from '../../types';
-import { RENOWN_ABILITIES } from '../../services/loadout/renownConfig';
+import { RENOWN_ABILITIES, DEFAULT_STAT_TOTALS } from '../../services/loadout/renownConfig';
 import { formatCareerName, formatSlotName, formatSummaryStatKey, isPercentSummaryKey, normalizeStatDisplayValue } from '../../utils/formatters';
 import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide } from '../../utils/statsCompareHelpers';
 import { getAllToggles } from '../../services/ui/statsToggles';
@@ -187,20 +187,23 @@ function buildSummary(loadout: Loadout | null, opts?: { showItems?: boolean; sho
   // Renown (only show if anything allocated)
   const ra = loadout.renownAbilities || {} as NonNullable<Loadout['renownAbilities']>;
   const roman = (lvl: number) => ['', 'I', 'II', 'III', 'IV', 'V'][Math.max(0, Math.min(5, Math.trunc(lvl)))] || '';
-  const statTotalsDefault = [0, 4, 16, 38, 72, 120];
   const getRenownRow = (key: string, lvl: number): [string, string, string] | null => {
     const def = RENOWN_ABILITIES.find(d => d.key === (key as string));
     if (!def) return null;
     const cap = def.capLevel ?? 5;
     const clamped = Math.max(0, Math.min(cap, Math.trunc(lvl)));
-    const totals = def.customTotals ?? (def.percent ? undefined : statTotalsDefault);
+    const totals = def.customTotals ?? (def.percent ? undefined : DEFAULT_STAT_TOTALS);
     // Special rendering per ability where needed
     if (def.key === 'deftDefender') {
-      const val = (totals || [0, 3, 7, 12, 18, 18])[clamped];
+      const val = (totals || [0, 2, 4, 8, 13, 13])[clamped];
       return [def.label, roman(clamped), `Dodge +${val}%, Disrupt +${val}%`];
     }
+    if (def.key === 'focusedPower') {
+      const val = (totals || [0, 2, 4, 8, 13, 13])[clamped];
+      return [def.label, roman(clamped), `Parry/Dodge/Disrupt Strikethrough +${val}%`];
+    }
     if (def.key === 'hardyConcession') {
-      const table = totals || [0, -1, -3, -6, -10, -15];
+      const table = totals || [0, -2, -4, -7, -10, -10];
       const v = table[clamped];
       // v is negative; show with minus sign
       return [def.label, roman(clamped), `Incoming Damage ${v}% | Outgoing Damage ${v}% | Outgoing Healing ${v}%`];
@@ -218,9 +221,6 @@ function buildSummary(loadout: Loadout | null, opts?: { showItems?: boolean; sho
     }
     if (def.key === 'defender') {
       return [def.label, roman(clamped), `Block +${value}${unit}`];
-    }
-    if (def.key === 'regeneration') {
-      return [def.label, roman(clamped), `Health Regen +${value}`];
     }
     if (def.key === 'futileStrikes') {
       return [def.label, roman(clamped), `Crit Hit Rate Reduction +${value}${unit}`];

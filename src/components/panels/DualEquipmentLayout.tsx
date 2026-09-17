@@ -6,19 +6,13 @@ const RenownPanel = React.lazy(() => import('./RenownPanel'));
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { Loadout, EquipSlot } from '../../types';
 const LoadoutSummaryModal = React.lazy(() => import('../summary/LoadoutSummaryModal'));
-import DualToolbar from '../toolbar/DualToolbar';
-import TabletTabBar from '../layout/TabletTabBar';
-import { useLayoutMode } from '../../hooks/useLayoutMode';
-import type { TabletTab } from '../../utils/layoutMode';
 
 export default function DualEquipmentLayout() {
-  const { useTabs } = useLayoutMode();
   const [sideA, setSideA] = useState<Loadout | null>(loadoutService.getLoadoutForSide('A'));
   const [sideB, setSideB] = useState<Loadout | null>(loadoutService.getLoadoutForSide('B'));
   const [summaryOpenFor, setSummaryOpenFor] = useState<'A' | 'B' | null>(null);
   const [showRenownA, setShowRenownA] = useState(false);
   const [showRenownB, setShowRenownB] = useState(false);
-  const [tabletTab, setTabletTab] = useState<TabletTab>('A');
 
   useEffect(() => {
     // Ensure both sides exist only if no URL params are present
@@ -168,7 +162,7 @@ export default function DualEquipmentLayout() {
   const otherRenownEmpty = !other?.renownAbilities || Object.values(other.renownAbilities).every((lvl) => !lvl);
   const nothingToCopy = otherEmpty && otherRenownEmpty;
     return (
-      <div className={`flex items-center justify-between gap-1 mb-2 min-w-0 ${useTabs ? 'flex-wrap' : 'whitespace-nowrap'}`}>
+      <div className="flex items-center justify-between gap-1 mb-2 min-w-0 whitespace-nowrap">
           {/* Renown toggler first; disabled if no career selected */}
           <button
             onClick={() => (label === 'A' ? setShowRenownA(v => !v) : setShowRenownB(v => !v))}
@@ -235,7 +229,7 @@ export default function DualEquipmentLayout() {
     const side = label === 'A' ? sideA : sideB;
     const border = label === 'A' ? 'panel-border-green-600' : 'panel-border-red-600';
     return (
-      <div className={useTabs ? '' : 'col-span-1'}>
+      <div className="col-span-1">
         <div className={`panel-container ${border} h-full flex flex-col`}>
           {sideIndicator(label)}
           <div className="field-group flex-1 min-h-0">
@@ -254,7 +248,7 @@ export default function DualEquipmentLayout() {
   };
 
   const compareColumn = (
-    <div className={useTabs ? '' : 'col-span-1'}>
+    <div className="col-span-1">
       <div className="panel-container panel-border-blue-500 h-full flex flex-col">
         <h2 className="panel-heading font-brand">Compare Stats</h2>
         <Suspense fallback={<div className="text-xs text-muted p-2">Loading stats…</div>}>
@@ -274,28 +268,6 @@ export default function DualEquipmentLayout() {
       />
     </Suspense>
   ) : null;
-
-  if (useTabs) {
-    return (
-      <div>
-        <TabletTabBar value={tabletTab} onChange={setTabletTab} />
-        {tabletTab === 'A' && (
-          <>
-            <DualToolbar sides="A" />
-            {loadoutColumn('A')}
-          </>
-        )}
-        {tabletTab === 'compare' && compareColumn}
-        {tabletTab === 'B' && (
-          <>
-            <DualToolbar sides="B" />
-            {loadoutColumn('B')}
-          </>
-        )}
-        {summaryModal}
-      </div>
-    );
-  }
 
   return (
     <div className="grid grid-cols-3 gap-4">

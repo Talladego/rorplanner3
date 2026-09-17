@@ -5,42 +5,13 @@ import { urlService } from './services/loadout/urlService';
 import DualToolbar from './components/toolbar/DualToolbar';
 import DualEquipmentLayout from './components/panels/DualEquipmentLayout';
 import ScaleToFit from './components/layout/ScaleToFit';
-import LayoutModeToggle from './components/layout/LayoutModeToggle';
-import { LayoutModeProvider, useLayoutMode } from './hooks/useLayoutMode';
 import ApolloProviderWrapper from './providers/ApolloProvider';
 import ErrorBoundary from './providers/ErrorBoundary';
 import { preloadCareerIcons } from './constants/careerIcons';
-import { DESIGN_WIDTH, SCALE_MAX, SCALE_MIN, TABLET_SCALE_FLOOR } from './constants/ui';
+import { DESIGN_WIDTH, SCALE_MAX, SCALE_MIN } from './constants/ui';
 // Presentation layer should subscribe through the service API, not the raw emitter
 
 function AppHeader() {
-  const { layoutMode } = useLayoutMode();
-  if (layoutMode === 'tablet') {
-    return (
-      <header className="relative text-center mb-6">
-        <h1 className="text-4xl font-bold text-primary font-brand">RorPlanner</h1>
-        <nav className="mt-3 flex items-center justify-between gap-2">
-          <a
-            href="https://rorleaderboard.pages.dev/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="header-link inline-flex items-center text-xs italic text-muted hover:underline"
-          >
-            Leaderboard
-          </a>
-          <LayoutModeToggle />
-          <a
-            href="https://discord.com/users/316636548353490944"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="header-link inline-flex items-center text-xs italic text-muted hover:underline"
-          >
-            Feedback
-          </a>
-        </nav>
-      </header>
-    );
-  }
   return (
     <header className="relative text-center mb-8">
       <h1 className="text-4xl font-bold text-primary font-brand">RorPlanner</h1>
@@ -52,55 +23,26 @@ function AppHeader() {
       >
         Leaderboard
       </a>
-      <div className="absolute right-4 top-0 flex items-center gap-3">
-        <LayoutModeToggle />
-        <a
-          href="https://discord.com/users/316636548353490944"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
-        >
-          Feedback
-        </a>
-      </div>
+      <a
+        href="https://discord.com/users/316636548353490944"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute right-4 top-0 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
+      >
+        Feedback
+      </a>
     </header>
   );
 }
 
 function AppShell() {
-  const { layoutMode, useTabs, useScaledCanvas } = useLayoutMode();
-  const minScale = layoutMode === 'tablet' ? TABLET_SCALE_FLOOR : SCALE_MIN;
-  const content = (
-    <>
-      <AppHeader />
-      {!useTabs && <DualToolbar />}
-      <DualEquipmentLayout />
-    </>
-  );
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.layout = layoutMode;
-    root.dataset.tabletTabs = useTabs ? 'true' : 'false';
-    return () => {
-      delete root.dataset.layout;
-      delete root.dataset.tabletTabs;
-    };
-  }, [layoutMode, useTabs]);
-
   return (
-    <div
-      className={`min-h-screen py-4 ${useTabs ? 'px-3 max-w-[1440px] mx-auto' : ''}`}
-      data-layout={layoutMode}
-      data-tablet-tabs={useTabs ? 'true' : 'false'}
-    >
-      {useScaledCanvas ? (
-        <ScaleToFit designWidth={DESIGN_WIDTH} minScale={minScale} maxScale={SCALE_MAX}>
-          {content}
-        </ScaleToFit>
-      ) : (
-        content
-      )}
+    <div className="min-h-screen py-4">
+      <ScaleToFit designWidth={DESIGN_WIDTH} minScale={SCALE_MIN} maxScale={SCALE_MAX}>
+        <AppHeader />
+        <DualToolbar />
+        <DualEquipmentLayout />
+      </ScaleToFit>
     </div>
   );
 }
@@ -196,9 +138,7 @@ function App() {
   return (
     <ErrorBoundary>
       <ApolloProviderWrapper>
-        <LayoutModeProvider>
-          <AppShell />
-        </LayoutModeProvider>
+        <AppShell />
       </ApolloProviderWrapper>
     </ErrorBoundary>
   );

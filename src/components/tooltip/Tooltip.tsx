@@ -4,7 +4,6 @@ import { Item, Loadout, EquipSlot } from '../../types';
 import { formatItemTypeName, formatSlotName } from '../../utils/formatters';
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { useScale } from '../layout/ScaleContext';
-import { useLayoutMode } from '../../hooks/useLayoutMode';
 import {
   applySlotHoverBright,
   collectPairedHoverTargets,
@@ -30,19 +29,18 @@ interface TooltipProps {
   side?: 'A' | 'B';
   slot?: EquipSlot;
   talismanIndex?: number;
-  /** Hover (desktop) vs tap-to-toggle (tablet). Defaults from layoutMode. */
+  /** Hover vs tap-to-toggle vs disabled. Defaults to hover. */
   interaction?: 'hover' | 'tap' | 'none';
-  /** Tablet details panel: open the item picker instead of only showing stats. */
+  /** Optional: open the item picker from a tap details overlay. */
   onRequestChange?: () => void;
 }
 
 export default function Tooltip({ children, item, className = '', isTalismanTooltip = false, loadoutId, side, slot, talismanIndex, interaction, onRequestChange }: TooltipProps) {
   const uiScale = useScale();
-  const { layoutMode, useTabs } = useLayoutMode();
-  const resolvedInteraction = interaction ?? (layoutMode === 'tablet' ? 'tap' : 'hover');
+  const resolvedInteraction = interaction ?? 'hover';
   const tapMode = resolvedInteraction === 'tap';
   const hoverMode = resolvedInteraction === 'hover';
-  const showMirror = hoverMode && !useTabs;
+  const showMirror = hoverMode;
   // Use a fixed width so item tooltips are consistently sized
   const TOOLTIP_WIDTH = 320;
   const [isVisible, setIsVisible] = useState(false);
