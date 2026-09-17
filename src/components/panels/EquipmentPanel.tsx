@@ -8,6 +8,7 @@ import { getBlockInvalidItems } from '../../services/ui/selectorPrefs';
 import { DEFAULT_SLOT_ICONS } from '../../constants/slotIcons';
 import Tooltip from '../tooltip/Tooltip';
 import HoverTooltip from '../tooltip/HoverTooltip';
+import { forceClearSlotHoverBright } from '../../utils/hoverBright';
 import { formatSlotName } from '../../utils/formatters';
 import { isTwoHandedWeapon } from '../../utils/items';
 import { getOffhandBlockReason, STAFF_ONLY_CAREERS, TWO_H_ONLY_CAREERS, CANNOT_USE_2H_MELEE } from '../../constants/careerWeaponRules';
@@ -57,6 +58,8 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
     if (!hasCareer) return;
     setSelectedSlot(slot);
     setIsModalOpen(true);
+    // Overlay can appear without a mouseleave (pointer never moved). Drop slot highlights.
+    forceClearSlotHoverBright();
   };
 
   const handleItemSelect = async (item: Item) => {
@@ -90,6 +93,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
     if (!hasCareer) return;
     setTalismanSlot({ slot, index });
     setIsModalOpen(true);
+    forceClearSlotHoverBright();
   };
 
   const handleTalismanSelect = async (talisman: Item) => {
@@ -213,7 +217,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                     <Tooltip item={{ ...slotData.item, talismans: slotData.talismans }} loadoutId={effectiveLoadout.id} side={side} slot={slot}>
                       <div
                         className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}${isSlotItemInvalid ? ' invalid' : ''}`}
-                        onClick={() => handleSlotClick(slot)}
+                        onClick={() => { handleSlotClick(slot); }}
                         onContextMenu={(e) => handleSlotRightClick(e, slot)}
                         data-anchor-key={side ? `${side}:${slot}` : undefined}
                       >
@@ -294,7 +298,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                                           src={t.iconUrl}
                                           alt={t.name}
                                           className={`w-full h-full object-contain rounded cursor-pointer`}
-                                          onClick={() => handleTalismanClick(slot, i)}
+                                          onClick={() => { handleTalismanClick(slot, i); }}
                                           onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
                                           data-anchor-key={side ? `${side}:${slot}:t${i}` : undefined}
                                         />
@@ -367,7 +371,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                                             src={t.iconUrl}
                                             alt={t.name}
                                             className={`w-full h-full object-contain rounded cursor-pointer`}
-                                            onClick={() => handleTalismanClick(slot, i)}
+                                            onClick={() => { handleTalismanClick(slot, i); }}
                                             onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
                                             data-anchor-key={side ? `${side}:${slot}:t${i}` : undefined}
                                           />
@@ -431,7 +435,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                       <Tooltip item={{ ...slotData.item, talismans: slotData.talismans }} loadoutId={effectiveLoadout.id} side={side} slot={slot}>
                         <div
                           className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}${isSlotItemInvalid ? ' invalid' : ''}`}
-                          onClick={() => handleSlotClick(slot)}
+                          onClick={() => { handleSlotClick(slot); }}
                           onContextMenu={(e) => handleSlotRightClick(e, slot)}
                           data-anchor-key={side ? `${side}:${slot}` : undefined}
                         >

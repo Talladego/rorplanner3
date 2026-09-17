@@ -389,7 +389,9 @@ export interface Loadout {
     vigor: number;
     opportunist: number;
     spiritualRefinement: number;
-    regeneration: number;
+    focusedPower: number;
+    /** Retired in patch 17/09/2026. Ignored if present on old URLs/loadouts. */
+    regeneration?: number;
     reflexes: number;
     defender: number;
     deftDefender: number;

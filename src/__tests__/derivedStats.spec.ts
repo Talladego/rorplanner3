@@ -9,6 +9,8 @@ import {
   computeDerivedBlockStrikethroughFromStrength,
   computeDerivedBlockStrikethroughFromBallisticSkill,
   computeDerivedBlockStrikethroughFromIntelligence,
+  computeBaseChanceToBeCriticallyHit,
+  computeChanceToBeCriticallyHit,
 } from '../utils/derivedStats';
 import type { StatsSummary } from '../types';
 
@@ -79,5 +81,20 @@ describe('derivedStats utils', () => {
     expect(computeDerivedBlockStrikethroughFromStrength({ ...zeroStats, strength: 400 }, lvl, { applyDR: false })).toBeCloseTo(2);
     expect(computeDerivedBlockStrikethroughFromBallisticSkill({ ...zeroStats, ballisticSkill: 300 }, lvl, { applyDR: false })).toBeCloseTo(1.5);
     expect(computeDerivedBlockStrikethroughFromIntelligence({ ...zeroStats, intelligence: 200 }, lvl, { applyDR: false })).toBeCloseTo(1);
+  });
+
+  it('base chance to be critically hit is 10 + CareerRank/4 (patch 17/09/2026)', () => {
+    expect(computeBaseChanceToBeCriticallyHit(40)).toBe(20);
+    expect(computeBaseChanceToBeCriticallyHit(1)).toBeCloseTo(10.25);
+    expect(computeBaseChanceToBeCriticallyHit(0)).toBe(10);
+    expect(computeBaseChanceToBeCriticallyHit(40)).not.toBe(15 + 40 / 4);
+  });
+
+  it('remaining chance to be crit subtracts reductions (Futile Strikes / items / initiative)', () => {
+    expect(computeChanceToBeCriticallyHit(40, 0)).toBe(20);
+    expect(computeChanceToBeCriticallyHit(40, 12)).toBe(8); // Futile Strikes IV
+    const initReduc = computeDerivedCritReductionFromInitiative({ ...zeroStats, initiative: 200 }, 40, { applyDR: false });
+    expect(initReduc).toBeCloseTo(10);
+    expect(computeChanceToBeCriticallyHit(40, 12 + initReduc)).toBeCloseTo(-2);
   });
 });

@@ -149,7 +149,10 @@ export function formatStatName(stat: Stat): string {
  * Formats StatsSummary camelCase keys for display with label overrides.
  * Falls back to Title Case of the camelCase key.
  */
-export function formatSummaryStatKey(key: string): string {
+export function formatSummaryStatKey(key: string, opts?: { includeDerivedStats?: boolean }): string {
+  if (opts?.includeDerivedStats && key === 'criticalHitRateReduction') {
+    return 'Chance to be Critically Hit';
+  }
   if (key in STAT_LABEL_OVERRIDES) return STAT_LABEL_OVERRIDES[key];
   return formatCamelCase(key);
 }

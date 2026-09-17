@@ -4,6 +4,13 @@ import { Item, Loadout, EquipSlot } from '../../types';
 import { formatItemTypeName, formatSlotName } from '../../utils/formatters';
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { useScale } from '../layout/ScaleContext';
+import {
+  applySlotHoverBright,
+  collectPairedHoverTargets,
+  clearSlotHoverBright,
+  ensureSlotHoverBrightPointerGuard,
+  releaseSlotHoverBright,
+} from '../../utils/hoverBright';
 import ItemNameText from './ItemNameText';
 import RequirementsBlock from './RequirementsBlock';
 import StatLines from './StatLines';
@@ -22,10 +29,18 @@ interface TooltipProps {
   side?: 'A' | 'B';
   slot?: EquipSlot;
   talismanIndex?: number;
+  /** Hover vs tap-to-toggle vs disabled. Defaults to hover. */
+  interaction?: 'hover' | 'tap' | 'none';
+  /** Optional: open the item picker from a tap details overlay. */
+  onRequestChange?: () => void;
 }
 
-export default function Tooltip({ children, item, className = '', isTalismanTooltip = false, loadoutId, side, slot, talismanIndex }: TooltipProps) {
+export default function Tooltip({ children, item, className = '', isTalismanTooltip = false, loadoutId, side, slot, talismanIndex, interaction, onRequestChange }: TooltipProps) {
   const uiScale = useScale();
+  const resolvedInteraction = interaction ?? 'hover';
+  const tapMode = resolvedInteraction === 'tap';
+  const hoverMode = resolvedInteraction === 'hover';
+  const showMirror = hoverMode;
   // Use a fixed width so item tooltips are consistently sized
   const TOOLTIP_WIDTH = 320;
   const [isVisible, setIsVisible] = useState(false);
@@ -39,8 +54,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
   const tooltipRef = useRef<HTMLDivElement>(null);
   const mirrorTooltipRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
-  const primaryHighlightElRef = useRef<HTMLElement | null>(null);
-  const mirrorHighlightElRef = useRef<HTMLElement | null>(null);
+  const hoverOwnerRef = useRef<object>({});
 
   // Resolve the loadout we should evaluate against (A/B aware)
   const getEffectiveLoadout = (): Loadout | null => {
@@ -137,17 +151,13 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
     </>
   );
 
-  const handleMouseEnter = (e: React.MouseEvent) => {
-    if (!item) return;
-
-    // Check if we need to fetch detailed item data
-    const needsDetails = !item.abilities?.some(a => a.description) || !item.buffs?.some(b => b.description);
-    const hasCorrectDetails = detailedItem && detailedItem.id === item.id;
-    
+  const fetchDetailsIfNeeded = (target: Item | null) => {
+    if (!target) return;
+    const needsDetails = !target.abilities?.some(a => a.description) || !target.buffs?.some(b => b.description);
+    const hasCorrectDetails = detailedItem && detailedItem.id === target.id;
     if (needsDetails && !hasCorrectDetails && !isLoadingDetails) {
       setIsLoadingDetails(true);
-      // Fetch detailed data asynchronously without blocking tooltip display
-      loadoutService.getItemWithDetails(item.id)
+      loadoutService.getItemWithDetails(target.id)
         .then(fullItem => {
           setDetailedItem(fullItem);
         })
@@ -158,64 +168,53 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           setIsLoadingDetails(false);
         });
     }
+  };
 
-    const rect = e.currentTarget.getBoundingClientRect();
+  const openAtAnchor = (rect: DOMRect) => {
     const margin = 10;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-
-    // Calculate position immediately without showing tooltip first
-  // Use fixed tooltip size for initial positioning (matches rendered width)
-  const estimatedTooltipWidth = TOOLTIP_WIDTH;
+    const estimatedTooltipWidth = TOOLTIP_WIDTH;
     const estimatedTooltipHeight = 200;
-
-    // Preferred anchoring: right side of element, aligned with top
     let x = rect.right + margin;
     let y = rect.top;
-
-    // Check if positioned tooltip would go off-screen horizontally
     if (x + estimatedTooltipWidth > viewportWidth) {
-      // Try positioning to the left instead
       x = rect.left - estimatedTooltipWidth - margin;
     }
-
-    // Check if positioned tooltip would go off-screen vertically
     if (y + estimatedTooltipHeight > viewportHeight) {
-      // Move up to fit within viewport
       y = viewportHeight - estimatedTooltipHeight - margin;
     }
-
-    // Ensure tooltip doesn't go above the viewport
-    if (y < 0) {
-      y = margin;
-    }
-
-    // Final horizontal boundary check
-    if (x < 0) {
-      x = margin;
-    } else if (x + estimatedTooltipWidth > viewportWidth) {
+    if (y < 0) y = margin;
+    if (x < 0) x = margin;
+    else if (x + estimatedTooltipWidth > viewportWidth) {
       x = viewportWidth - estimatedTooltipWidth - margin;
     }
-
-    // Set position and show tooltip
     setPosition({ x, y });
+  };
+
+  const handleMouseEnter = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!hoverMode) return;
+    if (!item) return;
+
+    fetchDetailsIfNeeded(item);
+    const rect = e.currentTarget.getBoundingClientRect();
+    openAtAnchor(rect);
     setIsVisible(true);
 
-    // Always brighten primary trigger when hovered
-    if (triggerRef.current) {
-      triggerRef.current.classList.add('hover-bright');
-      primaryHighlightElRef.current = triggerRef.current;
-      if (typeof talismanIndex === 'number') {
-        const talismanContainer = triggerRef.current.closest('[data-talisman-index]') as HTMLElement | null;
-        if (talismanContainer) {
-          talismanContainer.classList.add('hover-bright');
-        }
-      }
-    }
+    // Clear every leftover slot highlight, then light this trigger and its A/B mirror.
+    // Do not rely on a previous mouseleave — ScaleToFit transforms can skip it.
+    const pairTargets = collectPairedHoverTargets({
+      trigger: triggerRef.current,
+      talismanIndex,
+      side,
+      slot,
+      queryAnchor: (key) => document.querySelector(`[data-anchor-key="${key}"]`),
+    });
+    applySlotHoverBright(hoverOwnerRef.current, pairTargets);
 
     // Compute and show mirror tooltip over opposite side's corresponding slot/talisman (if available)
     try {
-      if (side && slot) {
+      if (showMirror && side && slot) {
         const otherSide = side === 'A' ? 'B' : 'A';
         // Use the exact same anchor element type by querying the Tooltip trigger wrapper via data-anchor-key
         const otherAnchorKey = `${otherSide}:${slot}${typeof talismanIndex === 'number' ? `:t${talismanIndex}` : ''}`;
@@ -225,17 +224,6 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
         if (otherLo) {
           const data = otherLo.items[slot as EquipSlot];
           otherItem = typeof talismanIndex === 'number' ? (data?.talismans?.[talismanIndex] || null) : (data?.item || null);
-        }
-        // Brighten mirror trigger if present (even if no item for mirror tooltip)
-        if (targetEl) {
-          targetEl.classList.add('hover-bright');
-          mirrorHighlightElRef.current = targetEl;
-          if (typeof talismanIndex === 'number') {
-            const mirrorTalismanContainer = targetEl.closest('[data-talisman-index]') as HTMLElement | null;
-            if (mirrorTalismanContainer) {
-              mirrorTalismanContainer.classList.add('hover-bright');
-            }
-          }
         }
 
         if (targetEl && otherItem) {
@@ -253,8 +241,6 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           if (my < margin2) my = margin2;
           setMirrorPosition({ x: mx, y: my });
           setMirrorVisible(true);
-
-          // mirror highlight already applied above if targetEl exists
 
           // After mirror tooltip is rendered, fine-tune position with actual dimensions
           setTimeout(() => {
@@ -300,27 +286,25 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
         const tooltipRect = tooltipRef.current.getBoundingClientRect();
         const actualTooltipWidth = tooltipRect.width;
         const actualTooltipHeight = tooltipRect.height;
+        const estimatedTooltipWidth = TOOLTIP_WIDTH;
+        const estimatedTooltipHeight = 200;
+        const margin = 10;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
 
         // Only adjust if there's a significant difference in dimensions
         const widthDiff = Math.abs(actualTooltipWidth - estimatedTooltipWidth);
         const heightDiff = Math.abs(actualTooltipHeight - estimatedTooltipHeight);
 
         if (widthDiff > 20 || heightDiff > 20) {
-          // Recalculate with actual dimensions
           let newX = rect.right + margin;
           let newY = rect.top;
-
-          // Check if positioned tooltip would go off-screen horizontally
           if (newX + actualTooltipWidth > viewportWidth) {
             newX = rect.left - actualTooltipWidth - margin;
           }
-
-          // Check if positioned tooltip would go off-screen vertically
           if (newY + actualTooltipHeight > viewportHeight) {
             newY = viewportHeight - actualTooltipHeight - margin;
           }
-
-          // Boundary checks
           if (newY < 0) {
             newY = margin;
           }
@@ -329,37 +313,59 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           } else if (newX + actualTooltipWidth > viewportWidth) {
             newX = viewportWidth - actualTooltipWidth - margin;
           }
-
           setPosition({ x: newX, y: newY });
         }
       }
     }, 10);
   };
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!hoverMode) return;
     setIsVisible(false);
     setMirrorVisible(false);
-    // Remove highlight classes if applied
-    if (primaryHighlightElRef.current) {
-      primaryHighlightElRef.current.classList.remove('hover-bright');
-      const talismanContainer = primaryHighlightElRef.current.closest('[data-talisman-index]') as HTMLElement | null;
-      if (talismanContainer) talismanContainer.classList.remove('hover-bright');
-      primaryHighlightElRef.current = null;
-    }
-    if (mirrorHighlightElRef.current) {
-      mirrorHighlightElRef.current.classList.remove('hover-bright');
-      const mirrorTalismanContainer = mirrorHighlightElRef.current.closest('[data-talisman-index]') as HTMLElement | null;
-      if (mirrorTalismanContainer) mirrorTalismanContainer.classList.remove('hover-bright');
-      mirrorHighlightElRef.current = null;
-    }
+    releaseSlotHoverBright(hoverOwnerRef.current, triggerRef.current, e.relatedTarget);
   };
+
+  const closeDetails = () => {
+    setIsVisible(false);
+    setMirrorVisible(false);
+    releaseSlotHoverBright(hoverOwnerRef.current, triggerRef.current);
+  };
+
+  const handleTriggerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!tapMode || !item) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (isVisible) {
+      closeDetails();
+      return;
+    }
+    fetchDetailsIfNeeded(item);
+    if (triggerRef.current) openAtAnchor(triggerRef.current.getBoundingClientRect());
+    setIsVisible(true);
+  };
+
+  useEffect(() => {
+    ensureSlotHoverBrightPointerGuard();
+    const owner = hoverOwnerRef.current;
+    return () => {
+      clearSlotHoverBright(owner);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!item) {
+      releaseSlotHoverBright(hoverOwnerRef.current, triggerRef.current);
+    }
+  }, [item]);
 
   // Close tooltip when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
-        setIsVisible(false);
-      }
+      const target = event.target as Node;
+      if (tooltipRef.current && tooltipRef.current.contains(target)) return;
+      if (triggerRef.current && triggerRef.current.contains(target)) return;
+      closeDetails();
     };
 
     if (isVisible) {
@@ -386,7 +392,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
           if (y + tipRect.height > window.innerHeight) y = window.innerHeight - tipRect.height - m;
           if (x < m) x = m;
           if (y < m) y = m;
-          setPosition({ x, y });
+          setPosition((prev) => (Math.abs(prev.x - x) < 0.5 && Math.abs(prev.y - y) < 0.5 ? prev : { x, y }));
         }
         if (mirrorVisible && mirrorTooltipRef.current && side && slot) {
           const otherSide = side === 'A' ? 'B' : 'A';
@@ -402,7 +408,7 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
             if (my + mtRect.height > window.innerHeight) my = window.innerHeight - mtRect.height - m2;
             if (mx < m2) mx = m2;
             if (my < m2) my = m2;
-            setMirrorPosition({ x: mx, y: my });
+            setMirrorPosition((prev) => (Math.abs(prev.x - mx) < 0.5 && Math.abs(prev.y - my) < 0.5 ? prev : { x: mx, y: my }));
           }
         }
       } catch {
@@ -476,18 +482,71 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
         ref={triggerRef}
         className={className}
         data-anchor-key={side && slot ? `${side}:${slot}${typeof talismanIndex === 'number' ? `:t${talismanIndex}` : ''}` : undefined}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onPointerEnter={hoverMode ? handleMouseEnter : undefined}
+        onPointerLeave={hoverMode ? handleMouseLeave : undefined}
+        onClick={tapMode ? handleTriggerClick : undefined}
       >
         {children}
       </div>
 
+      {isVisible && tapMode && createPortal(
+        <div
+          className="fixed inset-0 z-[10990] bg-black/50"
+          onClick={closeDetails}
+          aria-hidden="true"
+        />,
+        document.body
+      )}
+
       {isVisible && createPortal(
         <div
           ref={tooltipRef}
-          className={`fixed z-[11000] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 pointer-events-none`}
-          style={{ left: position.x, top: position.y, width: TOOLTIP_WIDTH, maxWidth: TOOLTIP_WIDTH, transform: `scale(${uiScale})`, transformOrigin: 'top left' }}
+          className={`tooltip-surface fixed z-[11000] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 ${tapMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          style={tapMode ? {
+            left: '50%',
+            top: '50%',
+            width: Math.min(TOOLTIP_WIDTH, window.innerWidth - 24),
+            maxWidth: TOOLTIP_WIDTH,
+            maxHeight: 'min(80vh, 640px)',
+            overflowY: 'auto',
+            transform: 'translate(-50%, -50%)',
+          } : {
+            left: position.x,
+            top: position.y,
+            width: TOOLTIP_WIDTH,
+            maxWidth: TOOLTIP_WIDTH,
+            transform: `scale(${uiScale})`,
+            transformOrigin: 'top left',
+          }}
         >
+          {tapMode && (
+            <div className="flex items-center justify-end gap-2 mb-2">
+              {onRequestChange && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeDetails();
+                    onRequestChange();
+                  }}
+                >
+                  Change
+                </button>
+              )}
+              <button
+                type="button"
+                className="modal-close-btn hover:bg-gray-700 rounded-full w-11 h-11 flex items-center justify-center"
+                aria-label="Close item details"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeDetails();
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
           {renderItemForTooltip && (
             <>
               {renderTooltipContent(renderItemForTooltip, itemEligible, (setId: string) => getEquippedSetItemsCountForLoadout(setId))}
@@ -506,10 +565,10 @@ export default function Tooltip({ children, item, className = '', isTalismanTool
       )}
 
       {/* Mirror tooltip over opposite side slot/talisman */}
-      {isVisible && mirrorVisible && renderOtherItemForTooltip && createPortal(
+      {isVisible && showMirror && mirrorVisible && renderOtherItemForTooltip && createPortal(
         <div
           ref={mirrorTooltipRef}
-          className={`fixed z-[10990] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 pointer-events-none`}
+          className={`tooltip-surface fixed z-[10990] bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 dark:border-gray-600 p-2 pointer-events-none`}
           style={{ left: mirrorPosition.x, top: mirrorPosition.y, width: TOOLTIP_WIDTH, maxWidth: TOOLTIP_WIDTH, transform: `scale(${uiScale})`, transformOrigin: 'top left' }}
         >
           {renderTooltipContent(renderOtherItemForTooltip, otherEligible, (setId: string) => {

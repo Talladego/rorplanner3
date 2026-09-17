@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { loadoutService } from '../../services/loadout/loadoutService';
-import { RENOWN_ABILITIES, DEFAULT_COST_TOTALS } from '../../services/loadout/renownConfig';
+import { RENOWN_ABILITIES, DEFAULT_COST_TOTALS, DEFAULT_STAT_TOTALS } from '../../services/loadout/renownConfig';
 import { useLoadoutById } from '../../hooks/useLoadoutById';
 import { ItemRarity } from '../../types';
 import { getRarityColor } from '../../utils/rarityColors';
@@ -8,7 +8,7 @@ import HoverTooltip from '../tooltip/HoverTooltip';
 
 const ABILITIES = RENOWN_ABILITIES;
 
-const LEVEL_TOTALS = [0, 4, 16, 38, 72, 120];
+const LEVEL_TOTALS = DEFAULT_STAT_TOTALS;
 const roman = ['', 'I', 'II', 'III', 'IV', 'V']; // map: 0->'', 1->I, 2->II, 3->III, 4->IV, 5->V
 
 function LevelSelect({ value, onChange, maxLevel, statName, percent, totalsOverride, visibleMaxLevel = 5 }: { value: number; onChange: (v: number) => void; maxLevel: number; statName: string; percent?: boolean; totalsOverride?: number[]; visibleMaxLevel?: number }) {
@@ -58,10 +58,7 @@ export default memo(function RenownPanel({ loadoutId, embedded = false }: { load
   const renderAbilityTooltip = (ab: (typeof ABILITIES)[number], level: number) => {
     const totals = (ab.customTotals && ab.customTotals.length ? ab.customTotals : LEVEL_TOTALS);
     const lvl = Math.max(0, Math.min(5, Math.trunc(level)));
-    let total = totals[Math.max(0, Math.min(5, lvl))] ?? 0;
-    // Regeneration should match compare stats panel: display as Hit Points Every 4 Seconds
-    const isRegen = ab.key === 'regeneration';
-    if (isRegen) total = total * 4;
+    const total = totals[Math.max(0, Math.min(5, lvl))] ?? 0;
     const unit = ab.percent ? '%' : '';
     const titleColor = (lvl: number) => {
       const rarityLevels: ItemRarity[] = [ItemRarity.UTILITY, ItemRarity.COMMON, ItemRarity.UNCOMMON, ItemRarity.RARE, ItemRarity.VERY_RARE, ItemRarity.MYTHIC];
@@ -73,11 +70,11 @@ export default memo(function RenownPanel({ loadoutId, embedded = false }: { load
         // Base line without numbers
         switch (ab.key) {
           case 'deftDefender': return ['Increases Dodge and Disrupt'];
+          case 'focusedPower': return ['Increases Parry, Dodge and Disrupt Strikethrough'];
           case 'hardyConcession': return ['Reduces Incoming Damage', 'Reduces Outgoing Damage', 'Reduces Outgoing Healing'];
           case 'futileStrikes': return ['Reduces chance to be critically hit'];
           case 'trivialBlows': return ['Reduces Critical Damage Taken'];
           default: {
-            if (isRegen) return ['Increases Hit Points Every 4 Seconds'];
             return [`Increases ${ab.stat}`];
           }
         }
@@ -86,6 +83,12 @@ export default memo(function RenownPanel({ loadoutId, embedded = false }: { load
       switch (ab.key) {
         case 'deftDefender':
           return [`Increases Dodge by ${Math.abs(total)}${unit}`, `Increases Disrupt by ${Math.abs(total)}${unit}`];
+        case 'focusedPower':
+          return [
+            `Increases Parry Strikethrough by ${Math.abs(total)}${unit}`,
+            `Increases Dodge Strikethrough by ${Math.abs(total)}${unit}`,
+            `Increases Disrupt Strikethrough by ${Math.abs(total)}${unit}`,
+          ];
         case 'hardyConcession':
           return [`Reduces Incoming Damage by ${Math.abs(total)}${unit}`, `Reduces Outgoing Damage by ${Math.abs(total)}${unit}`, `Reduces Outgoing Healing by ${Math.abs(total)}${unit}`];
         case 'futileStrikes':
@@ -93,10 +96,7 @@ export default memo(function RenownPanel({ loadoutId, embedded = false }: { load
         case 'trivialBlows':
           return [`Reduces Critical Damage Taken by ${Math.abs(total)}${unit}`];
         default:
-          return [isRegen
-            ? `Increases Hit Points Every 4 Seconds by ${Math.abs(total)}`
-            : `Increases ${ab.stat} by ${Math.abs(total)}${unit}`
-          ];
+          return [`Increases ${ab.stat} by ${Math.abs(total)}${unit}`];
       }
     })();
 
@@ -144,16 +144,16 @@ export default memo(function RenownPanel({ loadoutId, embedded = false }: { load
           return (
           <div
             key={ab.key}
-            className="flex items-center justify-between gap-1 rounded px-1 -mx-1 hover:bg-gray-800/60 hover:ring-1 hover:ring-gray-700 transition-colors"
+            className="row-hover flex items-center justify-between gap-1 rounded px-1 -mx-1"
           >
             <HoverTooltip content={renderAbilityTooltip(ab, clamped)}>
               <div className="flex items-center gap-1 min-w-0">
                 {/* Icon placeholder; will use ab.iconUrl when provided */}
-                <div className="w-5 h-5 rounded-sm bg-gray-700/70 overflow-hidden flex items-center justify-center flex-none">
+                <div className="w-5 h-5 rounded-sm bg-[var(--element)] overflow-hidden flex items-center justify-center flex-none">
                   {ab.iconUrl ? (
                     <img src={ab.iconUrl} alt="" className="w-5 h-5 object-cover" draggable={false} />
                   ) : (
-                    <div className="w-4 h-4 bg-gray-600 rounded-sm" />
+                    <div className="w-4 h-4 bg-[var(--border)] rounded-sm" />
                   )}
                 </div>
                 <div className="min-w-0">
@@ -164,9 +164,9 @@ export default memo(function RenownPanel({ loadoutId, embedded = false }: { load
             <LevelSelect
               value={currentLevel}
               maxLevel={maxLevel}
-              statName={ab.key === 'hardyConcession' ? 'Damage & Healing' : (ab.key === 'regeneration' ? 'Hit Points Every 4 Seconds' : ab.stat)}
+              statName={ab.key === 'hardyConcession' ? 'Damage & Healing' : ab.stat}
               percent={!!ab.percent}
-              totalsOverride={ab.key === 'regeneration' && ab.customTotals ? ab.customTotals.map(v => v * 4) : ab.customTotals}
+              totalsOverride={ab.customTotals}
               visibleMaxLevel={ab.capLevel ?? 5}
               onChange={(lvl) => {
                 if (loadoutId) loadoutService.setRenownAbilityLevelForLoadout(loadoutId, ab.key, lvl);

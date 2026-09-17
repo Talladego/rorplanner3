@@ -2,6 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        var light = window.matchMedia('(prefers-color-scheme: light)').matches;
+        document.documentElement.classList.toggle('dark', !light);
+        document.documentElement.classList.toggle('light', light);
+        document.documentElement.style.colorScheme = light ? 'light' : 'dark';
+      })();
+    </script>
   <!-- Favicon: PNG (preferred) -->
   <link rel="icon" href="/rorplanner.png" type="image/png" />
     <!-- Performance: warm up connection to external icon host -->
