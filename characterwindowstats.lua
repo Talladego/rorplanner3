@@ -347,7 +347,7 @@ function CharacterWindow.GetWeaponSkillTooltipDesc()
 end
 
 function CharacterWindow.GetInitiativeTooltipDesc()
-    local CritHit = 15 + GameData.Player.battleLevelWithRenown / 4.0 - g_currentInitiative / 100 * 5
+    local CritHit = 10 + GameData.Player.battleLevelWithRenown / 4.0 - g_currentInitiative / 100 * 5
     -- Adding 100 and then subtracting 100 to be able to show negative numbers
     -- GetBonus always returns a positive number
     CritHit = CharacterWindow.CalculateValueWithBonus( GameData.BonusTypes.EBONUS_CRITICAL_HIT_RATE_REDUCTION, CritHit + 100) - 100

@@ -1,6 +1,7 @@
 import { Career, Loadout, LoadoutItem, EquipSlot, LoadoutSide } from '../../types';
 import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 import { loadoutService } from './loadoutService';
+import { emptyRenownAbilities, isActiveRenownAbilityKey, RENOWN_PACK_KEYS } from './renownConfig';
 
 class UrlService {
 	private navigateCb: ((path: string, options?: { replace?: boolean }) => void) | null = null;
@@ -119,11 +120,7 @@ class UrlService {
 		const params = this.getSearchParams();
 		const hasAny = Array.from(params.keys()).some((k) => k.startsWith(`${prefix}.`));
 		if (!hasAny) return null;
-		const loadout = { career: null as Career | null, level: 40, renownRank: 80, renownAbilities: {
-			might: 0, bladeMaster: 0, marksman: 0, impetus: 0, acumen: 0, resolve: 0, fortitude: 0, vigor: 0,
-			opportunist: 0, spiritualRefinement: 0, regeneration: 0,
-			reflexes: 0, defender: 0, deftDefender: 0, hardyConcession: 0, futileStrikes: 0, trivialBlows: 0,
-		} as NonNullable<Loadout['renownAbilities']>, items: {} as Record<string, { item: { id: string } | null; talismans: ({ id: string } | null)[] }> };
+		const loadout = { career: null as Career | null, level: 40, renownRank: 80, renownAbilities: emptyRenownAbilities(), items: {} as Record<string, { item: { id: string } | null; talismans: ({ id: string } | null)[] }> };
 		const MONIKER_TO_SLOT: Record<string, string> = {
 			mh: 'MAIN_HAND',
 			oh: 'OFF_HAND',
@@ -188,10 +185,12 @@ class UrlService {
 					loadout.items[slot].talismans[index] = { id: value };
 				}
 			} else if (key.startsWith(`${prefix}.renown.`)) {
-				const rKey = key.substring(`${prefix}.renown.`.length) as keyof NonNullable<Loadout['renownAbilities']>;
+				const rKey = key.substring(`${prefix}.renown.`.length);
 				const n = Math.max(0, Math.min(5, Math.trunc(parseInt(value, 10) || 0)));
-				// Only set if value is > 0 to keep distinction; remaining will be zeroed during apply
-				if (n > 0) (loadout.renownAbilities as Record<string, number>)[rKey as string] = n;
+				// Skip retired Regeneration and unknown keys; remaining zeros are filled by emptyRenownAbilities
+				if (n > 0 && isActiveRenownAbilityKey(rKey)) {
+					(loadout.renownAbilities as Record<string, number>)[rKey] = n;
+				}
 			}
 		}
 		return loadout;
@@ -241,8 +240,9 @@ class UrlService {
 				// Apply renown abilities from URL (reset first to avoid residue)
 				loadoutService.resetRenownAbilitiesForLoadout(aId);
 				Object.entries(a.renownAbilities || {}).forEach(([rk, lvl]) => {
+					if (!isActiveRenownAbilityKey(rk)) return;
 					const n = Math.max(0, Math.min(5, Math.trunc(Number(lvl) || 0)));
-					if (n > 0) loadoutService.setRenownAbilityLevelForLoadout(aId, rk as keyof NonNullable<Loadout['renownAbilities']>, n);
+					if (n > 0) loadoutService.setRenownAbilityLevelForLoadout(aId, rk, n);
 				});
 				const charAFlag = params.get('loadCharacterA');
 				if (charAFlag) loadoutService.setCharacterStatusForLoadout(aId, true, charAFlag);
@@ -277,8 +277,9 @@ class UrlService {
 				// Apply renown abilities from URL (reset first to avoid residue)
 				loadoutService.resetRenownAbilitiesForLoadout(bId);
 				Object.entries(b.renownAbilities || {}).forEach(([rk, lvl]) => {
+					if (!isActiveRenownAbilityKey(rk)) return;
 					const n = Math.max(0, Math.min(5, Math.trunc(Number(lvl) || 0)));
-					if (n > 0) loadoutService.setRenownAbilityLevelForLoadout(bId, rk as keyof NonNullable<Loadout['renownAbilities']>, n);
+					if (n > 0) loadoutService.setRenownAbilityLevelForLoadout(bId, rk, n);
 				});
 				const charBFlag = params.get('loadCharacterB');
 				if (charBFlag) loadoutService.setCharacterStatusForLoadout(bId, true, charBFlag);
@@ -388,12 +389,12 @@ class UrlService {
 	}
 
 	private packRenownAbilities(ra: NonNullable<Loadout['renownAbilities']>): string | '' {
-		// Order of keys must be stable
-		const keys: (keyof NonNullable<Loadout['renownAbilities']>)[] = [
-			'might','bladeMaster','marksman','impetus','acumen','resolve','fortitude','vigor',
-			'opportunist','spiritualRefinement','regeneration','reflexes','defender','deftDefender','hardyConcession','futileStrikes','trivialBlows',
-		];
-		const vals = keys.map(k => Math.max(0, Math.min(5, Math.trunc(Number(ra[k] as number || 0)))));
+		// Order of keys must be stable. Retired `regeneration` stays in the bit layout.
+		const vals = RENOWN_PACK_KEYS.map((k) => {
+			if (k === 'regeneration') return 0;
+			const n = Number((ra as Record<string, number | undefined>)[k] || 0);
+			return Math.max(0, Math.min(5, Math.trunc(n)));
+		});
 		if (vals.every(v => v === 0)) return '';
 		// Pack 3 bits per value into a byte array
 		let bitBuf = 0; let bitCount = 0; const bytes: number[] = [];
@@ -427,10 +428,7 @@ class UrlService {
 	}
 
 	private unpackRenownAbilities(packed: string): NonNullable<Loadout['renownAbilities']> {
-		const res = {
-			might: 0, bladeMaster: 0, marksman: 0, impetus: 0, acumen: 0, resolve: 0, fortitude: 0, vigor: 0,
-			opportunist: 0, spiritualRefinement: 0, regeneration: 0, reflexes: 0, defender: 0, deftDefender: 0, hardyConcession: 0, futileStrikes: 0, trivialBlows: 0,
-		} as NonNullable<Loadout['renownAbilities']>;
+		const res = emptyRenownAbilities();
 		try {
 			const b64 = packed.replace(/-/g, '+').replace(/_/g, '/');
 							const bytes: number[] = (() => {
@@ -444,19 +442,18 @@ class UrlService {
 						}
 						return [];
 					})();
-			const keys: (keyof NonNullable<Loadout['renownAbilities']>)[] = [
-				'might','bladeMaster','marksman','impetus','acumen','resolve','fortitude','vigor',
-				'opportunist','spiritualRefinement','regeneration','reflexes','defender','deftDefender','hardyConcession','futileStrikes','trivialBlows',
-			];
 					let bitBuf = 0; let bitCount = 0; let bi = 0;
-			for (let i = 0; i < keys.length; i++) {
+			for (let i = 0; i < RENOWN_PACK_KEYS.length; i++) {
 				while (bitCount < 3) {
 					const byte = bytes[bi++];
 					if (byte === undefined) break;
 					bitBuf |= byte << bitCount; bitCount += 8;
 				}
 				const v = bitBuf & 0x7; bitBuf >>= 3; bitCount -= 3;
-						(res)[keys[i]] = v;
+				const key = RENOWN_PACK_KEYS[i];
+				if (key !== 'regeneration' && isActiveRenownAbilityKey(key)) {
+					res[key] = v;
+				}
 			}
 		} catch {
 			// ignore malformed packed data, leave zeros

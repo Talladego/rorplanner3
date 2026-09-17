@@ -224,62 +224,57 @@ export default function DualEquipmentLayout() {
     );
   };
 
+  const loadoutColumn = (label: 'A' | 'B') => {
+    const showRenown = label === 'A' ? showRenownA : showRenownB;
+    const side = label === 'A' ? sideA : sideB;
+    const border = label === 'A' ? 'panel-border-green-600' : 'panel-border-red-600';
+    return (
+      <div className="col-span-1">
+        <div className={`panel-container ${border} h-full flex flex-col`}>
+          {sideIndicator(label)}
+          <div className="field-group flex-1 min-h-0">
+            {buttonsRow(label)}
+            {showRenown ? (
+              <Suspense fallback={null}>
+                <RenownPanel loadoutId={side?.id || null} embedded />
+              </Suspense>
+            ) : (
+              <EquipmentPanel side={label} selectedCareer={side?.career || ''} loadoutId={side?.id || null} iconOnly hideHeading compact />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const compareColumn = (
+    <div className="col-span-1">
+      <div className="panel-container panel-border-blue-500 h-full flex flex-col">
+        <h2 className="panel-heading font-brand">Compare Stats</h2>
+        <Suspense fallback={<div className="text-xs text-muted p-2">Loading stats…</div>}>
+          <StatsComparePanel />
+        </Suspense>
+      </div>
+    </div>
+  );
+
+  const summaryModal = summaryOpenFor ? (
+    <Suspense fallback={null}>
+      <LoadoutSummaryModal
+        open={true}
+        onClose={() => setSummaryOpenFor(null)}
+        loadout={summaryOpenFor === 'A' ? sideA : sideB}
+        sideLabel={summaryOpenFor}
+      />
+    </Suspense>
+  ) : null;
+
   return (
     <div className="grid grid-cols-3 gap-4">
-      {/* Left panel: Equipment A or Renown */}
-      <div className="col-span-1">
-        <div className="panel-container panel-border-green-600 h-full flex flex-col">
-          {sideIndicator('A')}
-          <div className="field-group flex-1 min-h-0">
-            {buttonsRow('A')}
-            {showRenownA ? (
-              <Suspense fallback={null}>
-                <RenownPanel loadoutId={sideA?.id || null} embedded />
-              </Suspense>
-            ) : (
-              <EquipmentPanel side="A" selectedCareer={sideA?.career || ''} loadoutId={sideA?.id || null} iconOnly hideHeading compact />
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Middle panel: Stats compare */}
-      <div className="col-span-1">
-        <div className="panel-container panel-border-blue-500 h-full flex flex-col">
-          <h2 className="panel-heading font-brand">Compare Stats</h2>
-          <Suspense fallback={<div className="text-xs text-muted p-2">Loading stats…</div>}>
-            <StatsComparePanel />
-          </Suspense>
-        </div>
-      </div>
-
-      {/* Right panel: Equipment B or Renown */}
-      <div className="col-span-1">
-        <div className="panel-container panel-border-red-600 h-full flex flex-col">
-          {sideIndicator('B')}
-          <div className="field-group flex-1 min-h-0">
-            {buttonsRow('B')}
-            {showRenownB ? (
-              <Suspense fallback={null}>
-                <RenownPanel loadoutId={sideB?.id || null} embedded />
-              </Suspense>
-            ) : (
-              <EquipmentPanel side="B" selectedCareer={sideB?.career || ''} loadoutId={sideB?.id || null} iconOnly hideHeading compact />
-            )}
-          </div>
-        </div>
-      </div>
-      {/* Summary Modal */}
-      {summaryOpenFor && (
-        <Suspense fallback={null}>
-          <LoadoutSummaryModal
-          open={true}
-          onClose={() => setSummaryOpenFor(null)}
-          loadout={summaryOpenFor === 'A' ? sideA : sideB}
-          sideLabel={summaryOpenFor}
-          />
-        </Suspense>
-      )}
+      {loadoutColumn('A')}
+      {compareColumn}
+      {loadoutColumn('B')}
+      {summaryModal}
     </div>
   );
 }

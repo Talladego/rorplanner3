@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
+/* Tailwind `dark:` utilities follow the browser scheme (not a missing html.dark class). */
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
 :root {
+  color-scheme: dark;
   /* App background (black) */
   --background: #0a0a0a;
   --foreground: #f8f9fa;
@@ -21,37 +25,61 @@
   --text-muted: #888888;
   --accent: #555555;
   --accent-hover: #666666;
+  --item-color-common: #ffffff;
+  --hover-ring: rgba(255, 255, 255, 0.65);
+  --hover-ring-solid: #ffffff;
+  --hover-glow: rgba(255, 255, 255, 0.25);
+  --hover-list-ring: rgba(255, 255, 255, 0.3);
+  --row-hover: rgba(255, 255, 255, 0.06);
+  --row-hover-ring: #444444;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --background: #ffffff;
-    --foreground: #171717;
-    /* Light theme equivalents for triad */
-    --panel: #f1f3f5;         /* Darker of light greys for panels */
-    --panel-hover: #e9ecef;
-    --frame: #f8f9fa;         /* Medium light for frames */
-    --frame-border: #dee2e6;
-    --element: #ffffff;       /* Brightest for inner elements */
-    --element-hover: #f8f9fa;
-    /* Legacy aliases */
+    color-scheme: light;
+    /* Soft cool page so white panels lift instead of washing out */
+    --background: #e9ecef;
+    --foreground: #212529;
+    --panel: #ffffff;
+    --panel-hover: #f8f9fa;
+    --frame: #f1f3f5;
+    --frame-border: #adb5bd;
+    --element: #f8f9fa;
+    --element-hover: #e9ecef;
     --surface: var(--panel);
     --surface-hover: var(--panel-hover);
-    --border: #dee2e6;
-    --border-hover: #ced4da;
+    --border: #ced4da;
+    --border-hover: #adb5bd;
     --text-primary: #212529;
-    --text-secondary: #6c757d;
-    --text-muted: #adb5bd;
-    --accent: #6c757d;
-    --accent-hover: #5a6268;
+    --text-secondary: #495057;
+    --text-muted: #5c636a;
+    --accent: #343a40;
+    --accent-hover: #212529;
+    --item-color-common: #212529;
+    --hover-ring: rgba(0, 0, 0, 0.45);
+    --hover-ring-solid: #212529;
+    --hover-glow: rgba(0, 0, 0, 0.2);
+    --hover-list-ring: rgba(0, 0, 0, 0.28);
+    --row-hover: rgba(0, 0, 0, 0.05);
+    --row-hover-ring: #adb5bd;
   }
 }
 
-/* Ensure the page background always fills beyond app containers */
+/* Ensure the page background always fills beyond app containers.
+   scrollbar-gutter keeps clientWidth stable when the vertical bar appears so
+   ScaleToFit does not oscillate; overflow-x clips any remaining subpixel bleed. */
+html {
+  scrollbar-gutter: stable;
+  overflow-x: hidden;
+}
 html, body {
   height: 100%;
   background-color: var(--background);
   color: var(--text-primary);
+}
+body {
+  overflow-x: hidden;
+  color-scheme: inherit;
 }
 
 /* Custom Component Styles */
@@ -64,6 +92,12 @@ html, body {
   /* Default text color inside panels to ensure readability on dark backgrounds */
   color: var(--text-primary);
   overflow: visible; /* allow absolute/fixed dropdowns to escape the panel */
+}
+
+@media (prefers-color-scheme: light) {
+  .panel-container {
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 6px 16px rgba(15, 23, 42, 0.06);
+  }
 }
 
 /* Compact padding variant for Tier 1 panels when Tier 2 is the primary content */
@@ -213,10 +247,6 @@ html, body {
   border: 1px solid var(--border);
 }
 
-.dark .modal-container {
-  background-color: rgb(31 41 55);
-}
-
 /* Modal variant to host a Tier 1 panel inside without double backgrounds/borders */
 .modal-as-panel {
   background-color: transparent !important;
@@ -237,6 +267,26 @@ html, body {
   line-height: 1.5rem;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.modal-close-btn {
+  color: var(--text-primary);
+}
+.modal-close-btn:hover {
+  background-color: var(--element-hover);
+}
+
+.row-hover {
+  transition: background-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+.row-hover:hover {
+  background-color: var(--row-hover);
+  box-shadow: 0 0 0 1px var(--row-hover-ring);
+}
+
+/* Dark popovers keep common names readable even when the page is in light mode */
+.tooltip-surface {
+  --item-color-common: #f8f9fa;
 }
 
 /* Brand font utility for the main title */
@@ -324,7 +374,7 @@ html, body {
 /* On hover, talisman images pop and brighten */
 .talisman-slot:hover img {
   transform: scale(1.05);
-  filter: brightness(1.1) drop-shadow(0 0 2px rgba(255,255,255,0.25));
+  filter: brightness(1.1) drop-shadow(0 0 2px var(--hover-glow));
 }
 
 /* Group container for related fields (dashed rounded frame) */
@@ -352,9 +402,10 @@ html, body {
 /* Brighter outline on hover for primary/secondary paired highlight */
 /* Items: thicker and more rounded */
 .hover-bright .icon-frame,
-.hover-bright.icon-frame {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.65);
-  border-color: #fff !important;
+.hover-bright.icon-frame,
+.equipment-icon:hover .icon-frame {
+  box-shadow: 0 0 0 3px var(--hover-ring);
+  border-color: var(--hover-ring-solid) !important;
   border-width: 2px;
   border-style: solid; /* keep highlight crisp and solid */
   border-radius: 0.375rem; /* slightly rounder corners for clarity */
@@ -363,15 +414,15 @@ html, body {
 /* Apply the same hover-bright ring to empty frames */
 .hover-bright .icon-frame-empty,
 .hover-bright.icon-frame-empty {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.65);
-  border-color: #fff !important;
+  box-shadow: 0 0 0 3px var(--hover-ring);
+  border-color: var(--hover-ring-solid) !important;
   border-width: 2px;
   border-style: solid;
   border-radius: 0.375rem;
 }
 .equipment-icon:hover .icon-frame-empty {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.65);
-  border-color: #fff !important;
+  box-shadow: 0 0 0 3px var(--hover-ring);
+  border-color: var(--hover-ring-solid) !important;
   border-width: 2px;
   border-style: solid;
   border-radius: 0.375rem;
@@ -379,20 +430,20 @@ html, body {
 
 /* Talismans: keep thinner glow */
 .hover-bright.talisman-slot {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.65);
-  border-color: #fff !important;
+  box-shadow: 0 0 0 2px var(--hover-ring);
+  border-color: var(--hover-ring-solid) !important;
 }
 
-/* Apply white ring on hover for empty talisman frames as well */
+/* Apply theme-aware ring on hover for empty talisman frames as well */
 .talisman-slot.icon-frame-empty:hover,
 .talisman-slot:hover .icon-frame-empty,
 .talisman-slot:not(.invalid):hover {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.65);
-  border-color: #fff !important;
+  box-shadow: 0 0 0 2px var(--hover-ring);
+  border-color: var(--hover-ring-solid) !important;
 }
 
 .hover-bright img {
-  filter: brightness(1.1) drop-shadow(0 0 2px rgba(255,255,255,0.25));
+  filter: brightness(1.1) drop-shadow(0 0 2px var(--hover-glow));
 }
 
 /* Scale item/talisman icons on hover for parity */
@@ -410,11 +461,11 @@ html, body {
 .hover-bright .icon-frame-empty img,
 .hover-bright.icon-frame-empty img {
   border-radius: 0.375rem;
-  filter: brightness(1.1) drop-shadow(0 0 2px rgba(255,255,255,0.25));
+  filter: brightness(1.1) drop-shadow(0 0 2px var(--hover-glow));
 }
 .equipment-icon:hover .icon-frame-empty img {
   border-radius: 0.375rem;
-  filter: brightness(1.1) drop-shadow(0 0 2px rgba(255,255,255,0.25));
+  filter: brightness(1.1) drop-shadow(0 0 2px var(--hover-glow));
   transform: scale(1.05);
 }
 
@@ -429,25 +480,27 @@ html, body {
 
 /* Empty item slots: apply the same pop/glow on hover as slotted item icons */
 .equipment-icon:hover .icon-frame-empty {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.65);
-  border-color: #fff !important;
+  box-shadow: 0 0 0 3px var(--hover-ring);
+  border-color: var(--hover-ring-solid) !important;
   border-width: 2px;
   border-style: solid;
   border-radius: 0.375rem;
 }
 .equipment-icon:hover .icon-frame-empty img {
   border-radius: 0.375rem;
-  filter: brightness(1.1) drop-shadow(0 0 2px rgba(255,255,255,0.25));
+  filter: brightness(1.1) drop-shadow(0 0 2px var(--hover-glow));
 }
 
 /* When invalid, switch hover highlight to red for both items and talismans */
 .invalid.hover-bright .icon-frame,
-.invalid.hover-bright.icon-frame {
+.invalid.hover-bright.icon-frame,
+.equipment-icon.invalid:hover .icon-frame {
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.7); /* red-500 */
   border-color: rgb(239 68 68) !important;
 }
 
-.invalid.hover-bright.talisman-slot {
+.invalid.hover-bright.talisman-slot,
+.talisman-slot.invalid:hover {
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.7);
   border-color: rgb(239 68 68) !important;
 }
@@ -532,8 +585,10 @@ html, body {
   letter-spacing: 0.05em;
 }
 
-.dark .stats-section-title {
-  color: rgb(96 165 250);
+@media (prefers-color-scheme: dark) {
+  .stats-section-title {
+    color: rgb(96 165 250);
+  }
 }
 
 /* Subsection title: same color, slightly smaller */
@@ -547,31 +602,25 @@ html, body {
   letter-spacing: 0.05em;
 }
 
-.dark .stats-subsection-title {
-  color: rgb(96 165 250);
+@media (prefers-color-scheme: dark) {
+  .stats-subsection-title {
+    color: rgb(96 165 250);
+  }
 }
 
 .stats-empty-message {
   text-align: center;
-  color: rgb(107 114 128);
+  color: var(--text-muted);
   padding: 1rem;
   font-style: italic;
   font-size: 0.875rem;
 }
 
-.dark .stats-empty-message {
-  color: rgb(156 163 175);
-}
-
 .stats-loadout-info {
   padding: 0.75rem;
-  background-color: rgb(249 250 251);
+  background-color: var(--element);
   border-radius: 0.5rem;
   margin-bottom: 1rem;
-}
-
-.dark .stats-loadout-info {
-  background-color: rgb(31 41 55);
 }
 
 /* Item rarity and set colors (replacing inline style usages) */
@@ -580,8 +629,9 @@ html, body {
 .item-color-very-rare { color: #9238d0; }
 .item-color-rare { color: #0064c3; }
 .item-color-uncommon { color: #18f000; }
-.item-color-common { color: #ffffff; }
+.item-color-common { color: var(--item-color-common); }
 .item-color-utility { color: #969696; }
 
 /* Tooltip position helper */
 .tooltip-shift-down { transform: translateY(100%); }
+

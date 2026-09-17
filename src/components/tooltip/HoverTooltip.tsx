@@ -9,11 +9,13 @@ type HoverTooltipProps = {
   placement?: 'left' | 'right' | 'bottom';
   className?: string;
   fixedWidth?: number; // optional: force a fixed width for normalization
+  /** When true, render children only (used on tablet empty slots where tap already acts). */
+  disabled?: boolean;
 };
 
 // Lightweight hover tooltip suitable for inline rows (no portals)
 // Positions below the trigger; hides on scroll via CSS overflow of parent containers
-export default function HoverTooltip({ content, children, placement = 'right', className, fixedWidth }: HoverTooltipProps) {
+export default function HoverTooltip({ content, children, placement = 'right', className, fixedWidth, disabled = false }: HoverTooltipProps) {
   const uiScale = useScale();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -114,7 +116,7 @@ export default function HoverTooltip({ content, children, placement = 'right', c
       if (y + tipRect.height > window.innerHeight) y = window.innerHeight - tipRect.height - margin;
       if (x < margin) x = margin;
       if (y < margin) y = margin;
-      setPos({ x, y });
+      setPos((prev) => (Math.abs(prev.x - x) < 0.5 && Math.abs(prev.y - y) < 0.5 ? prev : { x, y }));
     };
     window.addEventListener('scroll', update, true);
     window.addEventListener('resize', update);
@@ -125,13 +127,22 @@ export default function HoverTooltip({ content, children, placement = 'right', c
     };
   }, [open, placement]);
 
+  if (disabled) {
+    return <>{children}</>;
+  }
+
   return (
-    <div ref={triggerRef} className={`relative block ${className || ''}`} onMouseEnter={handleEnter} onMouseLeave={() => setOpen(false)}>
+    <div
+      ref={triggerRef}
+      className={`relative block ${className || ''}`}
+      onMouseEnter={handleEnter}
+      onMouseLeave={() => setOpen(false)}
+    >
       {children}
       {open && createPortal(
         <span
           ref={tooltipRef}
-          className={'fixed z-[11000] rounded-lg bg-gray-900 dark:bg-gray-800 p-2 text-xs leading-snug text-white shadow-lg border border-gray-700 dark:border-gray-600 pointer-events-none whitespace-normal'}
+          className={`tooltip-surface fixed z-[11000] rounded-lg bg-gray-900 dark:bg-gray-800 p-2 text-xs leading-snug text-white shadow-lg border border-gray-700 dark:border-gray-600 pointer-events-none whitespace-normal`}
           style={{ left: pos.x, top: pos.y, width: fixedWidth ?? undefined, maxWidth: fixedWidth ?? 360, transform: `scale(${uiScale})`, transformOrigin: 'top left' }}
           role="tooltip"
         >

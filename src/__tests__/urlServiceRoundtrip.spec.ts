@@ -11,7 +11,7 @@ describe('urlService encode/decode roundtrip (compare, compact keys, no trophies
       renownRank: 80,
       renownAbilities: {
         might: 3, bladeMaster: 0, marksman: 1, impetus: 0, acumen: 0, resolve: 0, fortitude: 0, vigor: 0,
-        opportunist: 0, spiritualRefinement: 0, regeneration: 0, reflexes: 2, defender: 0, deftDefender: 0, hardyConcession: 0, futileStrikes: 0, trivialBlows: 0,
+        opportunist: 0, spiritualRefinement: 0, focusedPower: 0, reflexes: 2, defender: 0, deftDefender: 0, hardyConcession: 0, futileStrikes: 0, trivialBlows: 0,
       },
       items: {
         [EquipSlot.MAIN_HAND]: { item: { id: 'item-mh' } as any, talismans: [{ id: 'tal-0' } as any, null] },
@@ -68,6 +68,8 @@ describe('urlService encode/decode roundtrip (compare, compact keys, no trophies
       expect(decoded!.renownAbilities.might).toBe(3);
       expect(decoded!.renownAbilities.marksman).toBe(1);
       expect(decoded!.renownAbilities.reflexes).toBe(2);
+      expect(decoded!.renownAbilities.focusedPower).toBe(0);
+      expect(decoded!.renownAbilities.regeneration ?? 0).toBe(0);
       // Items preserved (no trophies)
       expect(decoded!.items.MAIN_HAND.item!.id).toBe('item-mh');
       expect(decoded!.items.MAIN_HAND.talismans[0]!.id).toBe('tal-0');
@@ -78,6 +80,60 @@ describe('urlService encode/decode roundtrip (compare, compact keys, no trophies
     } finally {
   // Restore
   (urlService as any).getSearchParams = orig;
+    }
+  });
+
+  it('round-trips Focused Power and ignores packed Regeneration from old URLs', () => {
+    const withFocus = makeLoadout({
+      renownAbilities: {
+        might: 0, bladeMaster: 0, marksman: 0, impetus: 0, acumen: 0, resolve: 0, fortitude: 0, vigor: 0,
+        opportunist: 0, spiritualRefinement: 0, focusedPower: 4, reflexes: 0, defender: 0, deftDefender: 0,
+        hardyConcession: 0, futileStrikes: 0, trivialBlows: 0, regeneration: 3,
+      },
+    });
+    const params = urlService.encodeLoadoutToUrlWithPrefix('a', withFocus);
+    const qs = new URLSearchParams(params as Record<string, string>).toString();
+    const orig = urlService.getSearchParams.bind(urlService);
+    (urlService as any).getSearchParams = () => new URLSearchParams(qs);
+    try {
+      const decoded = urlService.decodeLoadoutFromUrlWithPrefix('a');
+      expect(decoded!.renownAbilities.focusedPower).toBe(4);
+      expect(decoded!.renownAbilities.regeneration ?? 0).toBe(0);
+    } finally {
+      (urlService as any).getSearchParams = orig;
+    }
+  });
+
+  it('decodes a pre-patch ra= blob that still has the Regeneration slot', () => {
+    // 17 pre-patch keys, 3 bits each. regeneration is index 10.
+    const oldKeys = [
+      'might','bladeMaster','marksman','impetus','acumen','resolve','fortitude','vigor',
+      'opportunist','spiritualRefinement','regeneration','reflexes','defender','deftDefender',
+      'hardyConcession','futileStrikes','trivialBlows',
+    ];
+    const levels: Record<string, number> = { might: 2, regeneration: 3, reflexes: 1 };
+    const vals = oldKeys.map((k) => levels[k] || 0);
+    let bitBuf = 0; let bitCount = 0; const bytes: number[] = [];
+    for (const v of vals) {
+      bitBuf |= (v & 0x7) << bitCount;
+      bitCount += 3;
+      while (bitCount >= 8) {
+        bytes.push(bitBuf & 0xFF);
+        bitBuf >>= 8; bitCount -= 8;
+      }
+    }
+    if (bitCount > 0) bytes.push(bitBuf & 0xFF);
+    const b64 = Buffer.from(Uint8Array.from(bytes)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const orig = urlService.getSearchParams.bind(urlService);
+    (urlService as any).getSearchParams = () => new URLSearchParams(`a.l=40&a.r=80&a.ra=${b64}`);
+    try {
+      const decoded = urlService.decodeLoadoutFromUrlWithPrefix('a');
+      expect(decoded!.renownAbilities.might).toBe(2);
+      expect(decoded!.renownAbilities.reflexes).toBe(1);
+      expect(decoded!.renownAbilities.regeneration ?? 0).toBe(0);
+      expect(decoded!.renownAbilities.focusedPower).toBe(0);
+    } finally {
+      (urlService as any).getSearchParams = orig;
     }
   });
 });

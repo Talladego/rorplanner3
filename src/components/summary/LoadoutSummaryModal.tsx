@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loadout, EquipSlot, StatsSummary } from '../../types';
-import { RENOWN_ABILITIES } from '../../services/loadout/renownConfig';
+import { RENOWN_ABILITIES, DEFAULT_STAT_TOTALS } from '../../services/loadout/renownConfig';
 import { formatCareerName, formatSlotName, formatSummaryStatKey, isPercentSummaryKey, normalizeStatDisplayValue } from '../../utils/formatters';
-import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide } from '../../utils/statsCompareHelpers';
+import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide, computeCompareDisplayValue } from '../../utils/statsCompareHelpers';
 import { getAllToggles } from '../../services/ui/statsToggles';
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { computeAllDamageHealingBonuses } from '../../utils/damageHealingBonuses';
@@ -62,28 +62,11 @@ function buildStatsBlock(loadout: Loadout | null): string {
   const stats: StatsSummary = computeTotalStatsForSide(loadoutService.getActiveSide(), loadout.id || null, empty, includeBaseStats, includeDerivedStats, includeRenownStats);
   // Helper to compute display value same as compare panel
   const computeDisplayValue = (key: keyof StatsSummary, s: StatsSummary, contrib?: Array<{ name: string; totalValue: number }>): number => {
-    if (key === 'outgoingDamage') {
-      const itemPct = Number(s.outgoingDamage || 0);
-      const renownPct = Number(s.outgoingDamagePercent || 0);
-      const mult = (1 + itemPct / 100) * (1 + renownPct / 100);
-      return (mult - 1) * 100;
-    } else if (key === 'incomingDamage') {
-      const itemPct = Number(s.incomingDamage || 0);
-      const renownPct = Number(s.incomingDamagePercent || 0);
-      const mult = (1 + itemPct / 100) * (1 + renownPct / 100);
-      return (mult - 1) * 100;
-    } else if (key === 'outgoingHealPercent') {
-      if (contrib && contrib.length) {
-        const total = Number(s.outgoingHealPercent || 0);
-        const renown = contrib.filter(c => c.name.startsWith('From Renown')).reduce((acc, c) => acc + (Number(c.totalValue) || 0), 0);
-        const itemPct = total - renown;
-        const renownPct = renown;
-        const mult = (1 + itemPct / 100) * (1 + renownPct / 100);
-        return (mult - 1) * 100;
-      }
-      return Number(s.outgoingHealPercent || 0);
-    }
-    return Number(s[key] ?? 0);
+    return computeCompareDisplayValue(key, s, {
+      includeDerivedStats,
+      careerRank: loadout.career ? loadout.level : undefined,
+      contrib,
+    });
   };
 
   // Row builder with formatting consistent with compare panel decimal rules
@@ -105,7 +88,7 @@ function buildStatsBlock(loadout: Loadout | null): string {
       const formatted = isPct
         ? ((includeDerivedStats && hasDerived) ? `${(Math.round(displayV * 10) / 10).toFixed(1)}%` : `${Math.trunc(displayV)}%`)
         : `${needsNorm ? Math.trunc(displayV) : Math.trunc(displayV)}`;
-      rows.push([formatSummaryStatKey(k as string), formatted]);
+      rows.push([formatSummaryStatKey(k as string, { includeDerivedStats }), formatted]);
     });
     return rows;
   };
@@ -187,20 +170,23 @@ function buildSummary(loadout: Loadout | null, opts?: { showItems?: boolean; sho
   // Renown (only show if anything allocated)
   const ra = loadout.renownAbilities || {} as NonNullable<Loadout['renownAbilities']>;
   const roman = (lvl: number) => ['', 'I', 'II', 'III', 'IV', 'V'][Math.max(0, Math.min(5, Math.trunc(lvl)))] || '';
-  const statTotalsDefault = [0, 4, 16, 38, 72, 120];
   const getRenownRow = (key: string, lvl: number): [string, string, string] | null => {
     const def = RENOWN_ABILITIES.find(d => d.key === (key as string));
     if (!def) return null;
     const cap = def.capLevel ?? 5;
     const clamped = Math.max(0, Math.min(cap, Math.trunc(lvl)));
-    const totals = def.customTotals ?? (def.percent ? undefined : statTotalsDefault);
+    const totals = def.customTotals ?? (def.percent ? undefined : DEFAULT_STAT_TOTALS);
     // Special rendering per ability where needed
     if (def.key === 'deftDefender') {
-      const val = (totals || [0, 3, 7, 12, 18, 18])[clamped];
+      const val = (totals || [0, 2, 4, 8, 13, 13])[clamped];
       return [def.label, roman(clamped), `Dodge +${val}%, Disrupt +${val}%`];
     }
+    if (def.key === 'focusedPower') {
+      const val = (totals || [0, 2, 4, 8, 13, 13])[clamped];
+      return [def.label, roman(clamped), `Parry/Dodge/Disrupt Strikethrough +${val}%`];
+    }
     if (def.key === 'hardyConcession') {
-      const table = totals || [0, -1, -3, -6, -10, -15];
+      const table = totals || [0, -2, -4, -7, -10, -10];
       const v = table[clamped];
       // v is negative; show with minus sign
       return [def.label, roman(clamped), `Incoming Damage ${v}% | Outgoing Damage ${v}% | Outgoing Healing ${v}%`];
@@ -218,9 +204,6 @@ function buildSummary(loadout: Loadout | null, opts?: { showItems?: boolean; sho
     }
     if (def.key === 'defender') {
       return [def.label, roman(clamped), `Block +${value}${unit}`];
-    }
-    if (def.key === 'regeneration') {
-      return [def.label, roman(clamped), `Health Regen +${value}`];
     }
     if (def.key === 'futileStrikes') {
       return [def.label, roman(clamped), `Crit Hit Rate Reduction +${value}${unit}`];
@@ -361,7 +344,7 @@ export default function LoadoutSummaryModal({ open, onClose, loadout }: LoadoutS
               <button className="btn btn-primary btn-sm" onClick={handleCopy}>{copied ? 'Copied' : 'Copy'}</button>
               <button 
                 onClick={onClose} 
-                className="modal-close-btn hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+                className="modal-close-btn rounded-full w-8 h-8 flex items-center justify-center transition-colors"
                 aria-label="Close"
               >
                 ✕
@@ -370,15 +353,15 @@ export default function LoadoutSummaryModal({ open, onClose, loadout }: LoadoutS
           </div>
           <div className="field-group">
             <div className="flex items-center gap-4 mb-2">
-          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+          <label className="inline-flex items-center gap-2 text-xs select-none text-primary">
             <input type="checkbox" className="form-checkbox h-3 w-3" checked={showItems} onChange={(e) => setShowItems(e.currentTarget.checked)} />
             Items
           </label>
-          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+          <label className="inline-flex items-center gap-2 text-xs select-none text-primary">
             <input type="checkbox" className="form-checkbox h-3 w-3" checked={showRenown} onChange={(e) => setShowRenown(e.currentTarget.checked)} />
             Renown
           </label>
-          <label className="inline-flex items-center gap-2 text-xs select-none text-gray-200">
+          <label className="inline-flex items-center gap-2 text-xs select-none text-primary">
             <input type="checkbox" className="form-checkbox h-3 w-3" checked={showStats} onChange={(e) => setShowStats(e.currentTarget.checked)} />
             Stats
           </label>

@@ -84,19 +84,22 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   });
 
   useEffect(() => {
+    if (!isOpen || loading) return;
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (modalRef.current && !modalRef.current.contains(target)) {
         onClose();
       }
     };
-    if (isOpen) {
+    // Delay so the opening tap (iPad) cannot immediately dismiss the modal.
+    const timer = window.setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
-    }
+    }, 350);
     return () => {
+      window.clearTimeout(timer);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, loading]);
 
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
@@ -160,7 +163,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
             </h2>
             <div className="flex items-center gap-3">
               {!isTalismanMode && (
-                <div className="inline-flex items-center gap-2 text-xs select-none text-gray-900 dark:text-gray-100">
+                <div className="inline-flex items-center gap-2 text-xs select-none text-primary">
                   <label className="inline-flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -183,7 +186,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                   </HoverTooltip>
                 </div>
               )}
-                <div className="inline-flex items-center gap-2 text-xs select-none text-gray-900 dark:text-gray-100">
+                <div className="inline-flex items-center gap-2 text-xs select-none text-primary">
                   <label className="inline-flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -199,7 +202,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                 </div>
               <button 
                 onClick={onClose} 
-                className="modal-close-btn hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+                className="modal-close-btn rounded-full w-8 h-8 flex items-center justify-center transition-colors"
                 aria-label="Close"
               >
                 ✕
@@ -251,8 +254,12 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
                 <p className="text-red-500 dark:text-red-400 text-sm mb-2">Error loading items</p>
                 <p className="text-muted text-xs">{error}</p>
               </div>
-            ) : pageData.items.length === 0 && !loading ? (
-              <div className="text-center py-8">
+            ) : loading ? (
+              <div className="text-center py-16 min-h-[12rem] pointer-events-none select-none" aria-busy="true" aria-live="polite">
+                <p className="text-muted text-sm">Loading items…</p>
+              </div>
+            ) : pageData.items.length === 0 ? (
+              <div className="text-center py-8 min-h-[6rem] pointer-events-none select-none">
                 <p className="text-muted text-sm">No items found</p>
               </div>
             ) : (
