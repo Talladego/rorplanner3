@@ -59,6 +59,11 @@ describe('Renown patch 17/09/2026', () => {
     expect(RENOWN_ABILITIES.some((a) => a.key === 'focusedPower')).toBe(true);
   });
 
+  it('uses the armory icon for Focused Power (ability 11021 → icon 22257)', () => {
+    const fp = RENOWN_ABILITIES.find((a) => a.key === 'focusedPower');
+    expect(fp?.iconUrl).toBe('https://armory.returnofreckoning.com/icon/22257');
+  });
+
   it('applies Might III as +40 strength', () => {
     const loadoutId = loadoutService.createLoadout('Test', 40, 80);
     loadoutStoreAdapter.setCareer(Career.SLAYER);

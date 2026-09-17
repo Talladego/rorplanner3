@@ -42,7 +42,7 @@ export const RENOWN_ABILITIES: RenownAbilityDef[] = [
   { key: 'opportunist', label: 'Opportunist', stat: 'Offensive Crit Chance', iconUrl: icon(22263), percent: true, customTotals: [0, 2, 4, 8, 12, 12], capLevel: 4, costTotals: COMBAT_COST_TOTALS },
   { key: 'spiritualRefinement', label: 'Spiritual Refinement', stat: 'Healing Crit Chance', iconUrl: icon(22271), percent: true, customTotals: [0, 2, 4, 8, 12, 12], capLevel: 4, costTotals: COMBAT_COST_TOTALS },
   // New: 5|2%, 5|2%, 10|4%, 10|5% → 2 / 4 / 8 / 13 Parry/Dodge/Disrupt Strikethrough
-  { key: 'focusedPower', label: 'Focused Power', stat: 'Parry, Dodge and Disrupt Strikethrough', iconUrl: icon(22262), percent: true, customTotals: [0, 2, 4, 8, 13, 13], capLevel: 4, costTotals: COMBAT_COST_TOTALS },
+  { key: 'focusedPower', label: 'Focused Power', stat: 'Parry, Dodge and Disrupt Strikethrough', iconUrl: icon(22257), percent: true, customTotals: [0, 2, 4, 8, 13, 13], capLevel: 4, costTotals: COMBAT_COST_TOTALS },
   // 5|2%, 5|2%, 10|4%, 10|5% → 2 / 4 / 8 / 13
   { key: 'reflexes', label: 'Reflexes', stat: 'Parry', iconUrl: icon(22264), percent: true, customTotals: [0, 2, 4, 8, 13, 13], capLevel: 4, costTotals: COMBAT_COST_TOTALS },
   // 5|2%, 5|2%, 10|3%, 10|3% → 2 / 4 / 7 / 10 (rank IV still 10% block)
