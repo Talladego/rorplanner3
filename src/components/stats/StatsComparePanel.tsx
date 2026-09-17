@@ -136,7 +136,7 @@ export default function StatsComparePanel() {
     const loadout = side === 'A' ? loadoutA : loadoutB;
     return computeCompareDisplayValue(key, stats, {
       includeDerivedStats,
-      careerRank: loadout?.level,
+      careerRank: loadout?.career ? loadout.level : undefined,
     });
   };
   const makeRows = (defs: Array<{ key: keyof StatsSummary }>, alwaysShow?: Set<string>): Row[] =>

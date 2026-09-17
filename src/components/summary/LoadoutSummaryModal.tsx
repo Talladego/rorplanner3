@@ -64,7 +64,7 @@ function buildStatsBlock(loadout: Loadout | null): string {
   const computeDisplayValue = (key: keyof StatsSummary, s: StatsSummary, contrib?: Array<{ name: string; totalValue: number }>): number => {
     return computeCompareDisplayValue(key, s, {
       includeDerivedStats,
-      careerRank: loadout.level,
+      careerRank: loadout.career ? loadout.level : undefined,
       contrib,
     });
   };

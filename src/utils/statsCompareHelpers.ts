@@ -390,7 +390,7 @@ export function buildContributionsForKeyForSide(
 
   // Derived-on: remaining chance to be crit = career-rank base minus reductions.
   // Flip reduction sources (items, Futile Strikes, initiative) so the tooltip sums to the displayed remaining chance.
-  if (key === 'criticalHitRateReduction' && base && includeDerivedStats) {
+  if (key === 'criticalHitRateReduction' && base?.career && includeDerivedStats) {
     contrib = contrib.map((c) => ({ ...c, totalValue: -c.totalValue }));
     contrib.unshift({
       name: 'From Career Rank (Derived)',
