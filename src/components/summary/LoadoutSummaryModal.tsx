@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loadout, EquipSlot, StatsSummary } from '../../types';
 import { RENOWN_ABILITIES, DEFAULT_STAT_TOTALS } from '../../services/loadout/renownConfig';
 import { formatCareerName, formatSlotName, formatSummaryStatKey, isPercentSummaryKey, normalizeStatDisplayValue } from '../../utils/formatters';
-import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide } from '../../utils/statsCompareHelpers';
+import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide, computeCompareDisplayValue } from '../../utils/statsCompareHelpers';
 import { getAllToggles } from '../../services/ui/statsToggles';
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { computeAllDamageHealingBonuses } from '../../utils/damageHealingBonuses';
@@ -62,28 +62,11 @@ function buildStatsBlock(loadout: Loadout | null): string {
   const stats: StatsSummary = computeTotalStatsForSide(loadoutService.getActiveSide(), loadout.id || null, empty, includeBaseStats, includeDerivedStats, includeRenownStats);
   // Helper to compute display value same as compare panel
   const computeDisplayValue = (key: keyof StatsSummary, s: StatsSummary, contrib?: Array<{ name: string; totalValue: number }>): number => {
-    if (key === 'outgoingDamage') {
-      const itemPct = Number(s.outgoingDamage || 0);
-      const renownPct = Number(s.outgoingDamagePercent || 0);
-      const mult = (1 + itemPct / 100) * (1 + renownPct / 100);
-      return (mult - 1) * 100;
-    } else if (key === 'incomingDamage') {
-      const itemPct = Number(s.incomingDamage || 0);
-      const renownPct = Number(s.incomingDamagePercent || 0);
-      const mult = (1 + itemPct / 100) * (1 + renownPct / 100);
-      return (mult - 1) * 100;
-    } else if (key === 'outgoingHealPercent') {
-      if (contrib && contrib.length) {
-        const total = Number(s.outgoingHealPercent || 0);
-        const renown = contrib.filter(c => c.name.startsWith('From Renown')).reduce((acc, c) => acc + (Number(c.totalValue) || 0), 0);
-        const itemPct = total - renown;
-        const renownPct = renown;
-        const mult = (1 + itemPct / 100) * (1 + renownPct / 100);
-        return (mult - 1) * 100;
-      }
-      return Number(s.outgoingHealPercent || 0);
-    }
-    return Number(s[key] ?? 0);
+    return computeCompareDisplayValue(key, s, {
+      includeDerivedStats,
+      careerRank: loadout.level,
+      contrib,
+    });
   };
 
   // Row builder with formatting consistent with compare panel decimal rules
@@ -105,7 +88,7 @@ function buildStatsBlock(loadout: Loadout | null): string {
       const formatted = isPct
         ? ((includeDerivedStats && hasDerived) ? `${(Math.round(displayV * 10) / 10).toFixed(1)}%` : `${Math.trunc(displayV)}%`)
         : `${needsNorm ? Math.trunc(displayV) : Math.trunc(displayV)}`;
-      rows.push([formatSummaryStatKey(k as string), formatted]);
+      rows.push([formatSummaryStatKey(k as string, { includeDerivedStats }), formatted]);
     });
     return rows;
   };

@@ -11,6 +11,8 @@ import {
   computeDerivedBlockStrikethroughFromStrength,
   computeDerivedBlockStrikethroughFromBallisticSkill,
   computeDerivedBlockStrikethroughFromIntelligence,
+  computeChanceToBeCriticallyHit,
+  computeBaseChanceToBeCriticallyHit,
 } from './derivedStats';
 import type { Contribution } from '../components/stats/StatRow';
 
@@ -236,6 +238,48 @@ export function computeTotalStatsForSide(
   return total;
 }
 
+/**
+ * Display-value transforms for compare/summary rows.
+ * Remaining chance to be critically hit is only substituted when Derived Stats is on
+ * (mirrors client initiative tooltip); otherwise the row is raw reduction from items/renown.
+ */
+export function computeCompareDisplayValue(
+  key: keyof StatsSummary,
+  stats: StatsSummary,
+  opts?: {
+    includeDerivedStats?: boolean;
+    careerRank?: number;
+    contrib?: Array<{ name: string; totalValue: number }>;
+  },
+): number {
+  if (key === 'outgoingDamage') {
+    const itemPct = Number(stats.outgoingDamage || 0);
+    const renownPct = Number(stats.outgoingDamagePercent || 0);
+    return ((100 + itemPct) * (100 + renownPct)) / 100 - 100;
+  }
+  if (key === 'incomingDamage') {
+    const itemPct = Number(stats.incomingDamage || 0);
+    const renownPct = Number(stats.incomingDamagePercent || 0);
+    return ((100 + itemPct) * (100 + renownPct)) / 100 - 100;
+  }
+  if (key === 'outgoingHealPercent') {
+    const contrib = opts?.contrib;
+    if (contrib && contrib.length) {
+      const total = Number(stats.outgoingHealPercent || 0);
+      const renown = contrib
+        .filter((c) => c.name.startsWith('From Renown'))
+        .reduce((acc, c) => acc + (Number(c.totalValue) || 0), 0);
+      const itemPct = total - renown;
+      return ((100 + itemPct) * (100 + renown)) / 100 - 100;
+    }
+    return Number(stats.outgoingHealPercent || 0);
+  }
+  if (key === 'criticalHitRateReduction' && opts?.includeDerivedStats && (opts.careerRank ?? 0) > 0) {
+    return computeChanceToBeCriticallyHit(opts.careerRank as number, Number(stats.criticalHitRateReduction || 0));
+  }
+  return Number(stats[key] ?? 0);
+}
+
 const derivedLabel = (key: string): string => {
   if (key === 'block') return 'From Toughness (Derived)';
   if (key === 'parry' || key === 'evade') return 'From Initiative (Derived)';
@@ -343,5 +387,18 @@ export function buildContributionsForKeyForSide(
   }
 
   contrib = [...contrib, ...extra];
+
+  // Derived-on: remaining chance to be crit = career-rank base minus reductions.
+  // Flip reduction sources (items, Futile Strikes, initiative) so the tooltip sums to the displayed remaining chance.
+  if (key === 'criticalHitRateReduction' && base && includeDerivedStats) {
+    contrib = contrib.map((c) => ({ ...c, totalValue: -c.totalValue }));
+    contrib.unshift({
+      name: 'From Career Rank (Derived)',
+      count: 1,
+      totalValue: computeBaseChanceToBeCriticallyHit(base.level),
+      percentage: true,
+    });
+  }
+
   return contrib;
 }

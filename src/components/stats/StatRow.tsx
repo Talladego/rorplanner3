@@ -35,7 +35,7 @@ export default function StatRow({
   forceOneDecimal,
   includeDerivedStats,
 }: StatRowProps) {
-  const label = formatSummaryStatKey(statKey);
+  const label = formatSummaryStatKey(statKey, { includeDerivedStats });
   // Helpers for normalization and visibility
   const normalizeValue = (c: Contribution) =>
     needsUnitNormalization && !c.percentage
@@ -89,7 +89,7 @@ export default function StatRow({
             fixedWidth={320}
             content={
               <div className="max-w-[26rem] whitespace-normal break-words overflow-x-hidden">
-                <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatSummaryStatKey(statKey)} — A Contribution</div>
+                <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatSummaryStatKey(statKey, { includeDerivedStats })} — A Contribution</div>
                 <ul className="space-y-0.5">
                   {sortedA.length === 0 ? (
                     <li className="text-[11px] text-gray-400">No contributors</li>
@@ -120,7 +120,7 @@ export default function StatRow({
             fixedWidth={320}
             content={
               <div className="max-w-[26rem] whitespace-normal break-words overflow-x-hidden">
-                <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatSummaryStatKey(statKey)} — B Contribution</div>
+                <div className="mb-1 text-[10px] uppercase tracking-wide text-gray-300/80">{formatSummaryStatKey(statKey, { includeDerivedStats })} — B Contribution</div>
                 <ul className="space-y-0.5">
                   {sortedB.length === 0 ? (
                     <li className="text-[11px] text-gray-400">No contributors</li>
