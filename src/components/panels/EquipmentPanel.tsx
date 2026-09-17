@@ -12,7 +12,6 @@ import { forceClearSlotHoverBright } from '../../utils/hoverBright';
 import { formatSlotName } from '../../utils/formatters';
 import { isTwoHandedWeapon } from '../../utils/items';
 import { getOffhandBlockReason, STAFF_ONLY_CAREERS, TWO_H_ONLY_CAREERS, CANNOT_USE_2H_MELEE } from '../../constants/careerWeaponRules';
-import { useLayoutMode } from '../../hooks/useLayoutMode';
 
 interface EquipmentPanelProps {
   selectedCareer: Career | '';
@@ -24,8 +23,6 @@ interface EquipmentPanelProps {
 }
 
 export default function EquipmentPanel({ selectedCareer, loadoutId, compact = false, iconOnly = false, hideHeading = false, side }: EquipmentPanelProps) {
-  const { layoutMode } = useLayoutMode();
-  const isTablet = layoutMode === 'tablet';
   const { currentLoadout } = useLoadoutData();
   const { loadout } = useLoadoutById(loadoutId ?? null);
   // Important: if loadoutId is explicitly provided (even null), don't fallback to currentLoadout.
@@ -217,10 +214,10 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
               <div className={`equipment-slot ${compact ? 'p-1' : ''}`}>
                 <div className={(iconOnly ? 'flex items-start gap-1' : 'flex items-start gap-2')}>
                   {slotData.item ? (
-                    <Tooltip item={{ ...slotData.item, talismans: slotData.talismans }} loadoutId={effectiveLoadout.id} side={side} slot={slot} onRequestChange={() => handleSlotClick(slot)}>
+                    <Tooltip item={{ ...slotData.item, talismans: slotData.talismans }} loadoutId={effectiveLoadout.id} side={side} slot={slot}>
                       <div
                         className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}${isSlotItemInvalid ? ' invalid' : ''}`}
-                        onClick={() => { if (!isTablet) handleSlotClick(slot); }}
+                        onClick={() => { handleSlotClick(slot); }}
                         onContextMenu={(e) => handleSlotRightClick(e, slot)}
                         data-anchor-key={side ? `${side}:${slot}` : undefined}
                       >
@@ -243,7 +240,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                       </div>
                     </Tooltip>
                   ) : (
-                    <HoverTooltip disabled={isTablet} content={hasCareer ? `Click to select ${formatSlotName(slot)}` : 'Select a career first'}>
+                    <HoverTooltip content={hasCareer ? `Click to select ${formatSlotName(slot)}` : 'Select a career first'}>
                       <div
                         className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}`}
                         onClick={() => handleSlotClick(slot)}
@@ -292,7 +289,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                                   t.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
                                   t.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')) : ''} relative`}>
                                   {t ? (
-                                    <Tooltip item={t} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i} onRequestChange={() => handleTalismanClick(slot, i)}>
+                                    <Tooltip item={t} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i}>
                                       <div className="relative">
                                         {isDuplicateTalisman && (
                                           <span className="absolute top-0 left-0 text-red-500 text-[10px] leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold pointer-events-none" title="Duplicate talisman">🛇</span>
@@ -301,14 +298,14 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                                           src={t.iconUrl}
                                           alt={t.name}
                                           className={`w-full h-full object-contain rounded cursor-pointer`}
-                                          onClick={() => { if (!isTablet) handleTalismanClick(slot, i); }}
+                                          onClick={() => { handleTalismanClick(slot, i); }}
                                           onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
                                           data-anchor-key={side ? `${side}:${slot}:t${i}` : undefined}
                                         />
                                       </div>
                                     </Tooltip>
                                   ) : (
-                                    <HoverTooltip disabled={isTablet} content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
+                                    <HoverTooltip content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
                                       <div className="icon-frame-empty w-full h-full rounded cursor-pointer" onClick={() => handleTalismanClick(slot, i)} onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}>
                                         <img
                                           src={DEFAULT_SLOT_ICONS[EquipSlot.JEWELLERY1]}
@@ -365,7 +362,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                                     t.rarity === 'UNCOMMON' ? 'item-color-uncommon' :
                                     t.rarity === 'UTILITY' ? 'item-color-utility' : 'item-color-common')) : ''} relative`}> 
                                     {t ? (
-                                      <Tooltip item={t} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i} onRequestChange={() => handleTalismanClick(slot, i)}>
+                                      <Tooltip item={t} isTalismanTooltip={true} loadoutId={effectiveLoadout.id} side={side} slot={slot} talismanIndex={i}>
                                         <div className="relative">
                                           {isDuplicateTalisman && (
                                             <span className="absolute top-0 left-0 text-red-500 text-[10px] leading-none select-none z-20 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] font-bold pointer-events-none" title="Duplicate talisman">🛇</span>
@@ -374,14 +371,14 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                                             src={t.iconUrl}
                                             alt={t.name}
                                             className={`w-full h-full object-contain rounded cursor-pointer`}
-                                            onClick={() => { if (!isTablet) handleTalismanClick(slot, i); }}
+                                            onClick={() => { handleTalismanClick(slot, i); }}
                                             onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}
                                             data-anchor-key={side ? `${side}:${slot}:t${i}` : undefined}
                                           />
                                         </div>
                                       </Tooltip>
                                     ) : (
-                                  <HoverTooltip disabled={isTablet} content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
+                                  <HoverTooltip content={hasCareer ? 'Click to select talisman' : 'Select a career first'}>
                                     <div className="icon-frame-empty w-full h-full rounded cursor-pointer" onClick={() => handleTalismanClick(slot, i)} onContextMenu={(e) => handleTalismanRightClick(e, slot, i)}>
                                       <img
                                         src={DEFAULT_SLOT_ICONS[EquipSlot.JEWELLERY1]}
@@ -435,10 +432,10 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                 <div className={`equipment-slot ${compact ? 'p-1' : ''}`}>
                   <div className={(iconOnly ? 'flex items-start gap-1' : 'flex items-start gap-2')}>
                     {slotData.item ? (
-                      <Tooltip item={{ ...slotData.item, talismans: slotData.talismans }} loadoutId={effectiveLoadout.id} side={side} slot={slot} onRequestChange={() => handleSlotClick(slot)}>
+                      <Tooltip item={{ ...slotData.item, talismans: slotData.talismans }} loadoutId={effectiveLoadout.id} side={side} slot={slot}>
                         <div
                           className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}${isSlotItemInvalid ? ' invalid' : ''}`}
-                          onClick={() => { if (!isTablet) handleSlotClick(slot); }}
+                          onClick={() => { handleSlotClick(slot); }}
                           onContextMenu={(e) => handleSlotRightClick(e, slot)}
                           data-anchor-key={side ? `${side}:${slot}` : undefined}
                         >
@@ -460,7 +457,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
                         </div>
                       </Tooltip>
                     ) : (
-                      <HoverTooltip disabled={isTablet} content={hasCareer ? `Click to select ${formatSlotName(slot)}` : 'Select a career first'}>
+                      <HoverTooltip content={hasCareer ? `Click to select ${formatSlotName(slot)}` : 'Select a career first'}>
                         <div
                           className={`equipment-icon cursor-pointer ${compact ? 'w-12 h-12' : iconOnly ? 'w-12 h-12' : ''}`}
                           onClick={() => handleSlotClick(slot)}

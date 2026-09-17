@@ -59,8 +59,8 @@ describe('Stats aggregation', () => {
     }));
 
     const stats = loadoutService.computeStatsForLoadout(loadoutId); // includeRenown true
-    // Level 3 -> cumulative table [0,4,16,38...] gives 38 strength
-    expect(stats.strength).toBe(38);
+    // Level 3 -> cumulative table [0,4,16,40...] gives 40 strength
+    expect(stats.strength).toBe(40);
   });
 
   it('omits renown contributions when includeRenown=false', () => {

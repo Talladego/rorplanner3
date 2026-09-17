@@ -20,8 +20,9 @@ export function cloneLoadout(sourceId: string, name?: string): string {
   // Copy renown abilities
   if (src.renownAbilities) {
     (Object.keys(src.renownAbilities) as Array<keyof NonNullable<typeof src.renownAbilities>>).forEach((ab) => {
+      if (ab === 'regeneration') return;
       const lvl = src.renownAbilities?.[ab] ?? 0;
-      loadoutStoreAdapter.setRenownAbilityLevelForLoadout(newId, ab as keyof NonNullable<typeof src.renownAbilities>, lvl);
+      loadoutStoreAdapter.setRenownAbilityLevelForLoadout(newId, ab, lvl);
     });
   }
   Object.entries(src.items).forEach(([slot, data]) => {

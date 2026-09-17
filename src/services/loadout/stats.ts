@@ -5,6 +5,7 @@ import { isShieldType, isTwoHandedWeapon } from '../../utils/items';
 import { getItemColor } from '../../utils/rarityColors';
 import { STAT_TO_SUMMARY_KEY, SUMMARY_KEY_TO_STAT } from '../../constants/statMaps';
 import { getOffhandBlockReason, STAFF_ONLY_CAREERS, TWO_H_ONLY_CAREERS, CANNOT_USE_2H_MELEE } from '../../constants/careerWeaponRules';
+import { emptyRenownAbilities, getRenownEffectAtLevel } from './renownConfig';
 
 /**
  * Compute aggregate stats for a specific loadout id.
@@ -158,61 +159,47 @@ export function computeStatsForLoadout(loadoutId: string, opts?: { includeRenown
   // Apply renown ability bonuses (each level contributes cumulative total per spec)
   const includeRenown = opts?.includeRenown !== false;
   if (includeRenown) {
-  const ra = loadout.renownAbilities || {
-    might: 0, bladeMaster: 0, marksman: 0, impetus: 0, acumen: 0, resolve: 0, fortitude: 0, vigor: 0, opportunist: 0, spiritualRefinement: 0, regeneration: 0,
-    reflexes: 0, defender: 0, deftDefender: 0,
-  };
-  const levelToTotal = (lvl: number) => {
-    // Cumulative totals per provided table: 0,4,16,38,72,120
-    const totals = [0, 4, 16, 38, 72, 120];
-    return totals[Math.max(0, Math.min(5, Math.trunc(lvl)))];
-  };
-  (result.strength as number) += levelToTotal(ra.might || 0);
-  (result.weaponSkill as number) += levelToTotal(ra.bladeMaster || 0);
-  (result.ballisticSkill as number) += levelToTotal(ra.marksman || 0);
-  (result.initiative as number) += levelToTotal(ra.impetus || 0);
-  (result.intelligence as number) += levelToTotal(ra.acumen || 0);
-  (result.willpower as number) += levelToTotal(ra.resolve || 0);
-  (result.toughness as number) += levelToTotal(ra.fortitude || 0);
-  (result.wounds as number) += levelToTotal(ra.vigor || 0);
-  // Opportunist: Offensive Critical Hit affects melee, ranged, magic crit rates (percentage values)
-  const oppTable = [0, 2, 5, 9, 14, 14]; // Levels 0..5; cap at IV=14 per request
-  const opp = oppTable[Math.max(0, Math.min(5, Math.trunc(ra.opportunist || 0)))];
+  const ra = { ...emptyRenownAbilities(), ...(loadout.renownAbilities || {}) };
+  const levelToTotal = (key: string, lvl: number) => getRenownEffectAtLevel(key, lvl);
+  (result.strength as number) += levelToTotal('might', ra.might || 0);
+  (result.weaponSkill as number) += levelToTotal('bladeMaster', ra.bladeMaster || 0);
+  (result.ballisticSkill as number) += levelToTotal('marksman', ra.marksman || 0);
+  (result.initiative as number) += levelToTotal('impetus', ra.impetus || 0);
+  (result.intelligence as number) += levelToTotal('acumen', ra.acumen || 0);
+  (result.willpower as number) += levelToTotal('resolve', ra.resolve || 0);
+  (result.toughness as number) += levelToTotal('fortitude', ra.fortitude || 0);
+  (result.wounds as number) += levelToTotal('vigor', ra.vigor || 0);
+  // Opportunist: Offensive Crit Chance affects melee, ranged, magic crit rates
+  const opp = getRenownEffectAtLevel('opportunist', ra.opportunist || 0);
   (result.meleeCritRate as number) += opp;
   (result.rangedCritRate as number) += opp;
   (result.magicCritRate as number) += opp;
-  const srTable = [0, 2, 5, 9, 14, 14];
-  const sr = srTable[Math.max(0, Math.min(5, Math.trunc(ra.spiritualRefinement || 0)))];
+  const sr = getRenownEffectAtLevel('spiritualRefinement', ra.spiritualRefinement || 0);
   (result.healCritRate as number) += sr;
-  const regenTable = [0, 7, 17, 35, 35, 35];
-  const regen = regenTable[Math.max(0, Math.min(5, Math.trunc(ra.regeneration || 0)))];
-  (result.healthRegen as number) += regen;
+  const fp = getRenownEffectAtLevel('focusedPower', ra.focusedPower || 0);
+  (result.parryStrikethrough as number) += fp;
+  (result.evadeStrikethrough as number) += fp;
+  (result.disruptStrikethrough as number) += fp;
   // Reflexes (Parry%), Defender (Block%), Deft Defender (Dodge/Disrupt%)
-  const defTable = [0, 3, 7, 12, 18, 18];
-  const defenderTable = [0, 1, 3, 6, 10, 10];
-  const rfx = defTable[Math.max(0, Math.min(5, Math.trunc(ra.reflexes || 0)))];
-  const dfn = defenderTable[Math.max(0, Math.min(5, Math.trunc(ra.defender || 0)))];
-  const dd = defTable[Math.max(0, Math.min(5, Math.trunc(ra.deftDefender || 0)))];
+  const rfx = getRenownEffectAtLevel('reflexes', ra.reflexes || 0);
+  const dfn = getRenownEffectAtLevel('defender', ra.defender || 0);
+  const dd = getRenownEffectAtLevel('deftDefender', ra.deftDefender || 0);
   (result.parry as number) += rfx;
   (result.block as number) += dfn;
   (result.evade as number) += dd;
   (result.disrupt as number) += dd;
-    // Hardy Concession: applies negative percent to both Incoming and Outgoing Damage
-  const hcTable = [0, -1, -3, -6, -10, -15];
-  const hc = hcTable[Math.max(0, Math.min(5, Math.trunc((ra as any).hardyConcession || 0)))];
+    // Hardy Concession: applies negative percent to Incoming/Outgoing Damage and Outgoing Healing
+  const hc = getRenownEffectAtLevel('hardyConcession', ra.hardyConcession || 0);
   (result.incomingDamagePercent as number) += hc;
   (result.outgoingDamagePercent as number) += hc;
-  // HC also reduces outgoing healing; include as a negative percent modifier
   (result.outgoingHealPercent as number) += hc;
 
-    // Futile Strikes: Critical Hit Rate Reduction
-    const fsTable = [0, 3, 8, 15, 24, 24];
-    const fs = fsTable[Math.max(0, Math.min(5, Math.trunc((ra as any).futileStrikes || 0)))];
+    // Futile Strikes: reduced chance to be critically hit
+    const fs = getRenownEffectAtLevel('futileStrikes', ra.futileStrikes || 0);
     (result.criticalHitRateReduction as number) += fs;
 
-    // Trivial Blows: Critical Damage Taken Reduction
-    const tbTable = [0, 4, 12, 24, 40, 40];
-    const tb = tbTable[Math.max(0, Math.min(5, Math.trunc((ra as any).trivialBlows || 0)))];
+    // Trivial Blows: reduced critical damage taken
+    const tb = getRenownEffectAtLevel('trivialBlows', ra.trivialBlows || 0);
     (result.criticalDamageTakenReduction as number) += tb;
   }
   return result;
@@ -362,11 +349,7 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
   });
   // Add Renown contribution for primary stats (optional)
   if (opts?.includeRenown !== false) {
-    const ra = loadout.renownAbilities || { might: 0, bladeMaster: 0, marksman: 0, impetus: 0, acumen: 0, resolve: 0, fortitude: 0, vigor: 0, opportunist: 0, spiritualRefinement: 0, regeneration: 0, reflexes: 0, defender: 0, deftDefender: 0 };
-    const levelToTotal = (lvl: number) => {
-      const totals = [0, 4, 16, 38, 72, 120];
-      return totals[Math.max(0, Math.min(5, Math.trunc(lvl)))];
-    };
+    const ra = { ...emptyRenownAbilities(), ...(loadout.renownAbilities || {}) };
     const roman = (lvl: number) => ['','I','II','III','IV','V'][Math.max(0, Math.min(5, Math.trunc(lvl)))] || '';
     // Primary stat abilities mapping
     const primaryDefs: Array<{ key: keyof typeof ra; label: string; gql: string; sumKey: keyof StatsSummary }>= [
@@ -381,7 +364,7 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
     ];
     primaryDefs.forEach(({ key, label, gql, sumKey }) => {
       const lvl = ra[key] || 0;
-      const val = levelToTotal(lvl);
+      const val = getRenownEffectAtLevel(String(key), lvl);
       if (!val) return;
       if (String(statKey) === sumKey || target === gql) {
         const mapKey = `RENOWN|${String(key).toUpperCase()}|${gql}`;
@@ -394,8 +377,7 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
 
     // Opportunist contributions to crit rates
     const oppLvl = Math.max(0, Math.min(5, Math.trunc(ra.opportunist || 0)));
-    const oppTable = [0, 2, 5, 9, 14, 14];
-    const opp = oppTable[oppLvl];
+    const opp = getRenownEffectAtLevel('opportunist', oppLvl);
     if (opp) {
       const maybeAdd = (sumKey: keyof StatsSummary, gql: string) => {
         if (String(statKey) === sumKey || target === gql) {
@@ -411,8 +393,7 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
       maybeAdd('magicCritRate', 'MAGIC_CRIT_RATE');
     }
     const srLvl = Math.max(0, Math.min(5, Math.trunc(ra.spiritualRefinement || 0)));
-    const srTable = [0, 2, 5, 9, 14, 14];
-    const sr = srTable[srLvl];
+    const sr = getRenownEffectAtLevel('spiritualRefinement', srLvl);
     if (sr) {
       const k = 'RENOWN|SPIRITUAL_REFINEMENT|HEAL_CRIT_RATE';
       if (String(statKey) === 'healCritRate' || target === 'HEAL_CRIT_RATE') {
@@ -422,23 +403,26 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
         res.set(k, prev);
       }
     }
-    // Regeneration contributions to healthRegen
-    const regenLvl = Math.max(0, Math.min(5, Math.trunc(ra.regeneration || 0)));
-    const regenTable = [0, 7, 17, 35, 35, 35];
-    const regen = regenTable[regenLvl];
-    if (regen) {
-      if (String(statKey) === 'healthRegen' || target === 'HEALTH_REGEN') {
-        const k = 'RENOWN|REGENERATION|HEALTH_REGEN';
-        const prev = res.get(k) || { name: `From Renown (Regeneration ${roman(regenLvl)})`, count: 1, totalValue: 0, percentage: false };
-        prev.totalValue += regen;
-        prev.name = `From Renown (Regeneration ${roman(regenLvl)})`;
-        res.set(k, prev);
-      }
+    // Focused Power: Parry / Dodge / Disrupt Strikethrough
+    const fpLvl = Math.max(0, Math.min(5, Math.trunc(ra.focusedPower || 0)));
+    const fp = getRenownEffectAtLevel('focusedPower', fpLvl);
+    if (fp) {
+      const maybeAdd = (sumKey: keyof StatsSummary, gql: string) => {
+        if (String(statKey) === sumKey || target === gql) {
+          const k = 'RENOWN|FOCUSED_POWER|' + gql;
+          const prev = res.get(k) || { name: `From Renown (Focused Power ${roman(fpLvl)})`, count: 1, totalValue: 0, percentage: true };
+          prev.totalValue += fp;
+          prev.name = `From Renown (Focused Power ${roman(fpLvl)})`;
+          res.set(k, prev);
+        }
+      };
+      maybeAdd('parryStrikethrough', 'PARRY_STRIKETHROUGH');
+      maybeAdd('evadeStrikethrough', 'EVADE_STRIKETHROUGH');
+      maybeAdd('disruptStrikethrough', 'DISRUPT_STRIKETHROUGH');
     }
     // Reflexes (Parry%)
   const defLvlRfx = Math.max(0, Math.min(5, Math.trunc(ra.reflexes || 0)));
-  const defTable = [0, 3, 7, 12, 18, 18];
-    const rfx = defTable[defLvlRfx];
+    const rfx = getRenownEffectAtLevel('reflexes', defLvlRfx);
     if (rfx) {
       if (String(statKey) === 'parry' || target === 'PARRY') {
         const k = 'RENOWN|REFLEXES|PARRY';
@@ -450,8 +434,7 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
     }
     // Defender (Block%)
   const defLvlDfn = Math.max(0, Math.min(5, Math.trunc(ra.defender || 0)));
-  const defenderTable = [0, 1, 3, 6, 10, 10];
-  const dfn = defenderTable[defLvlDfn];
+  const dfn = getRenownEffectAtLevel('defender', defLvlDfn);
     if (dfn) {
       if (String(statKey) === 'block' || target === 'BLOCK') {
         const k = 'RENOWN|DEFENDER|BLOCK';
@@ -463,7 +446,7 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
     }
     // Deft Defender (Dodge/Disrupt%)
   const defLvlDd = Math.max(0, Math.min(5, Math.trunc(ra.deftDefender || 0)));
-  const dd = defTable[defLvlDd];
+  const dd = getRenownEffectAtLevel('deftDefender', defLvlDd);
     if (dd) {
       const maybeAdd = (sumKey: keyof StatsSummary, gql: string) => {
         if (String(statKey) === sumKey || target === gql) {
@@ -479,11 +462,9 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
     }
     // Hardy Concession contributions
     {
-      const lvl = Math.max(0, Math.min(5, Math.trunc((ra as any).hardyConcession || 0)));
-      const table = [0, -1, -3, -6, -10, -15];
-      const val = table[lvl];
+      const lvl = Math.max(0, Math.min(5, Math.trunc(ra.hardyConcession || 0)));
+      const val = getRenownEffectAtLevel('hardyConcession', lvl);
       if (val) {
-        const roman = (l: number) => ['', 'I', 'II', 'III', 'IV', 'V'][l] || '';
         if (String(statKey) === 'incomingDamagePercent' || target === 'INCOMING_DAMAGE_PERCENT') {
           const k = 'RENOWN|HARDY_CONCESSION|INCOMING_DAMAGE_PERCENT';
           const prev = res.get(k) || { name: `From Renown (Hardy Concession ${roman(lvl)})`, count: 1, totalValue: 0, percentage: true };
@@ -509,11 +490,9 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
     }
     // Futile Strikes contributions
     {
-      const lvl = Math.max(0, Math.min(5, Math.trunc((ra as any).futileStrikes || 0)));
-      const table = [0, 3, 8, 15, 24, 24];
-      const val = table[lvl];
+      const lvl = Math.max(0, Math.min(5, Math.trunc(ra.futileStrikes || 0)));
+      const val = getRenownEffectAtLevel('futileStrikes', lvl);
       if (val) {
-        const roman = (l: number) => ['', 'I', 'II', 'III', 'IV', 'V'][l] || '';
         if (String(statKey) === 'criticalHitRateReduction' || target === 'CRITICAL_HIT_RATE_REDUCTION') {
           const k = 'RENOWN|FUTILE_STRIKES|CRITICAL_HIT_RATE_REDUCTION';
           const prev = res.get(k) || { name: `From Renown (Futile Strikes ${roman(lvl)})`, count: 1, totalValue: 0, percentage: true };
@@ -525,11 +504,9 @@ export function getStatContributionsForLoadout(loadoutId: string, statKey: keyof
     }
     // Trivial Blows contributions
     {
-      const lvl = Math.max(0, Math.min(5, Math.trunc((ra as any).trivialBlows || 0)));
-      const table = [0, 4, 12, 24, 40, 40];
-      const val = table[lvl];
+      const lvl = Math.max(0, Math.min(5, Math.trunc(ra.trivialBlows || 0)));
+      const val = getRenownEffectAtLevel('trivialBlows', lvl);
       if (val) {
-        const roman = (l: number) => ['', 'I', 'II', 'III', 'IV', 'V'][l] || '';
         if (String(statKey) === 'criticalDamageTakenReduction' || target === 'CRITICAL_DAMAGE_TAKEN_REDUCTION') {
           const k = 'RENOWN|TRIVIAL_BLOWS|CRITICAL_DAMAGE_TAKEN_REDUCTION';
           const prev = res.get(k) || { name: `From Renown (Trivial Blows ${roman(lvl)})`, count: 1, totalValue: 0, percentage: true };

@@ -2,7 +2,6 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import type { MouseEventHandler } from 'react';
 import { createPortal } from 'react-dom';
 import { useScale } from '../layout/ScaleContext';
-import { useLayoutMode } from '../../hooks/useLayoutMode';
 
 type HoverTooltipProps = {
   content: ReactNode;
@@ -18,8 +17,6 @@ type HoverTooltipProps = {
 // Positions below the trigger; hides on scroll via CSS overflow of parent containers
 export default function HoverTooltip({ content, children, placement = 'right', className, fixedWidth, disabled = false }: HoverTooltipProps) {
   const uiScale = useScale();
-  const { layoutMode } = useLayoutMode();
-  const tapMode = layoutMode === 'tablet';
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const tooltipRef = useRef<HTMLSpanElement | null>(null);
@@ -63,7 +60,6 @@ export default function HoverTooltip({ content, children, placement = 'right', c
   };
 
   const handleEnter: MouseEventHandler<HTMLDivElement> = (e) => {
-    if (tapMode) return;
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     computePosition(rect);
     setOpen(true);
@@ -139,20 +135,14 @@ export default function HoverTooltip({ content, children, placement = 'right', c
     <div
       ref={triggerRef}
       className={`relative block ${className || ''}`}
-      onMouseEnter={tapMode ? undefined : handleEnter}
-      onMouseLeave={tapMode ? undefined : () => setOpen(false)}
-      onClick={tapMode ? (e) => {
-        e.stopPropagation();
-        if (!triggerRef.current) return;
-        if (!open) computePosition(triggerRef.current.getBoundingClientRect());
-        setOpen((v) => !v);
-      } : undefined}
+      onMouseEnter={handleEnter}
+      onMouseLeave={() => setOpen(false)}
     >
       {children}
       {open && createPortal(
         <span
           ref={tooltipRef}
-          className={`tooltip-surface fixed z-[11000] rounded-lg bg-gray-900 dark:bg-gray-800 p-2 text-xs leading-snug text-white shadow-lg border border-gray-700 dark:border-gray-600 ${tapMode ? 'pointer-events-auto' : 'pointer-events-none'} whitespace-normal`}
+          className={`tooltip-surface fixed z-[11000] rounded-lg bg-gray-900 dark:bg-gray-800 p-2 text-xs leading-snug text-white shadow-lg border border-gray-700 dark:border-gray-600 pointer-events-none whitespace-normal`}
           style={{ left: pos.x, top: pos.y, width: fixedWidth ?? undefined, maxWidth: fixedWidth ?? 360, transform: `scale(${uiScale})`, transformOrigin: 'top left' }}
           role="tooltip"
         >

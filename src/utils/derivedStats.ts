@@ -58,6 +58,26 @@ export function computeDerivedDefenses(summary: StatsSummary, level: number, opt
 }
 
 /**
+ * Base chance to be critically hit before reductions.
+ * Patch 17/09/2026: (15 + CareerRank/4) → (10 + CareerRank/4).
+ * Client Lua (CharacterWindow.GetInitiativeTooltipDesc) uses the same intercept.
+ */
+export function computeBaseChanceToBeCriticallyHit(careerRank: number): number {
+  const rank = Number.isFinite(careerRank) ? Math.max(0, careerRank) : 0;
+  return 10 + rank / 4;
+}
+
+/**
+ * Remaining chance to be critically hit after item / renown / initiative reductions.
+ * Mirrors client Lua: CritHit = base - Initiative/100*5, then apply
+ * EBONUS_CRITICAL_HIT_RATE_REDUCTION (Futile Strikes, items) via GetBonus.
+ * Planner stores those bonuses as positive reduction percentage points.
+ */
+export function computeChanceToBeCriticallyHit(careerRank: number, reductionPercent: number): number {
+  return computeBaseChanceToBeCriticallyHit(careerRank) - (Number(reductionPercent) || 0);
+}
+
+/**
  * Compute Initiative-based reduction to "Chance to be critically hit".
  * Client Lua uses g_currentInitiative (after DR) in: CritHit = ... - (Initiative/100)*5
  * We return just the Initiative contribution: Initiative/100*5 (percentage points).

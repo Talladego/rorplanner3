@@ -5,7 +5,7 @@ import type { StatsSummary } from '../../types';
 import { urlService } from '../../services/loadout/urlService';
 import { setIncludeBaseStats as setBaseShared, setIncludeDerivedStats as setDerivedShared, setIncludeRenownStats as setRenownShared } from '../../services/ui/statsToggles';
 import StatRow from './StatRow';
-import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide } from '../../utils/statsCompareHelpers';
+import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide, computeCompareDisplayValue } from '../../utils/statsCompareHelpers';
 import { computeAllDamageHealingBonuses } from '../../utils/damageHealingBonuses';
 
 // Per-UI helpers moved to formatters for reuse across components
@@ -125,37 +125,28 @@ export default function StatsComparePanel() {
     [bId, tick, empty, includeBaseStats, includeDerivedStats, includeRenownStats]
   );
 
+  const loadoutA = aId ? loadoutService.getLoadoutForSide('A') : null;
+  const loadoutB = bId ? loadoutService.getLoadoutForSide('B') : null;
+  const hasAnyCareer = Boolean(loadoutA?.career || loadoutB?.career);
+
   // Removed A/B equipped counts and related helpers per request
 
   type Row = { key: string; a: number; b: number };
-  const computeDisplayValue = (key: keyof StatsSummary, stats: StatsSummary): number => {
-    if (key === 'outgoingDamage') {
-      const od = Number(stats.outgoingDamage || 0); // items/sets, may be percent-flagged in contributions
-      const odp = Number(stats.outgoingDamagePercent || 0); // renown Hardy Concession
-      // Effective percent = ((100 + od) * (100 + odp)) / 100 - 100
-      return ((100 + od) * (100 + odp)) / 100 - 100;
-    } else if (key === 'incomingDamage') {
-      // Incoming Damage effective display combines item-side INCOMING_DAMAGE and renown INCOMING_DAMAGE_PERCENT (HC)
-      const idm = Number(stats.incomingDamage || 0);
-      const idmp = Number(stats.incomingDamagePercent || 0);
-      return ((100 + idm) * (100 + idmp)) / 100 - 100;
-    } else if (key === 'outgoingHealPercent') {
-      // Outgoing Healing effective display includes renown Hardy Concession negative percent
-      // Items may also provide OUTGOING_HEAL_PERCENT directly; multiply accordingly
-      const ohp = Number(stats.outgoingHealPercent || 0);
-      // No separate item-side 'outgoingHeal' bucket exists; the single bucket already accumulates both sources
-      // So just return the current value (already additive). If we ever separate, keep multiplicative structure.
-      return ohp; // kept as-is since both item and renown land in the same percent bucket
-    }
-    return Number(stats[key] ?? 0);
+  const computeDisplayValue = (key: keyof StatsSummary, stats: StatsSummary, side: 'A' | 'B'): number => {
+    const loadout = side === 'A' ? loadoutA : loadoutB;
+    return computeCompareDisplayValue(key, stats, {
+      includeDerivedStats,
+      careerRank: loadout?.career ? loadout.level : undefined,
+    });
   };
   const makeRows = (defs: Array<{ key: keyof StatsSummary }>, alwaysShow?: Set<string>): Row[] =>
     defs
-      .map(d => ({ key: d.key as string, a: computeDisplayValue(d.key, statsA), b: computeDisplayValue(d.key, statsB) }))
+      .map(d => ({ key: d.key as string, a: computeDisplayValue(d.key, statsA, 'A'), b: computeDisplayValue(d.key, statsB, 'B') }))
       .filter(r => (alwaysShow?.has(r.key) ?? false) || r.a !== 0 || r.b !== 0);
 
   const baseRows = makeRows(rowDefs.base);
-  const defenseRows = makeRows(rowDefs.defense);
+  const defenseAlwaysShow = includeDerivedStats ? new Set(['criticalHitRateReduction']) : undefined;
+  const defenseRows = makeRows(rowDefs.defense, defenseAlwaysShow);
   const meleeRows = makeRows(rowDefs.melee);
   const offenseRows = makeRows(rowDefs.offense);
   const rangedRows = makeRows(rowDefs.ranged);
@@ -182,10 +173,6 @@ export default function StatsComparePanel() {
     healingRows.length > 0 || showHealingDerived ||
     otherRows.length > 0
   );
-  // Determine if any side has a selected career
-  const loadoutA = aId ? loadoutService.getLoadoutForSide('A') : null;
-  const loadoutB = bId ? loadoutService.getLoadoutForSide('B') : null;
-  const hasAnyCareer = Boolean(loadoutA?.career || loadoutB?.career);
 
   // Auto-focus and preselect share URL when modal opens
   useEffect(() => {
