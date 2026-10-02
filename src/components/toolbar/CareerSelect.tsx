@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Career, LoadoutSide } from '../../types';
 import { formatCareerName } from '../../utils/formatters';
 import { getCareerIconUrl } from '../../constants/careerIcons';
-import { loadoutService } from '../../services/loadout/loadoutService';
+import { useLoadoutStore } from '../../hooks/useLoadoutStore';
 
 type Size = 'sm' | 'md';
 
@@ -22,9 +22,25 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number; width: number } | null>(null);
-  const [nonEmptyCareers, setNonEmptyCareers] = useState<Partial<Record<Career, boolean>>>({});
 
   const careers = useMemo(() => Object.values(Career), []);
+  const loadouts = useLoadoutStore((s) => s.loadouts);
+  const sideCareerMap = useLoadoutStore((s) => s.sideCareerLoadoutIds[side]);
+
+  const nonEmptyCareers = useMemo(() => {
+    const result: Partial<Record<Career, boolean>> = {};
+    for (const career of careers) {
+      const mappedId = sideCareerMap?.[career as Career];
+      if (!mappedId) continue;
+      const l = loadouts.find((lo) => lo.id === mappedId);
+      if (!l) continue;
+      const hasItem = Object.values(l.items || {}).some((entry) => !!entry?.item);
+      const hasTalis = Object.values(l.items || {}).some((entry) => (entry?.talismans || []).some((t) => !!t));
+      const hasRenown = l.renownAbilities && Object.values(l.renownAbilities).some((v) => (Number(v) || 0) > 0);
+      if (hasItem || hasTalis || hasRenown) result[career as Career] = true;
+    }
+    return result;
+  }, [careers, loadouts, sideCareerMap]);
 
   const selectedLabel = useMemo(() => {
     if (!value) return placeholder;
@@ -34,29 +50,7 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
   const iconSize = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
   const itemPadding = size === 'sm' ? 'py-0.5 px-2 text-xs' : 'py-2 px-3 text-sm';
 
-  // Panel should match the control's width and alignment
-
-  // Determine which careers are non-empty for THIS side only
-  const recomputeNonEmptyCareers = useCallback(() => {
-    const result: Partial<Record<Career, boolean>> = {};
-    const loadouts = loadoutService.getAllLoadouts();
-    for (const career of careers) {
-      const mappedId = loadoutService.getSideCareerLoadoutId(side, career as Career);
-      if (!mappedId) continue;
-      const l = loadouts.find((lo) => lo.id === mappedId);
-      if (!l) continue;
-      const hasItem = Object.values(l.items || {}).some((entry) => !!entry?.item);
-      const hasTalis = Object.values(l.items || {}).some((entry) => (entry?.talismans || []).some((t) => !!t));
-      const hasRenown = l.renownAbilities && Object.values(l.renownAbilities).some((v) => (Number(v) || 0) > 0);
-      if (hasItem || hasTalis || hasRenown) result[career as Career] = true;
-    }
-    setNonEmptyCareers(result);
-  }, [careers, side]);
-
   useEffect(() => {
-    // Initial compute
-    recomputeNonEmptyCareers();
-
     const onDocClick = (e: MouseEvent) => {
       if (!open) return;
       const t = e.target as Node;
@@ -65,27 +59,10 @@ export default function CareerSelect({ value, onChange, placeholder = 'Select Ca
       setOpen(false);
     };
     document.addEventListener('mousedown', onDocClick);
-    // Subscribe to loadout changes to keep asterisk state in sync
-    const unsub = loadoutService.subscribeToAllEvents((ev) => {
-      switch (ev.type) {
-        case 'ITEM_UPDATED':
-        case 'TALISMAN_UPDATED':
-        case 'LOADOUT_RESET':
-        case 'LOADOUT_CREATED':
-        case 'LOADOUT_SWITCHED':
-        case 'CAREER_CHANGED':
-        case 'SIDE_LOADOUT_ASSIGNED':
-        case 'STATS_UPDATED': // covers renown ability level changes and resets
-        case 'RENOWN_RANK_CHANGED':
-          recomputeNonEmptyCareers();
-          break;
-      }
-    });
     return () => {
       document.removeEventListener('mousedown', onDocClick);
-      unsub();
     };
-  }, [open, side, careers.length, recomputeNonEmptyCareers]);
+  }, [open]);
 
   const openMenu = () => {
     setOpen(true);

@@ -72,7 +72,7 @@ export default [
       ],
     },
   },
-  // Components must not import the store adapter directly; enforce boundary only for components
+  // Components must not import the store adapter or raw store; use loadoutService or useLoadoutStore hook
   {
     files: ['src/components/**/*.{ts,tsx}'],
     languageOptions: {
@@ -89,6 +89,10 @@ export default [
             {
               group: ['**/store/loadout/loadoutStoreAdapter'],
               message: 'Components must not import the store adapter directly; use loadoutService instead.',
+            },
+            {
+              group: ['**/store/loadout/loadoutStore', '**/store/loadout/loadoutStore.ts'],
+              message: 'Components must not import the raw Zustand store; use hooks/useLoadoutStore instead.',
             },
           ],
         },

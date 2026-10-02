@@ -28,7 +28,7 @@ class LoadoutStoreAdapter implements ILoadoutStore {
   setLoadoutNameForLoadout(loadoutId: string, name: string): void { useLoadoutStore.getState().setLoadoutNameForLoadout(loadoutId, name); }
   resetLoadoutById(loadoutId: string): void { useLoadoutStore.getState().resetLoadoutById(loadoutId); }
   resetCurrentLoadout(): void { useLoadoutStore.getState().resetCurrentLoadout(); }
-  calculateStats(): void { useLoadoutStore.getState().calculateStats(); }
+  setStatsSummary(stats: StatsSummary): void { useLoadoutStore.getState().setStatsSummary(stats); }
   setActiveSide(side: LoadoutSide): void { useLoadoutStore.getState().setActiveSide(side); }
   assignSideLoadout(side: LoadoutSide, loadoutId: string | null): void { useLoadoutStore.getState().assignSideLoadout(side, loadoutId); }
   createLoadout(name: string, level?: number, renownRank?: number, isFromCharacter?: boolean, characterName?: string): string { return useLoadoutStore.getState().createLoadout(name, level, renownRank, isFromCharacter, characterName); }

@@ -1,14 +1,29 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Career, EquipSlot, Item, Loadout, LoadoutSide, StatsSummary } from '../../types';
-import { createInitialLoadout, initialStats } from './state';
+import { createInitialLoadout } from './state';
 import { emptyRenownAbilities } from '../../services/loadout/renownConfig';
-// Consolidated stats computation now lives in services/loadout/stats.
-// Store delegates to the shared function instead of duplicating logic here.
-import { computeStatsForLoadout } from '../../services/loadout/stats';
-// import { mapStatToKey } from './utils'; // no longer needed; stats computed via service
 import * as sel from './selectors';
+import type { StoreApi } from 'zustand';
 
-export function buildActions(set: any, get: any) {
+/** Minimal store shape needed by action builders (avoids circular import with loadoutStore). */
+type ActionsStore = {
+  loadouts: Loadout[];
+  currentLoadoutId: string | null;
+  activeSide: LoadoutSide;
+  sideLoadoutIds: Record<LoadoutSide, string | null>;
+  sideCareerLoadoutIds: Record<LoadoutSide, Partial<Record<Career, string>>>;
+  statsSummary: StatsSummary;
+  getCurrentLoadout: () => Loadout | null;
+  getActiveSide: () => LoadoutSide;
+  getSideLoadoutId: (side: LoadoutSide) => string | null;
+  getLoadoutForSide: (side: LoadoutSide) => Loadout | null;
+  getSideCareerLoadoutId: (side: LoadoutSide, career: Career) => string | null;
+};
+
+type SetState = StoreApi<ActionsStore>['setState'];
+type GetState = StoreApi<ActionsStore>['getState'];
+
+export function buildActions(set: SetState, get: GetState) {
   // Ensure unique ids even for rapid successive creations within the same millisecond
   let __loadoutSeq = 0;
   return {
@@ -175,14 +190,10 @@ export function buildActions(set: any, get: any) {
       return { loadouts: state.loadouts.map((l: Loadout) => (l.id === current.id ? reset : l)) };
     }),
 
-    // Delegate to consolidated computeStatsForLoadout (single source of truth).
-    // This ensures set bonuses, unique-equipped rules, slot validation, shields, and renown are applied consistently.
-    calculateStats: () => set((state: any) => {
-      const current = state.getCurrentLoadout() as Loadout | null;
-      if (!current) return { statsSummary: initialStats };
-      const stats: StatsSummary = computeStatsForLoadout(current.id, { includeRenown: true });
-      return { statsSummary: stats };
-    }),
+    // Pure stats write — computation lives in statsFacade.
+    setStatsSummary: (stats: StatsSummary) => set(() => ({
+      statsSummary: stats,
+    })),
 
     // Multi-loadout management
     createLoadout: (name: string, level: number = 40, renownRank: number = 80, isFromCharacter: boolean = false, characterName?: string): string => {

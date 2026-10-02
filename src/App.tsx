@@ -27,7 +27,7 @@ function AppHeader() {
         href="https://discord.com/users/316636548353490944"
         target="_blank"
         rel="noopener noreferrer"
-        className="absolute right-4 top-0 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
+        className="absolute right-0 top-0 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
       >
         Feedback
       </a>
@@ -35,10 +35,17 @@ function AppHeader() {
   );
 }
 
-function AppShell() {
+function AppShell({ errorMessage }: { errorMessage: string }) {
   return (
     <div className="min-h-screen py-4">
       <ScaleToFit designWidth={DESIGN_WIDTH} minScale={SCALE_MIN} maxScale={SCALE_MAX}>
+        <div className="min-h-[16px] mb-1 flex items-center px-1">
+          {errorMessage && (
+            <div className="text-[11px] text-red-600 leading-snug w-full truncate" title={errorMessage}>
+              {errorMessage}
+            </div>
+          )}
+        </div>
         <AppHeader />
         <DualToolbar />
         <DualEquipmentLayout />
@@ -138,7 +145,7 @@ function App() {
   return (
     <ErrorBoundary>
       <ApolloProviderWrapper>
-        <AppShell />
+        <AppShell errorMessage={errorMessage} />
       </ApolloProviderWrapper>
     </ErrorBoundary>
   );

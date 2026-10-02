@@ -7,6 +7,7 @@ import { setIncludeBaseStats as setBaseShared, setIncludeDerivedStats as setDeri
 import StatRow from './StatRow';
 import { buildEmptySummary, computeTotalStatsForSide, rowDefs, buildContributionsForKeyForSide, computeCompareDisplayValue } from '../../utils/statsCompareHelpers';
 import { computeAllDamageHealingBonuses } from '../../utils/damageHealingBonuses';
+import { useLoadoutStore } from '../../hooks/useLoadoutStore';
 
 // Per-UI helpers moved to formatters for reuse across components
 
@@ -27,9 +28,11 @@ export default function StatsComparePanel() {
       <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
-  const [aId, setAId] = useState<string | null>(loadoutService.getSideLoadoutId('A'));
-  const [bId, setBId] = useState<string | null>(loadoutService.getSideLoadoutId('B'));
-  const [tick, setTick] = useState(0); // force rerender on stats updates
+  const [aId, setAId] = useState<string | null>(null);
+  const [bId, setBId] = useState<string | null>(null);
+  // loadouts identity changes when items/stats inputs change — replaces void-tick forced rerenders
+  const loadouts = useLoadoutStore((s) => s.loadouts);
+  const sideLoadoutIds = useLoadoutStore((s) => s.sideLoadoutIds);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const shareRef = useRef<HTMLTextAreaElement | null>(null);
@@ -81,52 +84,38 @@ export default function StatsComparePanel() {
     } catch {
       // ignore invalid or missing URL params for stats toggles
     }
-    const pull = () => {
-      setAId(loadoutService.getSideLoadoutId('A'));
-      setBId(loadoutService.getSideLoadoutId('B'));
-    };
-    pull();
-    const unsub = loadoutService.subscribeToAllEvents((ev) => {
-      if ([
-        'ITEM_UPDATED',
-        'TALISMAN_UPDATED',
-        'LOADOUT_RESET',
-        'LOADOUT_CREATED',
-        'LOADOUT_SWITCHED',
-        'LEVEL_CHANGED',
-        'RENOWN_RANK_CHANGED',
-        'CAREER_CHANGED',
-        'SIDE_LOADOUT_ASSIGNED',
-        'ACTIVE_SIDE_CHANGED',
-        'STATS_UPDATED',
-      ].includes(ev.type)) {
-        pull();
-        // Force rerender to recompute stats even if ids unchanged
-        setTick((t) => t + 1);
-      }
-    });
-    return unsub;
   }, []);
+
+  useEffect(() => {
+    setAId(sideLoadoutIds.A);
+    setBId(sideLoadoutIds.B);
+  }, [sideLoadoutIds]);
 
   const empty: StatsSummary = useMemo(() => buildEmptySummary(), []);
 
   const statsA: StatsSummary = useMemo(
     () => {
-      void tick;
+      void loadouts; // recompute when any loadout content changes
       return computeTotalStatsForSide('A', aId, empty, includeBaseStats, includeDerivedStats, includeRenownStats);
     },
-    [aId, tick, empty, includeBaseStats, includeDerivedStats, includeRenownStats]
+    [aId, loadouts, empty, includeBaseStats, includeDerivedStats, includeRenownStats]
   );
   const statsB: StatsSummary = useMemo(
     () => {
-      void tick;
+      void loadouts; // recompute when any loadout content changes
       return computeTotalStatsForSide('B', bId, empty, includeBaseStats, includeDerivedStats, includeRenownStats);
     },
-    [bId, tick, empty, includeBaseStats, includeDerivedStats, includeRenownStats]
+    [bId, loadouts, empty, includeBaseStats, includeDerivedStats, includeRenownStats]
   );
 
-  const loadoutA = aId ? loadoutService.getLoadoutForSide('A') : null;
-  const loadoutB = bId ? loadoutService.getLoadoutForSide('B') : null;
+  const loadoutA = useMemo(
+    () => (aId ? loadouts.find((l) => l.id === aId) || null : null),
+    [aId, loadouts]
+  );
+  const loadoutB = useMemo(
+    () => (bId ? loadouts.find((l) => l.id === bId) || null : null),
+    [bId, loadouts]
+  );
   const hasAnyCareer = Boolean(loadoutA?.career || loadoutB?.career);
 
   // Removed A/B equipped counts and related helpers per request

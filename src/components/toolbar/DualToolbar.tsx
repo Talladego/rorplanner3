@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Career, Loadout } from '../../types';
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { urlService } from '../../services/loadout/urlService';
+import { useLoadoutStore } from '../../hooks/useLoadoutStore';
 // import { formatCareerName } from '../utils/formatters';
 import CareerSelect from './CareerSelect';
 
@@ -10,48 +11,46 @@ interface SideToolbarProps {
 }
 
 function SideToolbar({ side }: SideToolbarProps) {
-  const [selectedCareer, setSelectedCareer] = useState<Career | ''>('');
-  const [level, setLevel] = useState(40);
-  const [renownRank, setRenownRank] = useState(80);
-  const [characterName, setCharacterName] = useState('');
+  const loadout = useLoadoutStore((s): Loadout | null => {
+    const id = s.sideLoadoutIds[side];
+    return id ? s.loadouts.find((l) => l.id === id) || null : null;
+  });
+  const [selectedCareer, setSelectedCareer] = useState<Career | ''>(loadout?.career || '');
+  const [level, setLevel] = useState(loadout?.level ?? 40);
+  const [renownRank, setRenownRank] = useState(loadout?.renownRank ?? 80);
+  const [characterName, setCharacterName] = useState(loadout?.characterName || '');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   // Track pending name during async character load to suppress store-driven reversions
   const pendingNameRef = useRef<string | null>(null);
-  const [, setLoadout] = useState<Loadout | null>(loadoutService.getLoadoutForSide(side));
 
-  // Sync with events
+  // Mirror store loadout into local editable fields (skip name while a load is in-flight)
   useEffect(() => {
-    const unsub = loadoutService.subscribeToAllEvents((ev) => {
-      if (
-        ev.type === 'SIDE_LOADOUT_ASSIGNED' ||
-        ev.type === 'LOADOUT_SWITCHED' ||
-        ev.type === 'CAREER_CHANGED' ||
-        ev.type === 'LEVEL_CHANGED' ||
-        ev.type === 'RENOWN_RANK_CHANGED' ||
-        ev.type === 'LOADOUT_RESET' ||
-        ev.type === 'CHARACTER_LOADED' ||
-        ev.type === 'CHARACTER_LOADED_FROM_URL'
-      ) {
-        const lo = loadoutService.getLoadoutForSide(side);
-        setLoadout(lo);
-        if (lo) {
-          setSelectedCareer(lo.career || '');
-          setLevel(lo.level);
-          setRenownRank(lo.renownRank);
-          // Suppress store-driven name updates while a new character load is in-flight.
-          // Only update from store when the character has finished loading.
-          if (ev.type === 'CHARACTER_LOADED' || ev.type === 'CHARACTER_LOADED_FROM_URL') {
-            setCharacterName(lo.characterName || pendingNameRef.current || '');
-            pendingNameRef.current = null;
-            setLoadError(null);
-          } else if (pendingNameRef.current === null) {
-            setCharacterName(lo.characterName || '');
-          }
-        }
+    if (!loadout) return;
+    setSelectedCareer(loadout.career || '');
+    setLevel(loadout.level);
+    setRenownRank(loadout.renownRank);
+    if (pendingNameRef.current === null) {
+      setCharacterName(loadout.characterName || '');
+    }
+  }, [loadout]);
+
+  // Character-load side effects still come through the event bus
+  useEffect(() => {
+    const onLoaded = () => {
+      const lo = loadoutService.getLoadoutForSide(side);
+      if (lo) {
+        setCharacterName(lo.characterName || pendingNameRef.current || '');
       }
-    });
-    return unsub;
+      pendingNameRef.current = null;
+      setLoadError(null);
+    };
+    const unsub1 = loadoutService.subscribeToEvents('CHARACTER_LOADED', onLoaded);
+    const unsub2 = loadoutService.subscribeToEvents('CHARACTER_LOADED_FROM_URL', onLoaded);
+    return () => {
+      unsub1();
+      unsub2();
+    };
   }, [side]);
 
   // Ensure side loadout exists on mount (skip if URL already has params to be parsed)
@@ -61,14 +60,6 @@ function SideToolbar({ side }: SideToolbarProps) {
       const hasParams = hash.includes('?');
       if (!hasParams) {
         loadoutService.ensureSideLoadout(side);
-        const lo = loadoutService.getLoadoutForSide(side);
-        setLoadout(lo);
-        if (lo) {
-          setSelectedCareer(lo.career || '');
-          setLevel(lo.level);
-          setRenownRank(lo.renownRank);
-          setCharacterName(lo.characterName || '');
-        }
       }
     } catch (_err) {
       // intentionally ignore; ensuring side loadout can be a no-op during init

@@ -1,5 +1,5 @@
 import React, { useState, Suspense } from 'react';
-import { EquipSlot, Item, Stat, Career, ItemRarity, CAREER_RACE_MAPPING } from '../../types';
+import { EquipSlot, Item, Stat, Career, ItemRarity } from '../../types';
 import { loadoutService } from '../../services/loadout/loadoutService';
 import { useLoadoutData } from '../../hooks/useLoadoutData';
 import { useLoadoutById } from '../../hooks/useLoadoutById';
@@ -10,8 +10,6 @@ import Tooltip from '../tooltip/Tooltip';
 import HoverTooltip from '../tooltip/HoverTooltip';
 import { forceClearSlotHoverBright } from '../../utils/hoverBright';
 import { formatSlotName } from '../../utils/formatters';
-import { isTwoHandedWeapon } from '../../utils/items';
-import { getOffhandBlockReason, STAFF_ONLY_CAREERS, TWO_H_ONLY_CAREERS, CANNOT_USE_2H_MELEE } from '../../constants/careerWeaponRules';
 
 interface EquipmentPanelProps {
   selectedCareer: Career | '';
@@ -30,6 +28,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   const effectiveLoadout = (loadoutId !== undefined) ? loadout : currentLoadout;
   const [selectedSlot, setSelectedSlot] = useState<EquipSlot | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [equipError, setEquipError] = useState<string>('');
 
   const [talismanSlot, setTalismanSlot] = useState<{ slot: EquipSlot; index: number } | null>(null);
   const hasCareer = !!selectedCareer;
@@ -45,14 +44,6 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   const [talismanStatsFilter, setTalismanStatsFilter] = useState<Stat[]>([]);
   const [talismanRarityFilter, setTalismanRarityFilter] = useState<ItemRarity[]>([]);
 
-  // Helper function to check if an item is eligible based on level/renown requirements
-  const isItemEligible = (item: Item | null): boolean => {
-    if (!item || !effectiveLoadout) return true;
-    const levelEligible = !item.levelRequirement || item.levelRequirement <= effectiveLoadout.level;
-    const renownEligible = !item.renownRankRequirement || item.renownRankRequirement <= effectiveLoadout.renownRank;
-    return levelEligible && renownEligible;
-  };
-
   const handleSlotClick = (slot: EquipSlot) => {
     // Do not open selector unless a career has been selected
     if (!hasCareer) return;
@@ -65,7 +56,9 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   const handleItemSelect = async (item: Item) => {
     // Capture slot before any await to avoid race with onClose() clearing state
     const slotToUpdate = selectedSlot;
-    if (slotToUpdate) {
+    if (!slotToUpdate) return;
+    try {
+      setEquipError('');
       // Fetch complete item details including set bonuses
       const completeItem = await loadoutService.getItemWithDetails(item.id);
       if (loadoutId) {
@@ -74,6 +67,10 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
         await loadoutService.updateItem(slotToUpdate, completeItem);
       }
       // No need to manually update local state - the hook handles reactivity
+    } catch (error) {
+      const message = (error as Error)?.message || 'Failed to equip item';
+      console.error('Failed to equip item:', error);
+      setEquipError(message);
     }
   };
 
@@ -99,7 +96,9 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   const handleTalismanSelect = async (talisman: Item) => {
     // Capture talisman slot before any await to avoid race with onClose() clearing state
     const slotInfo = talismanSlot;
-    if (slotInfo) {
+    if (!slotInfo) return;
+    try {
+      setEquipError('');
       // Fetch complete talisman details including set bonuses
       const completeTalisman = await loadoutService.getItemWithDetails(talisman.id);
       if (loadoutId) {
@@ -107,6 +106,10 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
       } else {
         await loadoutService.updateTalisman(slotInfo.slot, slotInfo.index, completeTalisman);
       }
+    } catch (error) {
+      const message = (error as Error)?.message || 'Failed to equip talisman';
+      console.error('Failed to equip talisman:', error);
+      setEquipError(message);
     }
   };
 
@@ -157,6 +160,11 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
   return (
     <div className={wrapperClass}>
       {!hideHeading && <h2 className="panel-heading">Equipment</h2>}
+      <div className="min-h-[16px] mb-1 flex items-center">
+        {equipError && (
+          <div className="text-[11px] text-red-600 leading-snug w-full truncate" title={equipError}>{equipError}</div>
+        )}
+      </div>
     {/* Grid of equipment slots */}
   <div className={`grid grid-cols-2 ${compact ? 'gap-1' : 'gap-2'}`}>
         {slotOrder.map((slot, index) => {
@@ -166,49 +174,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
 
           const slotData = effectiveLoadout.items[slot];
           const item = slotData.item || null;
-          // Slot compatibility mirror of selector rules (per target slot)
-          const invalidBySlotIncompatible = !!item && (() => {
-            const targetSlot = slot;
-            if (targetSlot === EquipSlot.POCKET1 || targetSlot === EquipSlot.POCKET2) {
-              return !(item.slot === EquipSlot.POCKET1 || item.slot === EquipSlot.POCKET2);
-            }
-            if (targetSlot === EquipSlot.MAIN_HAND) {
-              return !(item.slot === EquipSlot.MAIN_HAND || item.slot === EquipSlot.EITHER_HAND);
-            }
-            if (targetSlot === EquipSlot.OFF_HAND) {
-              return !(item.slot === EquipSlot.OFF_HAND || item.slot === EquipSlot.EITHER_HAND);
-            }
-            if (targetSlot === EquipSlot.JEWELLERY2 || targetSlot === EquipSlot.JEWELLERY3 || targetSlot === EquipSlot.JEWELLERY4) {
-              return !(item.slot === targetSlot || item.slot === EquipSlot.JEWELLERY1);
-            }
-            return item.slot !== targetSlot;
-          })();
-          const invalidByLevel = item ? !isItemEligible(item) : false;
-          const invalidByCareer = item && selectedCareer
-            ? (item.careerRestriction && item.careerRestriction.length > 0 && !item.careerRestriction.includes(selectedCareer))
-            : false;
-          const invalidByRace = item && selectedCareer
-            ? (item.raceRestriction && item.raceRestriction.length > 0 && !item.raceRestriction.some(r => (CAREER_RACE_MAPPING[selectedCareer as Career] || []).includes(r)))
-            : false;
-          const mainItem = effectiveLoadout.items[EquipSlot.MAIN_HAND]?.item || null;
-          const invalidBy2HConflict = item ? (
-            (slot === EquipSlot.OFF_HAND && mainItem && isTwoHandedWeapon(mainItem))
-          ) : false;
-          const invalidByPolicy = item && selectedCareer ? (
-            (slot === EquipSlot.OFF_HAND && !!getOffhandBlockReason(selectedCareer as Career, item)) ||
-            (slot === EquipSlot.MAIN_HAND && (
-              (STAFF_ONLY_CAREERS.has(selectedCareer as Career) && item.type !== 'STAFF') ||
-              (TWO_H_ONLY_CAREERS.has(selectedCareer as Career) && !isTwoHandedWeapon(item)) ||
-              (CANNOT_USE_2H_MELEE.has(selectedCareer as Career) && isTwoHandedWeapon(item))
-            ))
-          ) : false;
-          // Unique-equpped: if the same unique item appears earlier in the UI order, mark this later one invalid
-          const earlierSlots = slotOrder.slice(0, index).filter((s): s is EquipSlot => s !== null);
-          const invalidByUniqueDuplicate = !!item && !!item.uniqueEquipped && earlierSlots.some((s) => {
-            const earlier = effectiveLoadout.items[s]?.item || null;
-            return earlier && earlier.id === item.id;
-          });
-          const isSlotItemInvalid = !!item && (invalidByLevel || invalidByCareer || invalidByRace || invalidBySlotIncompatible || invalidBy2HConflict || invalidByPolicy || invalidByUniqueDuplicate);
+          const isSlotItemInvalid = !!item && !loadoutService.getItemEligibility(slot, item, effectiveLoadout.id).eligible;
           return (
             <div key={slot} className="relative" data-side={side || ''} data-slot={slot}>
               <div className={`equipment-slot ${compact ? 'p-1' : ''}`}>
@@ -409,23 +375,7 @@ export default function EquipmentPanel({ selectedCareer, loadoutId, compact = fa
           const item = slotData.item || null;
           // Match single-column width inside a two-column grid (subtract half the gap)
           const eventTileWidth = compact ? 'calc(50% - 0.125rem)' : 'calc(50% - 0.25rem)';
-          // Event: only accept items for EVENT slot
-          const invalidBySlotIncompatible = !!item && (item.slot !== EquipSlot.EVENT);
-          const invalidByLevel = item ? !isItemEligible(item) : false;
-          const invalidByCareer = item && selectedCareer
-            ? (item.careerRestriction && item.careerRestriction.length > 0 && !item.careerRestriction.includes(selectedCareer))
-            : false;
-          const invalidByRace = item && selectedCareer
-            ? (item.raceRestriction && item.raceRestriction.length > 0 && !item.raceRestriction.some(r => (CAREER_RACE_MAPPING[selectedCareer as Career] || []).includes(r)))
-            : false;
-          const invalidBy2HConflict = false;
-          const invalidByPolicy = false;
-          const earlierSlots = slotOrder.filter((s): s is EquipSlot => s !== null);
-          const invalidByUniqueDuplicate = !!item && !!item.uniqueEquipped && earlierSlots.some((s) => {
-            const earlier = effectiveLoadout.items[s]?.item || null;
-            return earlier && earlier.id === item.id;
-          });
-          const isSlotItemInvalid = !!item && (invalidByLevel || invalidByCareer || invalidByRace || invalidBySlotIncompatible || invalidBy2HConflict || invalidByPolicy || invalidByUniqueDuplicate);
+          const isSlotItemInvalid = !!item && !loadoutService.getItemEligibility(slot, item, effectiveLoadout.id).eligible;
           return (
             <div key="event-full" className="col-span-2 flex justify-center">
               <div className="relative" data-side={side || ''} data-slot={slot} style={{ width: eventTileWidth, maxWidth: '100%' }}>

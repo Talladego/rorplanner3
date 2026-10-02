@@ -322,8 +322,6 @@ class UrlService {
 		this.updateUrlWithCompare(a, b);
 	}
 
-	clearCharacterFromUrl(): void { return; }
-
 	clearLoadoutFromUrl(): void {
 		const params = this.getSearchParams();
 		const keys = Array.from(params.keys());
