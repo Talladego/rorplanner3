@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Career, EquipSlot, Item, Loadout, LoadoutSide, StatsSummary } from '../../types';
+import { EquipSlot, type Career, type Item, type Loadout, type LoadoutSide, type StatsSummary } from '../../types';
 import { createInitialLoadout } from './state';
 import { emptyRenownAbilities } from '../../services/loadout/renownConfig';
 import * as sel from './selectors';
@@ -178,6 +178,42 @@ export function buildActions(set: SetState, get: GetState) {
       newItems[slot] = { ...newItems[slot], talismans };
       const updated = { ...target, items: newItems } as Loadout;
       return { loadouts: state.loadouts.map((l: Loadout) => (l.id === loadoutId ? updated : l)) };
+    }),
+
+    // Single write so a side-to-side copy does not nest a React update per slot.
+    copyLoadoutOnto: (targetId: string, sourceId: string) => set((state: any) => {
+      if (!targetId || !sourceId || targetId === sourceId) return state;
+      const source = state.loadouts.find((l: Loadout) => l.id === sourceId) as Loadout | undefined;
+      const target = state.loadouts.find((l: Loadout) => l.id === targetId) as Loadout | undefined;
+      if (!source || !target) return state;
+      const slotKeys = new Set<string>([
+        ...Object.values(EquipSlot),
+        ...Object.keys(source.items || {}),
+      ]);
+      const items = {} as Loadout['items'];
+      slotKeys.forEach((slot) => {
+        const data = source.items?.[slot as EquipSlot];
+        items[slot as EquipSlot] = {
+          item: data?.item ?? null,
+          talismans: data?.talismans ? data.talismans.slice() : [],
+        };
+      });
+      const renownAbilities = {
+        ...emptyRenownAbilities(),
+        ...(source.renownAbilities || {}),
+      };
+      delete (renownAbilities as { regeneration?: number }).regeneration;
+      const updated: Loadout = {
+        ...target,
+        career: source.career,
+        level: source.level,
+        renownRank: source.renownRank,
+        renownAbilities,
+        isFromCharacter: !!source.isFromCharacter,
+        characterName: source.characterName,
+        items,
+      };
+      return { loadouts: state.loadouts.map((l: Loadout) => (l.id === targetId ? updated : l)) };
     }),
 
     resetCurrentLoadout: () => set((state: any) => {

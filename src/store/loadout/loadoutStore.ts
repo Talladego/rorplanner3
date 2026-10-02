@@ -20,6 +20,7 @@ interface LoadoutState {
   setTalisman: (slot: EquipSlot, index: number, talisman: Item | null) => void;
   setItemForLoadout: (loadoutId: string, slot: EquipSlot, item: Item | null) => void;
   setTalismanForLoadout: (loadoutId: string, slot: EquipSlot, index: number, talisman: Item | null) => void;
+  copyLoadoutOnto: (targetId: string, sourceId: string) => void;
   setCareerForLoadout: (loadoutId: string, career: Career | null) => void;
   setLevelForLoadout: (loadoutId: string, level: number) => void;
   setRenownForLoadout: (loadoutId: string, renownRank: number) => void;
