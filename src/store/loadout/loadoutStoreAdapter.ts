@@ -18,6 +18,7 @@ class LoadoutStoreAdapter implements ILoadoutStore {
   setTalisman(slot: EquipSlot, index: number, talisman: Item | null): void { useLoadoutStore.getState().setTalisman(slot, index, talisman); }
   setItemForLoadout(loadoutId: string, slot: EquipSlot, item: Item | null): void { useLoadoutStore.getState().setItemForLoadout(loadoutId, slot, item); }
   setTalismanForLoadout(loadoutId: string, slot: EquipSlot, index: number, talisman: Item | null): void { useLoadoutStore.getState().setTalismanForLoadout(loadoutId, slot, index, talisman); }
+  copyLoadoutOnto(targetId: string, sourceId: string): void { useLoadoutStore.getState().copyLoadoutOnto(targetId, sourceId); }
   setCareerForLoadout(loadoutId: string, career: Career | null): void { useLoadoutStore.getState().setCareerForLoadout(loadoutId, career); }
   setLevelForLoadout(loadoutId: string, level: number): void { useLoadoutStore.getState().setLevelForLoadout(loadoutId, level); }
   setRenownForLoadout(loadoutId: string, renownRank: number): void { useLoadoutStore.getState().setRenownForLoadout(loadoutId, renownRank); }

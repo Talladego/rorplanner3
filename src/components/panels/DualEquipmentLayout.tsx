@@ -78,41 +78,11 @@ export default function DualEquipmentLayout() {
 
     await loadoutService.selectSideForEdit(to);
 
-    // Suppress URL churn and unique-equipment conflicts by clearing target first
+    // One write. Copying slot-by-slot nests a React update per item/talisman inside
+    // this click and aborts before later slots (back, belt, jewels) are written.
     loadoutService.beginBulkApply();
     try {
-      // 1) Clear all target slots to avoid unique-equipped and compatibility conflicts
-      for (const slot of Object.values(EquipSlot)) {
-        await loadoutService.updateItemForLoadout(targetId, slot, null);
-      }
-
-      // 2) Copy basic fields
-      loadoutService.setCareerForLoadout(targetId, source.career);
-      loadoutService.setLevelForLoadout(targetId, source.level);
-      loadoutService.setRenownForLoadout(targetId, source.renownRank);
-      // Copy character metadata (toolbar load field)
-      loadoutService.setCharacterStatusForLoadout(targetId, !!source.isFromCharacter, source.characterName);
-
-      // 2b) Copy renown abilities
-      const abilities = source.renownAbilities || {};
-      for (const [ab, lvl] of Object.entries(abilities)) {
-        const levelNum = typeof lvl === 'number' ? lvl : Number(lvl) || 0;
-        loadoutService.setRenownAbilityLevelForLoadout(
-          targetId,
-          ab as keyof NonNullable<typeof source.renownAbilities>,
-          levelNum,
-        );
-      }
-
-      // 3) Copy items and talismans across all slots
-      for (const [slotKey, data] of Object.entries(source.items)) {
-        const slot = slotKey as unknown as EquipSlot;
-        await loadoutService.updateItemForLoadout(targetId, slot, data.item);
-        const talismans = data.talismans || [];
-        for (let idx = 0; idx < talismans.length; idx++) {
-          await loadoutService.updateTalismanForLoadout(targetId, slot, idx, talismans[idx]);
-        }
-      }
+      loadoutService.copyLoadoutOnto(targetId, source.id);
     } finally {
       loadoutService.endBulkApply();
     }

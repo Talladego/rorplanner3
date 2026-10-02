@@ -502,6 +502,13 @@ export const loadoutService = {
     return cloneLoadoutMutation(sourceId, name);
   },
 
+  // Replace target equipment, talismans, career, level, renown, and character
+  // metadata from source in one store write.
+  copyLoadoutOnto(targetId: string, sourceId: string) {
+    loadoutStoreAdapter.copyLoadoutOnto(targetId, sourceId);
+    this.getStatsSummary();
+  },
+
   // Detailed stats for arbitrary loadout id (delegated)
   computeStatsForLoadout(loadoutId: string, opts?: { includeRenown?: boolean }) {
     return statsFacade.computeStatsForLoadout(loadoutId, opts);
