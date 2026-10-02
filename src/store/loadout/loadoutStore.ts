@@ -31,7 +31,7 @@ interface LoadoutState {
   setLoadoutNameForLoadout: (loadoutId: string, name: string) => void;
   resetLoadoutById: (loadoutId: string) => void;
   resetCurrentLoadout: () => void;
-  calculateStats: () => void;
+  setStatsSummary: (stats: StatsSummary) => void;
   // Mode actions
   getActiveSide: () => LoadoutSide;
   setActiveSide: (side: LoadoutSide) => void;

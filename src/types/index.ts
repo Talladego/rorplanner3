@@ -224,7 +224,7 @@ export interface ILoadoutStore {
   setLevelForLoadout(loadoutId: string, level: number): void;
   setRenownForLoadout(loadoutId: string, renownRank: number): void;
   resetCurrentLoadout(): void;
-  calculateStats(): void;
+  setStatsSummary(stats: StatsSummary): void;
   // Mode setters (dual-only)
   setActiveSide(side: LoadoutSide): void;
   assignSideLoadout(side: LoadoutSide, loadoutId: string | null): void;

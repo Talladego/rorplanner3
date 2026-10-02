@@ -2,7 +2,7 @@
 
 import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 // GraphQL operations imported from generated typed documents
-import { EquipSlot, Item, Career, Stat, ItemRarity, LoadoutSide } from '../../types';
+import { EquipSlot, Item, Career, Stat, LoadoutSide } from '../../types';
 import { loadoutEventEmitter } from './loadoutEventEmitter';
 import { subscribeToEvents as subscribeToEventsHelper, subscribeToAllEvents as subscribeToAllEventsHelper } from './events';
 import { urlService } from './urlService';
@@ -11,11 +11,11 @@ import { LoadoutEvents } from '../../types/events';
 // (Removed direct character GraphQL queries from service; handled in characterImport module)
 // Character import extracted to separate module
 import { loadFromNamedCharacter as loadFromNamedCharacterExternal, importFromCharacter as importFromCharacterExternal } from './characterImport';
-import { getItemsForSlotApi, getTalismansForItemLevelApi, getItemWithDetailsApi } from './api';
+import { getItemWithDetailsApi } from './api';
 import * as statsFacade from './statsFacade';
 // Validation helpers handled in equipmentValidation module
-import { getItemEligibility as getItemEligibilityShared, getTalismanEligibility as getTalismanEligibilityShared, validateItemForCurrentLoadout, validateItemForLoadout } from './equipmentValidation';
-import { sanitizeHasStats, getAllowedFilterStats } from './filters';
+import { getItemEligibility as getItemEligibilityShared, getTalismanEligibility as getTalismanEligibilityShared, validateItemForCurrentLoadout, validateItemForLoadout, canEquipUniqueItem as canEquipUniqueItemShared } from './equipmentValidation';
+import { getAllowedFilterStats } from './filters';
 import { getBlockInvalidItems } from '../ui/selectorPrefs';
 import * as selectors from './selectors';
 import {
@@ -205,16 +205,7 @@ export const loadoutService = {
 
   // Check if equipping this item would violate unique-equipped rules
   canEquipUniqueItem(item: Item, loadoutId?: string): { canEquip: boolean; reason?: string } {
-    if (!item.uniqueEquipped) {
-      return { canEquip: true };
-    }
-
-    // Check if this exact item is already equipped in the target loadout
-    if (this.isUniqueItemAlreadyEquippedInLoadout(item.id, loadoutId)) {
-      return { canEquip: false, reason: 'This unique item is already equipped' };
-    }
-
-    return { canEquip: true };
+    return canEquipUniqueItemShared(item, loadoutId);
   },
 
   async updateItem(slot: EquipSlot, item: Item | null) {
@@ -278,89 +269,11 @@ export const loadoutService = {
     if (!this._isCharacterLoading) urlService.updateUrlForCurrentLoadout();
   },
 
-  // 3. Fetch items for equipment selection
-  /**
-   * Fetch a paginated list of items for a specific slot.
-   * Cache-first (Apollo) + in-memory LRU keyed by filters/cursors. Prefetches next page and warms icon cache.
-   */
-  async getItemsForSlot(slot: EquipSlot | null, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
-    try {
-      const allowedStats = sanitizeHasStats(hasStats);
-      // Delegate to API module; compatibility filters handled in query builder
-      return await getItemsForSlotApi(
-        slot,
-        career,
-        limit,
-        after,
-        levelRequirement,
-        renownRankRequirement,
-        nameFilter,
-        allowedStats,
-        hasRarities,
-        before,
-        last,
-      );
-    } catch (error) {
-      console.error('Failed to fetch items for slot:', error);
-      throw error;
-    }
-  },
-
-  // Helper method for single slot queries (compat alias)
-  async getItemsForSingleSlot(slot: EquipSlot | null, career?: Career, limit: number = 50, after?: string, levelRequirement: number = 40, renownRankRequirement: number = 80, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
-    // Preserve method for compatibility, but delegate to API implementation
-    return await getItemsForSlotApi(
-      slot,
-      career,
-      limit,
-      after,
-      levelRequirement,
-      renownRankRequirement,
-      nameFilter,
-      hasStats,
-      hasRarities,
-      before,
-      last,
-    );
-  },
-
-  // 3.5. Fetch talismans for holding item's level requirement (rule: talisman.levelRequirement ≤ holding item.levelRequirement)
-  /**
-   * Fetch talismans whose level requirement is <= the holding item's level.
-   * Cache-first + LRU; prefetch next page and warm icons.
-   */
-  async getTalismansForItemLevel(holdingLevelRequirement: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
-    try {
-      const allowedStats = sanitizeHasStats(hasStats);
-      return await getTalismansForItemLevelApi(
-        holdingLevelRequirement,
-        limit,
-        after,
-        nameFilter,
-        allowedStats,
-        hasRarities,
-        before,
-        last,
-      );
-    } catch (error) {
-      console.error('Failed to fetch talismans for level req:', error);
-      throw error;
-    }
-  },
-
   // Expose allowed filter stats for UI consumption
   /** Return the allowlist of stats permitted in filters. */
   getAllowedFilterStats(): Stat[] {
     return getAllowedFilterStats();
   },
-
-  // 3.7. Get talismans for a specific slot (no special cases)
-  /** Alias to getTalismansForItemLevel; slot param unused for compatibility. */
-  async getTalismansForSlot(_slot: EquipSlot, holdingLevelRequirement: number, limit: number = 50, after?: string, nameFilter?: string, hasStats?: Stat[], hasRarities?: ItemRarity[], before?: string, last?: number): Promise<any> {
-    return await this.getTalismansForItemLevel(holdingLevelRequirement, limit, after, nameFilter, hasStats, hasRarities, before, last);
-  },
-
-  // Legendary talisman special-case removed (schema lacks reliable indicators)
 
   // 3. Retrieve stats summary
   /** Recompute and emit the aggregate stats summary for the current loadout. */

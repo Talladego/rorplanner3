@@ -109,21 +109,22 @@ export function getTalismanEligibility(slot: EquipSlot, index: number, talisman:
   return { eligible: reasons.length === 0, reasons };
 }
 
-export function validateItemForCurrentLoadout(slot: EquipSlot, item: Item) {
-  const loadout = loadoutStoreAdapter.getCurrentLoadout();
-  if (!loadout) return; // nothing to validate if none selected
+type LoadoutLike = NonNullable<ReturnType<typeof loadoutStoreAdapter.getCurrentLoadout>>;
+
+/** Shared throw-on-invalid equip rules used by both current and targeted loadout validators. */
+function assertItemValid(loadout: LoadoutLike, slot: EquipSlot, item: Item, loadoutIdForUnique?: string) {
   // Unique-equipped
-  if (item.uniqueEquipped && isUniqueItemAlreadyEquippedInLoadout(item.id, loadout.id)) {
+  if (item.uniqueEquipped && isUniqueItemAlreadyEquippedInLoadout(item.id, loadoutIdForUnique ?? loadout.id)) {
     throw new Error('This unique item is already equipped');
   }
   // Career restriction
-  if (loadout?.career && Array.isArray(item.careerRestriction) && item.careerRestriction.length > 0) {
+  if (loadout.career && Array.isArray(item.careerRestriction) && item.careerRestriction.length > 0) {
     if (!item.careerRestriction.includes(loadout.career as Career)) {
       throw new Error('Not usable by this career');
     }
   }
   // Race restriction
-  if (loadout?.career && Array.isArray(item.raceRestriction) && item.raceRestriction.length > 0) {
+  if (loadout.career && Array.isArray(item.raceRestriction) && item.raceRestriction.length > 0) {
     const allowedRaces = CAREER_RACE_MAPPING[loadout.career as Career] || [];
     const ok = item.raceRestriction.some(r => allowedRaces.includes(r));
     if (!ok) throw new Error('Not usable by this race');
@@ -158,17 +159,17 @@ export function validateItemForCurrentLoadout(slot: EquipSlot, item: Item) {
   }
   // Main-hand career constraints
   if (slot === EquipSlot.MAIN_HAND && item && career) {
-  if (STAFF_ONLY_CAREERS.has(career as Career)) {
+    if (STAFF_ONLY_CAREERS.has(career as Career)) {
       if (item.type !== 'STAFF') {
         throw new Error('This career must equip a two-handed staff in the main hand');
       }
     }
-  if (TWO_H_ONLY_CAREERS.has(career as Career)) {
+    if (TWO_H_ONLY_CAREERS.has(career as Career)) {
       if (!isTwoHandedWeapon(item)) {
         throw new Error('This career must equip a two-handed weapon in the main hand');
       }
     }
-  if (CANNOT_USE_2H_MELEE.has(career as Career)) {
+    if (CANNOT_USE_2H_MELEE.has(career as Career)) {
       if (isTwoHandedWeapon(item)) {
         throw new Error('This career cannot equip two-handed weapons');
       }
@@ -176,69 +177,15 @@ export function validateItemForCurrentLoadout(slot: EquipSlot, item: Item) {
   }
 }
 
+export function validateItemForCurrentLoadout(slot: EquipSlot, item: Item) {
+  const loadout = loadoutStoreAdapter.getCurrentLoadout();
+  if (!loadout) return;
+  assertItemValid(loadout, slot, item, loadout.id);
+}
+
 export function validateItemForLoadout(loadoutId: string, slot: EquipSlot, item: Item) {
   const target = loadoutStoreAdapter.getLoadouts().find(l => l.id === loadoutId);
   if (!target) return;
-  // Unique-equipped
-  if (item.uniqueEquipped && isUniqueItemAlreadyEquippedInLoadout(item.id, loadoutId)) {
-    throw new Error('This unique item is already equipped');
-  }
-  // Career restriction
-  if (target?.career && Array.isArray(item.careerRestriction) && item.careerRestriction.length > 0) {
-    if (!item.careerRestriction.includes(target.career as Career)) {
-      throw new Error('Not usable by this career');
-    }
-  }
-  // Race restriction
-  if (target?.career && Array.isArray(item.raceRestriction) && item.raceRestriction.length > 0) {
-    const allowedRaces = CAREER_RACE_MAPPING[target.career as Career] || [];
-    const ok = item.raceRestriction.some(r => allowedRaces.includes(r));
-    if (!ok) throw new Error('Not usable by this race');
-  }
-  // Two-handed vs off-hand exclusivity
-  const main = target.items[EquipSlot.MAIN_HAND]?.item || null;
-  const off = target.items[EquipSlot.OFF_HAND]?.item || null;
-  const career = target.career || null;
-  if (slot === EquipSlot.MAIN_HAND && item && isTwoHandedWeapon(item) && off) {
-    throw new Error('Cannot equip a two-handed weapon while an off-hand is equipped');
-  }
-  if (slot === EquipSlot.OFF_HAND && item && main && isTwoHandedWeapon(main)) {
-    throw new Error('Cannot equip an off-hand while a two-handed weapon is equipped in the main hand');
-  }
-  if (slot === EquipSlot.OFF_HAND && item && career) {
-    const reason = getOffhandBlockReason(career, item);
-    if (reason) throw new Error(reason);
-  }
-  // Slot compatibility
-  if (item) {
-    if (slot === EquipSlot.POCKET1 || slot === EquipSlot.POCKET2) {
-      if (!(item.slot === EquipSlot.POCKET1 || item.slot === EquipSlot.POCKET2)) throw new Error('Not compatible with this slot');
-    } else if (slot === EquipSlot.MAIN_HAND) {
-      if (!(item.slot === EquipSlot.MAIN_HAND || item.slot === EquipSlot.EITHER_HAND)) throw new Error('Not compatible with this slot');
-    } else if (slot === EquipSlot.OFF_HAND) {
-      if (!(item.slot === EquipSlot.OFF_HAND || item.slot === EquipSlot.EITHER_HAND)) throw new Error('Not compatible with this slot');
-    } else if (slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4) {
-      if (!(item.slot === slot || item.slot === EquipSlot.JEWELLERY1)) throw new Error('Not compatible with this slot');
-    } else {
-      if (item.slot !== slot) throw new Error('Not compatible with this slot');
-    }
-  }
-  // Main-hand career constraints
-  if (slot === EquipSlot.MAIN_HAND && item && career) {
-  if (STAFF_ONLY_CAREERS.has(career as Career)) {
-      if (item.type !== 'STAFF') {
-        throw new Error('This career must equip a two-handed staff in the main hand');
-      }
-    }
-  if (TWO_H_ONLY_CAREERS.has(career as Career)) {
-      if (!isTwoHandedWeapon(item)) {
-        throw new Error('This career must equip a two-handed weapon in the main hand');
-      }
-    }
-  if (CANNOT_USE_2H_MELEE.has(career as Career)) {
-      if (isTwoHandedWeapon(item)) {
-        throw new Error('This career cannot equip two-handed weapons');
-      }
-    }
-  }
+  assertItemValid(target, slot, item, loadoutId);
 }
+

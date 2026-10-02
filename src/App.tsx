@@ -4,48 +4,10 @@ import { loadoutService } from './services/loadout/loadoutService';
 import { urlService } from './services/loadout/urlService';
 import DualToolbar from './components/toolbar/DualToolbar';
 import DualEquipmentLayout from './components/panels/DualEquipmentLayout';
-import ScaleToFit from './components/layout/ScaleToFit';
 import ApolloProviderWrapper from './providers/ApolloProvider';
 import ErrorBoundary from './providers/ErrorBoundary';
 import { preloadCareerIcons } from './constants/careerIcons';
-import { DESIGN_WIDTH, SCALE_MAX, SCALE_MIN } from './constants/ui';
 // Presentation layer should subscribe through the service API, not the raw emitter
-
-function AppHeader() {
-  return (
-    <header className="relative text-center mb-8">
-      <h1 className="text-4xl font-bold text-primary font-brand">RorPlanner</h1>
-      <a
-        href="https://rorleaderboard.pages.dev/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="absolute left-0 top-0 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
-      >
-        Leaderboard
-      </a>
-      <a
-        href="https://discord.com/users/316636548353490944"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="absolute right-4 top-0 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
-      >
-        Feedback
-      </a>
-    </header>
-  );
-}
-
-function AppShell() {
-  return (
-    <div className="min-h-screen py-4">
-      <ScaleToFit designWidth={DESIGN_WIDTH} minScale={SCALE_MIN} maxScale={SCALE_MAX}>
-        <AppHeader />
-        <DualToolbar />
-        <DualEquipmentLayout />
-      </ScaleToFit>
-    </div>
-  );
-}
 
 function App() {
   const navigate = useNavigate();
@@ -138,7 +100,38 @@ function App() {
   return (
     <ErrorBoundary>
       <ApolloProviderWrapper>
-        <AppShell />
+        <div className="min-h-screen py-4">
+          <div className="mx-auto" style={{ width: 1440, minWidth: 1440 }}>
+            <div className="min-h-[16px] mb-1 flex items-center px-1">
+              {errorMessage && (
+                <div className="text-[11px] text-red-600 leading-snug w-full truncate" title={errorMessage}>
+                  {errorMessage}
+                </div>
+              )}
+            </div>
+            <header className="relative text-center mb-8">
+              <h1 className="text-4xl font-bold text-primary font-brand">RorPlanner</h1>
+              <a
+                href="https://rorleaderboard.pages.dev/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute left-0 top-0 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
+              >
+                Leaderboard
+              </a>
+              <a
+                href="https://discord.com/users/316636548353490944"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute right-0 top-0 inline-flex items-center gap-1.5 text-xs italic text-muted hover:underline"
+              >
+                Feedback
+              </a>
+            </header>
+            <DualToolbar />
+            <DualEquipmentLayout />
+          </div>
+        </div>
       </ApolloProviderWrapper>
     </ErrorBoundary>
   );

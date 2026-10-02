@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { EquipSlot, Item, Stat, Career, ItemRarity } from '../../types';
 import { useLoadoutData } from '../../hooks/useLoadoutData';
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, PAGE_SIZE_STORAGE_KEY } from '../../constants/ui';
@@ -152,12 +153,12 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
     setPageHistory([]);
   };
 
-  return (
+  return createPortal(
     <div className="modal-overlay">
       {/* Tier 1 (blue frame) inside modal; modal-as-panel strips default modal chrome */}
-      <div ref={modalRef} className="modal-container modal-as-panel max-w-2xl">
-        <div className="panel-container panel-border-blue-500">
-          <div className="flex items-center justify-between mb-2">
+      <div ref={modalRef} className="modal-container modal-as-panel max-w-2xl flex flex-col min-h-0">
+        <div className="panel-container panel-border-blue-500 flex flex-col min-h-0 max-h-full overflow-hidden">
+          <div className="flex items-center justify-between mb-2 shrink-0">
             <h2 className="panel-heading mb-0">
               {isTalismanMode ? `Select Talisman for ${formatSlotName(slot)}` : `Select Item for ${formatSlotName(slot)}`}
             </h2>
@@ -210,105 +211,112 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
             </div>
           </div>
           {/* Tier 2 dashed container holds filters, list, and pagination */}
-          <div className="field-group">
-            <FilterControls
-              nameFilter={nameFilter}
-              onNameChange={(value) => handleNameFilterChange(value)}
-              rarityFilter={rarityFilter}
-              onRarityChange={(newRarityFilter) => {
-                onRarityFilterChange(newRarityFilter);
-                setCurrentPage(1);
-                setPageHistory([]);
-                setHookCurrentPage(1);
-                setHookPageHistory([]);
-                refetch(nameFilter, statsFilter, newRarityFilter);
-              }}
-              statsFilter={statsFilter}
-              onStatsChange={(normalized) => {
-                onStatsFilterChange(normalized);
-                setCurrentPage(1);
-                setPageHistory([]);
-                setHookCurrentPage(1);
-                setHookPageHistory([]);
-                refetch(nameFilter, normalized, rarityFilter);
-              }}
-              allowedStatOptions={allowedStatOptions}
-              onReset={() => {
-                onNameFilterChange('');
-                onStatsFilterChange([]);
-                onRarityFilterChange([]);
-                setEnableCareerFilter(true);
-                // Also reset Block invalid items to default ON
-                setBlockInvalid(true);
-                setBlockInvalidItems(true);
-                setCurrentPage(1);
-                setPageHistory([]);
-                setHookCurrentPage(1);
-                setHookPageHistory([]);
-                refetch('', [], [], true);
-              }}
-            />
-
-            {error ? (
-              <div className="text-center py-8">
-                <p className="text-red-500 dark:text-red-400 text-sm mb-2">Error loading items</p>
-                <p className="text-muted text-xs">{error}</p>
-              </div>
-            ) : loading ? (
-              <div className="text-center py-16 min-h-[12rem] pointer-events-none select-none" aria-busy="true" aria-live="polite">
-                <p className="text-muted text-sm">Loading items…</p>
-              </div>
-            ) : pageData.items.length === 0 ? (
-              <div className="text-center py-8 min-h-[6rem] pointer-events-none select-none">
-                <p className="text-muted text-sm">No items found</p>
-              </div>
-            ) : (
-              <ResultsList
-                key={`results-${itemsPerPage}`}
-                items={pageData.items.length > itemsPerPage 
-                  ? pageData.items.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                  : pageData.items}
-                isTalismanMode={!!isTalismanMode}
-                loadoutId={loadoutId}
-                slot={slot}
-                career={career}
-                talismanSlotIndex={talismanSlotIndex}
-                onSelect={handleItemSelect}
-                effectiveLoadoutId={effectiveLoadout?.id}
+          <div className="field-group flex flex-col min-h-0 flex-1 overflow-hidden">
+            <div className="shrink-0">
+              <FilterControls
+                nameFilter={nameFilter}
+                onNameChange={(value) => handleNameFilterChange(value)}
+                rarityFilter={rarityFilter}
+                onRarityChange={(newRarityFilter) => {
+                  onRarityFilterChange(newRarityFilter);
+                  setCurrentPage(1);
+                  setPageHistory([]);
+                  setHookCurrentPage(1);
+                  setHookPageHistory([]);
+                  refetch(nameFilter, statsFilter, newRarityFilter);
+                }}
                 statsFilter={statsFilter}
-                blockInvalidItems={blockInvalidItems}
+                onStatsChange={(normalized) => {
+                  onStatsFilterChange(normalized);
+                  setCurrentPage(1);
+                  setPageHistory([]);
+                  setHookCurrentPage(1);
+                  setHookPageHistory([]);
+                  refetch(nameFilter, normalized, rarityFilter);
+                }}
+                allowedStatOptions={allowedStatOptions}
+                onReset={() => {
+                  onNameFilterChange('');
+                  onStatsFilterChange([]);
+                  onRarityFilterChange([]);
+                  setEnableCareerFilter(true);
+                  // Also reset Block invalid items to default ON
+                  setBlockInvalid(true);
+                  setBlockInvalidItems(true);
+                  setCurrentPage(1);
+                  setPageHistory([]);
+                  setHookCurrentPage(1);
+                  setHookPageHistory([]);
+                  refetch('', [], [], true);
+                }}
               />
-            )}
+            </div>
 
-            <PaginationControls
-              loading={loading}
-              totalCount={pageData.totalCount}
-              currentPage={currentPage}
-              pageSize={itemsPerPage}
-              hasNextPage={pageData.hasNextPage}
-              hasPreviousPage={pageData.hasPreviousPage}
-              pageHistoryLength={pageHistory.length}
-              onPrev={handlePreviousPage}
-              onNext={handleNextPage}
-              pageSizeOptions={[...PAGE_SIZE_OPTIONS]}
-              onChangePageSize={(n) => {
-                setItemsPerPage(n);
-                try {
-                  localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(n));
-                } catch {
-                  // ignore storage failures
-                }
-                setCurrentPage(1);
-                setPageHistory([]);
-                setHookCurrentPage(1);
-                setHookPageHistory([]);
-                  // Refetch with new page size so server-side pages reload
-                  refetch(nameFilter, statsFilter, rarityFilter);
-              }}
-            />
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {error ? (
+                <div className="text-center py-8">
+                  <p className="text-red-500 dark:text-red-400 text-sm mb-2">Error loading items</p>
+                  <p className="text-muted text-xs">{error}</p>
+                </div>
+              ) : loading ? (
+                <div className="text-center py-16 min-h-[12rem] pointer-events-none select-none" aria-busy="true" aria-live="polite">
+                  <p className="text-muted text-sm">Loading items…</p>
+                </div>
+              ) : pageData.items.length === 0 ? (
+                <div className="text-center py-8 min-h-[6rem] pointer-events-none select-none">
+                  <p className="text-muted text-sm">No items found</p>
+                </div>
+              ) : (
+                <ResultsList
+                  key={`results-${itemsPerPage}`}
+                  items={pageData.items.length > itemsPerPage 
+                    ? pageData.items.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                    : pageData.items}
+                  isTalismanMode={!!isTalismanMode}
+                  loadoutId={loadoutId}
+                  slot={slot}
+                  career={career}
+                  talismanSlotIndex={talismanSlotIndex}
+                  onSelect={handleItemSelect}
+                  effectiveLoadoutId={effectiveLoadout?.id}
+                  statsFilter={statsFilter}
+                  blockInvalidItems={blockInvalidItems}
+                />
+              )}
+            </div>
+
+            <div className="shrink-0">
+              <PaginationControls
+                loading={loading}
+                totalCount={pageData.totalCount}
+                currentPage={currentPage}
+                pageSize={itemsPerPage}
+                hasNextPage={pageData.hasNextPage}
+                hasPreviousPage={pageData.hasPreviousPage}
+                pageHistoryLength={pageHistory.length}
+                onPrev={handlePreviousPage}
+                onNext={handleNextPage}
+                pageSizeOptions={[...PAGE_SIZE_OPTIONS]}
+                onChangePageSize={(n) => {
+                  setItemsPerPage(n);
+                  try {
+                    localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(n));
+                  } catch {
+                    // ignore storage failures
+                  }
+                  setCurrentPage(1);
+                  setPageHistory([]);
+                  setHookCurrentPage(1);
+                  setHookPageHistory([]);
+                    // Refetch with new page size so server-side pages reload
+                    refetch(nameFilter, statsFilter, rarityFilter);
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

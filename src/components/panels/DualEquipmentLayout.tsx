@@ -4,12 +4,19 @@ import React, { Suspense } from 'react';
 const StatsComparePanel = React.lazy(() => import('./StatsComparePanel'));
 const RenownPanel = React.lazy(() => import('./RenownPanel'));
 import { loadoutService } from '../../services/loadout/loadoutService';
-import { Loadout, EquipSlot } from '../../types';
+import { EquipSlot, Loadout } from '../../types';
+import { useLoadoutStore } from '../../hooks/useLoadoutStore';
 const LoadoutSummaryModal = React.lazy(() => import('../summary/LoadoutSummaryModal'));
 
 export default function DualEquipmentLayout() {
-  const [sideA, setSideA] = useState<Loadout | null>(loadoutService.getLoadoutForSide('A'));
-  const [sideB, setSideB] = useState<Loadout | null>(loadoutService.getLoadoutForSide('B'));
+  const sideA = useLoadoutStore((s) => {
+    const id = s.sideLoadoutIds.A;
+    return id ? s.loadouts.find((l) => l.id === id) || null : null;
+  });
+  const sideB = useLoadoutStore((s) => {
+    const id = s.sideLoadoutIds.B;
+    return id ? s.loadouts.find((l) => l.id === id) || null : null;
+  });
   const [summaryOpenFor, setSummaryOpenFor] = useState<'A' | 'B' | null>(null);
   const [showRenownA, setShowRenownA] = useState(false);
   const [showRenownB, setShowRenownB] = useState(false);
@@ -22,41 +29,21 @@ export default function DualEquipmentLayout() {
       if (!hasParams) {
         loadoutService.ensureSideLoadout('A');
         loadoutService.ensureSideLoadout('B');
-        setSideA(loadoutService.getLoadoutForSide('A'));
-        setSideB(loadoutService.getLoadoutForSide('B'));
       }
     } catch {
-      // non-fatal; event subscription below will reconcile state
+      // non-fatal; store subscription will reconcile state
     }
 
-    // Stay in sync with service events
-    const unsub = loadoutService.subscribeToAllEvents((ev) => {
-      if (
-        ev.type === 'SIDE_LOADOUT_ASSIGNED' ||
-        ev.type === 'LOADOUT_CREATED' ||
-        ev.type === 'LOADOUT_SWITCHED' ||
-        ev.type === 'ITEM_UPDATED' ||
-        ev.type === 'TALISMAN_UPDATED' ||
-        ev.type === 'LOADOUT_RESET' ||
-        ev.type === 'CAREER_CHANGED' ||
-        ev.type === 'LEVEL_CHANGED' ||
-        ev.type === 'RENOWN_RANK_CHANGED' ||
-        ev.type === 'STATS_UPDATED'
-      ) {
-        setSideA(loadoutService.getLoadoutForSide('A'));
-        setSideB(loadoutService.getLoadoutForSide('B'));
-        // If a side was reset while showing Renown, return to Equipment view for that side
-        if (ev.type === 'LOADOUT_RESET') {
-          try {
-            const aId = loadoutService.getSideLoadoutId('A');
-            const bId = loadoutService.getSideLoadoutId('B');
-            const resetId = ev.payload && typeof ev.payload === 'object' ? (ev.payload as { loadoutId?: string }).loadoutId : undefined;
-            if (resetId && aId === resetId) setShowRenownA(false);
-            if (resetId && bId === resetId) setShowRenownB(false);
-          } catch {
-            // noop: best-effort UI reset
-          }
-        }
+    // Side-effect only: collapse renown view when a side is reset
+    const unsub = loadoutService.subscribeToEvents('LOADOUT_RESET', (ev) => {
+      try {
+        const aId = loadoutService.getSideLoadoutId('A');
+        const bId = loadoutService.getSideLoadoutId('B');
+        const resetId = ev.payload && typeof ev.payload === 'object' ? (ev.payload as { loadoutId?: string }).loadoutId : undefined;
+        if (resetId && aId === resetId) setShowRenownA(false);
+        if (resetId && bId === resetId) setShowRenownB(false);
+      } catch {
+        // noop: best-effort UI reset
       }
     });
     return unsub;

@@ -2,14 +2,18 @@ import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 import { loadoutEventEmitter } from './loadoutEventEmitter';
 import { updateUrlIfAuto } from './urlSync';
 import { computeStatsForLoadout as computeStatsForLoadoutExternal, getStatContributionsForLoadout as getStatContributionsForLoadoutExternal } from './stats';
+import { initialStats } from '../../store/loadout/state';
 
 export interface StatsContext {
   isBulk: boolean;
 }
 
 export function getStatsSummary(ctx: StatsContext) {
-  loadoutStoreAdapter.calculateStats();
-  const stats = loadoutStoreAdapter.getStatsSummary();
+  const current = loadoutStoreAdapter.getCurrentLoadout();
+  const stats = current
+    ? computeStatsForLoadoutExternal(current.id, { includeRenown: true })
+    : initialStats;
+  loadoutStoreAdapter.setStatsSummary(stats);
   loadoutEventEmitter.emit({ type: 'STATS_UPDATED', payload: { stats }, timestamp: Date.now() });
   updateUrlIfAuto(ctx.isBulk);
   return stats;
