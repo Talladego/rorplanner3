@@ -156,8 +156,8 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
   return createPortal(
     <div className="modal-overlay">
       {/* Tier 1 (blue frame) inside modal; modal-as-panel strips default modal chrome */}
-      <div ref={modalRef} className="modal-container modal-as-panel max-w-2xl flex flex-col min-h-0">
-        <div className="panel-container panel-border-blue-500 flex flex-col min-h-0 max-h-full overflow-hidden">
+      <div ref={modalRef} className="modal-container modal-as-panel max-w-2xl">
+        <div className="panel-container panel-border-blue-500 flex flex-col min-h-0 max-h-full overflow-hidden w-full">
           <div className="flex items-center justify-between mb-2 shrink-0">
             <h2 className="panel-heading mb-0">
               {isTalismanMode ? `Select Talisman for ${formatSlotName(slot)}` : `Select Item for ${formatSlotName(slot)}`}
@@ -210,7 +210,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
               </button>
             </div>
           </div>
-          {/* Tier 2 dashed container holds filters, list, and pagination */}
+          {/* Tier 2: filters + paging stay put; only the results pane scrolls */}
           <div className="field-group flex flex-col min-h-0 flex-1 overflow-hidden">
             <div className="shrink-0">
               <FilterControls
@@ -252,7 +252,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
               />
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="results-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
               {error ? (
                 <div className="text-center py-8">
                   <p className="text-red-500 dark:text-red-400 text-sm mb-2">Error loading items</p>
@@ -285,7 +285,7 @@ export default function EquipmentSelector({ slot, isOpen, onClose, onSelect, isT
               )}
             </div>
 
-            <div className="shrink-0">
+            <div className="shrink-0 border-t border-dashed border-[var(--frame-border)] pt-1 mt-1">
               <PaginationControls
                 loading={loading}
                 totalCount={pageData.totalCount}
