@@ -43,6 +43,12 @@ import App from '../App';
 
 describe('App URL error banner', () => {
   beforeEach(() => {
+    // jsdom has no ResizeObserver; ScaleToFit observes layout on mount.
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
     getSearchParams.mockReturnValue(new URLSearchParams('a.c=IB'));
     handleCompareFromUrl.mockReset();
   });
