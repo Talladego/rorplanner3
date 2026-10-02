@@ -27,24 +27,31 @@ vi.mock('../components/panels/RenownPanel', () => ({
   default: () => <div>renown</div>,
 }));
 
-const COPIED_SLOTS: EquipSlot[] = [
-  EquipSlot.HELM,
-  EquipSlot.SHOULDER,
-  EquipSlot.BACK,
-  EquipSlot.BODY,
-  EquipSlot.GLOVES,
-  EquipSlot.BELT,
-  EquipSlot.BOOTS,
-  EquipSlot.MAIN_HAND,
-  EquipSlot.OFF_HAND,
-  EquipSlot.RANGED_WEAPON,
-  EquipSlot.JEWELLERY1,
-  EquipSlot.JEWELLERY2,
-  EquipSlot.JEWELLERY3,
-  EquipSlot.JEWELLERY4,
-  EquipSlot.POCKET1,
-  EquipSlot.POCKET2,
+// Staging repro (character Talladegun, Load on A, then Copy from A):
+// these slots stayed filled on A and empty on B. Every other equipped slot copied.
+const DROPPED_ON_STAGING: Array<{ slot: EquipSlot; name: string; itemSlot: EquipSlot }> = [
+  { slot: EquipSlot.BACK, name: 'Sovereign Gearpack of the Gadgetmaster', itemSlot: EquipSlot.BACK },
+  { slot: EquipSlot.JEWELLERY1, name: 'Silver Topaz Annulus', itemSlot: EquipSlot.JEWELLERY1 },
+  { slot: EquipSlot.JEWELLERY2, name: 'Gold Topaz Annulus', itemSlot: EquipSlot.JEWELLERY1 },
+  { slot: EquipSlot.BELT, name: 'Triumphant Tool Belt', itemSlot: EquipSlot.BELT },
+  { slot: EquipSlot.JEWELLERY3, name: 'Triumphant Gearwrench', itemSlot: EquipSlot.JEWELLERY1 },
+  { slot: EquipSlot.JEWELLERY4, name: 'Sovereign Gearwrench of the Gadgetmaster', itemSlot: EquipSlot.JEWELLERY1 },
 ];
+
+const COPIED_ON_STAGING: Array<{ slot: EquipSlot; name: string; itemSlot: EquipSlot }> = [
+  { slot: EquipSlot.HELM, name: 'Sovereign Hardhat of the Gadgetmaster', itemSlot: EquipSlot.HELM },
+  { slot: EquipSlot.MAIN_HAND, name: 'Bloodlord Spanner', itemSlot: EquipSlot.MAIN_HAND },
+  { slot: EquipSlot.SHOULDER, name: 'Sovereign Sparkplate of the Gadgetmaster', itemSlot: EquipSlot.SHOULDER },
+  { slot: EquipSlot.OFF_HAND, name: "Gareksson's Brutabashin' Ring", itemSlot: EquipSlot.EITHER_HAND },
+  { slot: EquipSlot.RANGED_WEAPON, name: 'Fortress Handgun', itemSlot: EquipSlot.RANGED_WEAPON },
+  { slot: EquipSlot.BODY, name: 'Triumphant Bulwark', itemSlot: EquipSlot.BODY },
+  { slot: EquipSlot.GLOVES, name: 'Sovereign Work Gloves of the Gadgetmaster', itemSlot: EquipSlot.GLOVES },
+  { slot: EquipSlot.BOOTS, name: 'Triumphant Steeltoes', itemSlot: EquipSlot.BOOTS },
+  { slot: EquipSlot.POCKET1, name: "Bit o' Bitterstone Ore", itemSlot: EquipSlot.POCKET1 },
+  { slot: EquipSlot.POCKET2, name: 'Refreshing Pocket Keg', itemSlot: EquipSlot.POCKET2 },
+];
+
+const TALLADEGUN_GEAR = [...DROPPED_ON_STAGING, ...COPIED_ON_STAGING];
 
 function resetStore() {
   useLoadoutStore.setState({
@@ -67,33 +74,34 @@ function equipFullSideA(): string {
   loadoutService.setRenownAbilityLevelForLoadout(aId, 'might', 2);
   loadoutService.setCharacterStatusForLoadout(aId, true, 'Talladegun');
 
-  for (const slot of COPIED_SLOTS) {
-    const itemSlot = slot === EquipSlot.JEWELLERY2 || slot === EquipSlot.JEWELLERY3 || slot === EquipSlot.JEWELLERY4
-      ? EquipSlot.JEWELLERY1
-      : slot === EquipSlot.OFF_HAND
-        ? EquipSlot.EITHER_HAND
-        : slot;
+  for (const gear of TALLADEGUN_GEAR) {
     const item = makeItem({
-      id: `item-${slot}`,
-      name: `Item ${slot}`,
-      slot: itemSlot,
+      id: `item-${gear.slot}`,
+      name: gear.name,
+      slot: gear.itemSlot,
       careerRestriction: [Career.ENGINEER],
       iconUrl: '/icons/slots/back.png',
       talismanSlots: 1,
-      uniqueEquipped: slot.startsWith('JEWELLERY'),
+      uniqueEquipped: gear.slot.startsWith('JEWELLERY'),
     });
-    useLoadoutStore.getState().setItemForLoadout(aId, slot, item);
+    useLoadoutStore.getState().setItemForLoadout(aId, gear.slot, item);
     const talisman = makeItem({
-      id: `tal-${slot}`,
-      name: `Talisman ${slot}`,
+      id: `tal-${gear.slot}`,
+      name: `Talisman ${gear.slot}`,
       slot: EquipSlot.NONE,
       careerRestriction: [],
       iconUrl: '/icons/slots/jewellery.png',
       talismanSlots: 0,
     });
-    useLoadoutStore.getState().setTalismanForLoadout(aId, slot, 0, talisman);
+    useLoadoutStore.getState().setTalismanForLoadout(aId, gear.slot, 0, talisman);
   }
   return aId;
+}
+
+function slotOnSide(side: 'A' | 'B', slot: EquipSlot): HTMLElement {
+  const node = document.querySelector(`[data-side="${side}"][data-slot="${slot}"]`);
+  if (!node) throw new Error(`missing ${side} ${slot}`);
+  return node as HTMLElement;
 }
 
 describe('Copy from A', () => {
@@ -101,7 +109,7 @@ describe('Copy from A', () => {
     resetStore();
   });
 
-  it('copies cloak, belt, jewels, and talismans onto Loadout B', async () => {
+  it('copies Talladegun back, belt, and jewels that staging left empty on B', async () => {
     equipFullSideA();
     render(
       <>
@@ -114,8 +122,8 @@ describe('Copy from A', () => {
 
     await waitFor(() => {
       const b = loadoutService.getLoadoutForSide('B');
-      expect(b?.items[EquipSlot.BELT]?.item?.id).toBe('item-BELT');
-      expect(b?.items[EquipSlot.JEWELLERY4]?.item?.id).toBe('item-JEWELLERY4');
+      expect(b?.items[EquipSlot.BACK]?.item?.name).toBe('Sovereign Gearpack of the Gadgetmaster');
+      expect(b?.items[EquipSlot.JEWELLERY4]?.item?.name).toBe('Sovereign Gearwrench of the Gadgetmaster');
     });
 
     const a = loadoutService.getLoadoutForSide('A')!;
@@ -128,15 +136,17 @@ describe('Copy from A', () => {
     expect(b.renownAbilities?.might).toBe(2);
     expect(b.name).not.toBe(a.name);
 
-    for (const slot of COPIED_SLOTS) {
-      expect(b.items[slot]?.item?.id, slot).toBe(a.items[slot]?.item?.id);
-      expect(b.items[slot]?.talismans?.[0]?.id, `${slot} talisman`).toBe(`tal-${slot}`);
-      expect(a.items[slot]?.item?.id, `${slot} still on A`).toBe(`item-${slot}`);
+    for (const gear of TALLADEGUN_GEAR) {
+      expect(b.items[gear.slot]?.item?.name, gear.slot).toBe(gear.name);
+      expect(b.items[gear.slot]?.item?.id, gear.slot).toBe(a.items[gear.slot]?.item?.id);
+      expect(b.items[gear.slot]?.talismans?.[0]?.id, `${gear.slot} talisman`).toBe(`tal-${gear.slot}`);
+      expect(a.items[gear.slot]?.item?.name, `${gear.slot} still on A`).toBe(gear.name);
+      expect(slotOnSide('B', gear.slot).textContent).toContain(gear.name);
+      expect(slotOnSide('A', gear.slot).textContent).toContain(gear.name);
     }
 
-    expect(screen.getAllByText('Item BACK').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText('Item BELT').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText('Item JEWELLERY1').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText('Item JEWELLERY4').length).toBeGreaterThanOrEqual(2);
+    for (const gear of DROPPED_ON_STAGING) {
+      expect(screen.getAllByText(gear.name).length).toBeGreaterThanOrEqual(2);
+    }
   });
 });
