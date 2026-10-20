@@ -109,7 +109,7 @@ function App() {
     preloadCareerIcons();
 
     const keys = Array.from(urlService.getSearchParams().keys());
-    const hasCompareParams = keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
+    const hasCompareParams = keys.some(key => key === 'p' || key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
 
     if (hasCompareParams) {
       // Load dual compare state from URL
@@ -132,7 +132,7 @@ function App() {
     // Respect feature flag: by default, do not handle URL changes after initial load
     if (!urlService.isNavigationHandlingEnabled()) return;
     const keys = Array.from(urlService.getSearchParams().keys());
-    const hasCompareParams = keys.some(key => key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
+    const hasCompareParams = keys.some(key => key === 'p' || key.startsWith('a.') || key.startsWith('b.') || key === 'loadCharacterA' || key === 'loadCharacterB');
 
     // Only load if there are parameters and we're not in an error state
     if (hasCompareParams && !errorMessage.includes('Failed to load compare')) {

@@ -1,21 +1,81 @@
+import { deflateSync, inflateSync } from 'fflate';
 import { Career, Loadout, LoadoutItem, EquipSlot, LoadoutSide } from '../../types';
 import { loadoutStoreAdapter } from '../../store/loadout/loadoutStoreAdapter';
 import { loadoutService } from './loadoutService';
 import { emptyRenownAbilities, isActiveRenownAbilityKey, RENOWN_PACK_KEYS } from './renownConfig';
+
+export interface DecodedShareLoadout {
+	career: Career | null;
+	level: number;
+	renownRank: number;
+	renownAbilities: NonNullable<Loadout['renownAbilities']>;
+	items: Record<string, { item: { id: string } | null; talismans: ({ id: string } | null)[] }>;
+}
+
+export interface DecodedCompareShare {
+	a: DecodedShareLoadout | null;
+	b: DecodedShareLoadout | null;
+	activeSide: LoadoutSide;
+}
 
 class UrlService {
 	private navigateCb: ((path: string, options?: { replace?: boolean }) => void) | null = null;
 	private suppressUpdates = false;
 	private autoUpdateEnabled = false;
 	private navigationHandlingEnabled = false;
+	/** Bump only when the packed layout itself becomes incompatible. */
+	private readonly SHARE_PACK_VERSION = 1;
+	private readonly SHARE_PACKED_PARAM = 'p';
+	/**
+	 * Marks a deflated payload. `~` is percent-encoded as `%7E` by
+	 * `URLSearchParams`; `.` is left as-is.
+	 */
+	private readonly SHARE_PACK_COMPRESSED_PREFIX = '.';
+	/**
+	 * Decoded packed-payload cap. A real loadout is a few hundred bytes;
+	 * 64 KiB stays well above that and is also the inflate output limit,
+	 * so a crafted `p=` cannot expand to megabytes.
+	 */
+	private readonly MAX_PACKED_BYTES = 64 * 1024;
+	private readonly MAX_RENOWN_BYTES = 64;
+	private readonly MAX_TALISMANS = 32;
+	private readonly MAX_ID_BYTES = 256;
+	/**
+	 * Equipment order inside one packed side. Trophy slots are omitted.
+	 * Append-only for a given SHARE_PACK_VERSION: each side is a fixed
+	 * sequence, so inserting or reordering a slot needs a new version.
+	 * Renown keys are different — see RENOWN_PACK_KEYS. Their block is
+	 * length-prefixed, so appending a key does not shift later fields.
+	 */
+	private readonly SHARE_SLOT_ORDER: EquipSlot[] = [
+		EquipSlot.MAIN_HAND,
+		EquipSlot.OFF_HAND,
+		EquipSlot.RANGED_WEAPON,
+		EquipSlot.EITHER_HAND,
+		EquipSlot.BODY,
+		EquipSlot.GLOVES,
+		EquipSlot.BOOTS,
+		EquipSlot.HELM,
+		EquipSlot.SHOULDER,
+		EquipSlot.POCKET1,
+		EquipSlot.POCKET2,
+		EquipSlot.BACK,
+		EquipSlot.BELT,
+		EquipSlot.JEWELLERY1,
+		EquipSlot.JEWELLERY2,
+		EquipSlot.JEWELLERY3,
+		EquipSlot.JEWELLERY4,
+		EquipSlot.STANDARD,
+		EquipSlot.EVENT,
+	];
 
 	setAutoUpdateEnabled(val: boolean) { this.autoUpdateEnabled = val; }
 	isAutoUpdateEnabled(): boolean { return this.autoUpdateEnabled; }
 	setNavigationHandlingEnabled(val: boolean) { this.navigationHandlingEnabled = val; }
 	isNavigationHandlingEnabled(): boolean { return this.navigationHandlingEnabled; }
 
-	setNavigateCallback(_callback: (path: string, options?: { replace?: boolean }) => void) {
-		this.navigateCb = _callback;
+	setNavigateCallback(callback: ((path: string, options?: { replace?: boolean }) => void) | null) {
+		this.navigateCb = callback;
 	}
 
 	getSearchParams(): URLSearchParams {
@@ -110,13 +170,7 @@ class UrlService {
 		return prefixed;
 	}
 
-	decodeLoadoutFromUrlWithPrefix(prefix: 'a' | 'b'): {
-		career: Career | null;
-		level: number;
-		renownRank: number;
-		renownAbilities: NonNullable<Loadout['renownAbilities']>;
-		items: Record<string, { item: { id: string } | null; talismans: ({ id: string } | null)[] }>;
-	} | null {
+	decodeLoadoutFromUrlWithPrefix(prefix: 'a' | 'b'): DecodedShareLoadout | null {
 		const params = this.getSearchParams();
 		const hasAny = Array.from(params.keys()).some((k) => k.startsWith(`${prefix}.`));
 		if (!hasAny) return null;
@@ -201,12 +255,17 @@ class UrlService {
 		const params: Record<string, string | null> = {};
 		const current = this.getSearchParams();
 		for (const key of Array.from(current.keys())) {
-			if (key.startsWith('a.') || key.startsWith('b.')) params[key] = null;
+			if (key.startsWith('a.') || key.startsWith('b.') || key === this.SHARE_PACKED_PARAM) params[key] = null;
 		}
 		params.loadCharacterA = null;
 		params.loadCharacterB = null;
-		if (aLoadout) Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', aLoadout));
-		if (bLoadout) Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', bLoadout));
+		// `s` (stats toggles) and `activeSide` stay as their own query params.
+		if (aLoadout || bLoadout) {
+			const activeSide: LoadoutSide = current.get('activeSide') === 'b' ? 'B' : 'A';
+			params[this.SHARE_PACKED_PARAM] = this.packCompareState(aLoadout, bLoadout, { activeSide });
+		} else {
+			params[this.SHARE_PACKED_PARAM] = null;
+		}
 		this.updateUrl(params, { replace: true });
 	}
 
@@ -216,14 +275,35 @@ class UrlService {
 		try { await loadoutService.loadFromNamedCharacter(_characterName); } finally { this.suppressUpdates = false; }
 	}
 
-	async handleCompareFromUrl(): Promise<void> {
+	/**
+	 * Read compare state from the current URL.
+	 * A valid `p=` wins. A missing or corrupt `p=` is ignored and legacy
+	 * `a.*` / `b.*` params are used instead. Returns null when neither
+	 * form describes a loadout. Does not read `s` (stats toggles).
+	 */
+	decodeCompareShare(): DecodedCompareShare | null {
 		const params = this.getSearchParams();
+		const packed = params.get(this.SHARE_PACKED_PARAM);
+		if (packed) {
+			const decoded = this.unpackCompareState(packed);
+			if (decoded) return decoded;
+		}
 		const a = this.decodeLoadoutFromUrlWithPrefix('a');
 		const b = this.decodeLoadoutFromUrlWithPrefix('b');
+		if (!a && !b) return null;
+		const activeSide: LoadoutSide = params.get('activeSide') === 'b' ? 'B' : 'A';
+		return { a, b, activeSide };
+	}
+
+	async handleCompareFromUrl(): Promise<void> {
+		const params = this.getSearchParams();
+		const decoded = this.decodeCompareShare();
+		const a = decoded?.a ?? null;
+		const b = decoded?.b ?? null;
 		const charA = params.get('loadCharacterA');
 		const charB = params.get('loadCharacterB');
 		if (!a && !b && !charA && !charB) return;
-		const active = (params.get('activeSide') === 'b' ? 'B' : 'A') as LoadoutSide;
+		const active = (decoded?.activeSide ?? (params.get('activeSide') === 'b' ? 'B' : 'A')) as LoadoutSide;
 		this.suppressUpdates = true;
 		try {
 			loadoutService.beginBulkApply();
@@ -324,9 +404,9 @@ class UrlService {
 
 	clearLoadoutFromUrl(): void {
 		const params = this.getSearchParams();
-		const keys = Array.from(params.keys());
-		keys.forEach(k => params.delete(k));
-		this.updateUrl(Object.fromEntries(params.entries()), { replace: true });
+		const toDelete: Record<string, string | null> = {};
+		for (const k of Array.from(params.keys())) toDelete[k] = null;
+		this.updateUrl(toDelete, { replace: true });
 	}
 
 	clearSideFromUrl(side: LoadoutSide): void {
@@ -338,6 +418,14 @@ class UrlService {
 		}
 		if (side === 'A') toDelete.loadCharacterA = null;
 		if (side === 'B') toDelete.loadCharacterB = null;
+
+		if (params.has(this.SHARE_PACKED_PARAM)) {
+			const a = side === 'A' ? null : loadoutStoreAdapter.getLoadoutForSide('A');
+			const b = side === 'B' ? null : loadoutStoreAdapter.getLoadoutForSide('B');
+			const activeSide: LoadoutSide = params.get('activeSide') === 'b' ? 'B' : 'A';
+			toDelete[this.SHARE_PACKED_PARAM] = (a || b) ? this.packCompareState(a, b, { activeSide }) : null;
+		}
+
 		this.updateUrl(toDelete, { replace: true });
 	}
 
@@ -350,18 +438,18 @@ class UrlService {
 		} catch {
 			// ignore referrer access issues
 		}
-		const params: Record<string, string | null> = {};
-		if (a) Object.assign(params, this.encodeLoadoutToUrlWithPrefix('a', a));
-		if (b) Object.assign(params, this.encodeLoadoutToUrlWithPrefix('b', b));
-		// Include stats panel toggle state as single bitmask 's' (0-7)
+		// Loadouts live in `p=`. Stats toggles stay in `s=` so StatsComparePanel
+		// can keep reading that param on its own.
+		const query = new URLSearchParams();
+		if (a || b) query.set(this.SHARE_PACKED_PARAM, this.packCompareState(a, b));
 		if (options) {
 			let mask = 0;
 			if (options.includeBaseStats) mask |= 1; // bit0
 			if (options.includeRenownStats) mask |= 2; // bit1
 			if (options.includeDerivedStats) mask |= 4; // bit2
-			params['s'] = String(mask);
+			query.set('s', String(mask));
 		}
-		const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null) as [string, string][]).toString();
+		const qs = query.toString();
 		return `${base}#/?${qs}`;
 	}
 
@@ -387,67 +475,154 @@ class UrlService {
 	}
 
 	private packRenownAbilities(ra: NonNullable<Loadout['renownAbilities']>): string | '' {
-		// Order of keys must be stable. Retired `regeneration` stays in the bit layout.
+		const bin = this.packRenownAbilitiesToBytes(ra);
+		if (!bin) return '';
+		return this.bytesToBase64Url(bin);
+	}
+
+	private unpackRenownAbilities(packed: string): NonNullable<Loadout['renownAbilities']> {
+		return this.unpackRenownAbilitiesFromBytes(this.base64UrlToBytes(packed));
+	}
+
+	// ===== Packed compare share encoding =====
+	// Layout (version 1):
+	//   u8 version
+	//   u8 flags: bit0 hasA, bit1 hasB, bit5 activeSide B. Bits 2-4 and 6-7 are reserved.
+	//   Stats toggles are NOT in this payload; they stay in the `s` query param.
+	//   For each present side: career varint, level varint, renownRank varint,
+	//   renown byte-length varint, renown bytes (RENOWN_PACK_KEYS, 3 bits each),
+	//   then every SHARE_SLOT_ORDER entry as tagged item id + talisman list.
+	private packCompareState(
+		a: Loadout | null,
+		b: Loadout | null,
+		options?: { activeSide?: LoadoutSide },
+	): string {
+		const bytes: number[] = [];
+		bytes.push(this.SHARE_PACK_VERSION);
+		let flags = 0;
+		if (a) flags |= 1;
+		if (b) flags |= 2;
+		if ((options?.activeSide ?? 'A') === 'B') flags |= 1 << 5;
+		bytes.push(flags & 0xFF);
+		if (a) this.writePackedLoadout(bytes, a);
+		if (b) this.writePackedLoadout(bytes, b);
+		return this.encodePackedBytes(new Uint8Array(bytes));
+	}
+
+	private unpackCompareState(packed: string): DecodedCompareShare | null {
+		try {
+			const bin = this.decodePackedBytes(packed);
+			if (bin.length < 2) return null;
+			if (bin[0] !== this.SHARE_PACK_VERSION) return null;
+			const flags = bin[1];
+			const hasA = (flags & 1) !== 0;
+			const hasB = (flags & 2) !== 0;
+			const activeSide: LoadoutSide = (flags & (1 << 5)) !== 0 ? 'B' : 'A';
+			const ref = { i: 2 };
+			const a = hasA ? this.readPackedLoadout(bin, ref) : null;
+			const b = hasB ? this.readPackedLoadout(bin, ref) : null;
+			if (ref.i !== bin.length) return null;
+			return { a, b, activeSide };
+		} catch {
+			return null;
+		}
+	}
+
+	private writePackedLoadout(out: number[], loadout: Loadout): void {
+		const careerIdx = loadout.career ? this.careersList.indexOf(loadout.career) : -1;
+		this.writeVarint(out, careerIdx >= 0 ? careerIdx + 1 : 0);
+		this.writeVarint(out, Math.max(0, Math.trunc(Number(loadout.level) || 0)));
+		this.writeVarint(out, Math.max(0, Math.trunc(Number(loadout.renownRank) || 0)));
+		// Length-prefixed so appending a key to RENOWN_PACK_KEYS only grows this block.
+		const ra = loadout.renownAbilities ?? emptyRenownAbilities();
+		const raBytes = this.packRenownAbilitiesToBytes(ra);
+		if (!raBytes) {
+			this.writeVarint(out, 0);
+		} else {
+			this.writeVarint(out, raBytes.length);
+			for (const b of raBytes) out.push(b);
+		}
+		for (const slot of this.SHARE_SLOT_ORDER) {
+			const slotData: LoadoutItem | undefined = loadout.items?.[slot];
+			this.writeTaggedId(out, slotData?.item?.id);
+			const talismans = slotData?.talismans ?? [];
+			let count = talismans.length;
+			while (count > 0 && !talismans[count - 1]?.id) count--;
+			this.writeVarint(out, count);
+			for (let i = 0; i < count; i++) this.writeTaggedId(out, talismans[i]?.id);
+		}
+	}
+
+	private readPackedLoadout(bytes: Uint8Array, ref: { i: number }): DecodedShareLoadout {
+		const careerCode = this.readVarint(bytes, ref);
+		const career = careerCode > 0 && careerCode <= this.careersList.length ? this.careersList[careerCode - 1] : null;
+		const level = this.readVarint(bytes, ref);
+		const renownRank = this.readVarint(bytes, ref);
+		const raLen = this.readVarint(bytes, ref);
+		if (raLen > this.MAX_RENOWN_BYTES) throw new Error('Renown block too large');
+		if (ref.i + raLen > bytes.length) throw new Error('Truncated renown');
+		const raBytes = bytes.subarray(ref.i, ref.i + raLen);
+		ref.i += raLen;
+		const renownAbilities = this.unpackRenownAbilitiesFromBytes(raBytes);
+		const items: DecodedShareLoadout['items'] = {};
+		for (const slot of this.SHARE_SLOT_ORDER) {
+			const itemId = this.readTaggedId(bytes, ref);
+			const talCount = this.readVarint(bytes, ref);
+			if (talCount > this.MAX_TALISMANS) throw new Error('Too many talismans');
+			const talismans: ({ id: string } | null)[] = [];
+			for (let i = 0; i < talCount; i++) {
+				const tid = this.readTaggedId(bytes, ref);
+				talismans[i] = tid ? { id: tid } : null;
+			}
+			const hasAnyTal = talismans.some((t) => !!t?.id);
+			if (itemId || hasAnyTal) items[slot] = { item: itemId ? { id: itemId } : null, talismans };
+		}
+		return { career, level, renownRank, renownAbilities, items };
+	}
+
+	// ===== Byte helpers =====
+	private packRenownAbilitiesToBytes(ra: NonNullable<Loadout['renownAbilities']>): Uint8Array | null {
+		// Same positions as RENOWN_PACK_KEYS. Retired regeneration is always 0.
 		const vals = RENOWN_PACK_KEYS.map((k) => {
 			if (k === 'regeneration') return 0;
 			const n = Number((ra as Record<string, number | undefined>)[k] || 0);
 			return Math.max(0, Math.min(5, Math.trunc(n)));
 		});
-		if (vals.every(v => v === 0)) return '';
-		// Pack 3 bits per value into a byte array
-		let bitBuf = 0; let bitCount = 0; const bytes: number[] = [];
+		if (vals.every((v) => v === 0)) return null;
+		let bitBuf = 0;
+		let bitCount = 0;
+		const bytes: number[] = [];
 		for (const v of vals) {
 			bitBuf |= (v & 0x7) << bitCount;
 			bitCount += 3;
 			while (bitCount >= 8) {
 				bytes.push(bitBuf & 0xFF);
-				bitBuf >>= 8; bitCount -= 8;
+				bitBuf >>= 8;
+				bitCount -= 8;
 			}
 		}
 		if (bitCount > 0) bytes.push(bitBuf & 0xFF);
-		// Convert to base64url
-			const bin = new Uint8Array(bytes);
-			// Convert bytes to base64
-				const b64 = (() => {
-					type BufferLike = { from(input: string | Uint8Array, enc?: string): { toString(enc: string): string } | Uint8Array };
-				if (typeof btoa === 'function') {
-					const binStr = Array.from(bin).map(b => String.fromCharCode(b)).join('');
-					return btoa(binStr);
-				}
-					// Fallback: use Buffer if available (Node polyfill)
-					const Buf = (globalThis as unknown as { Buffer?: BufferLike }).Buffer;
-					if (Buf) {
-						return (Buf.from(bin) as unknown as { toString(enc: string): string }).toString('base64');
-				}
-				// Very rare case in strict environments: return empty
-				return '';
-			})();
-		return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+		return new Uint8Array(bytes);
 	}
 
-	private unpackRenownAbilities(packed: string): NonNullable<Loadout['renownAbilities']> {
+	private unpackRenownAbilitiesFromBytes(bytes: Uint8Array): NonNullable<Loadout['renownAbilities']> {
 		const res = emptyRenownAbilities();
 		try {
-			const b64 = packed.replace(/-/g, '+').replace(/_/g, '/');
-							const bytes: number[] = (() => {
-						if (typeof atob === 'function') {
-							const binStr = atob(b64);
-							return Array.from(binStr).map(ch => ch.charCodeAt(0));
-						}
-								const Buf = (globalThis as unknown as { Buffer?: { from(input: string, enc: string): Uint8Array } }).Buffer;
-								if (Buf) {
-									return Array.from(Buf.from(b64, 'base64'));
-						}
-						return [];
-					})();
-					let bitBuf = 0; let bitCount = 0; let bi = 0;
+			let bitBuf = 0;
+			let bitCount = 0;
+			let bi = 0;
+			// Only known keys are consumed. Extra trailing bits (a newer key list)
+			// are ignored; missing trailing bits (an older payload) stay 0.
 			for (let i = 0; i < RENOWN_PACK_KEYS.length; i++) {
 				while (bitCount < 3) {
 					const byte = bytes[bi++];
 					if (byte === undefined) break;
-					bitBuf |= byte << bitCount; bitCount += 8;
+					bitBuf |= byte << bitCount;
+					bitCount += 8;
 				}
-				const v = bitBuf & 0x7; bitBuf >>= 3; bitCount -= 3;
+				const v = bitBuf & 0x7;
+				bitBuf >>= 3;
+				bitCount -= 3;
 				const key = RENOWN_PACK_KEYS[i];
 				if (key !== 'regeneration' && isActiveRenownAbilityKey(key)) {
 					res[key] = v;
@@ -457,6 +632,129 @@ class UrlService {
 			// ignore malformed packed data, leave zeros
 		}
 		return res;
+	}
+
+	private writeTaggedId(out: number[], id: string | null | undefined): void {
+		if (id == null || id === '') {
+			this.writeVarint(out, 0);
+			return;
+		}
+		const raw = String(id);
+		if (/^\d+$/.test(raw)) {
+			const n = Number(raw);
+			// The stored tag is n + 2. An id next to MAX_SAFE_INTEGER would
+			// make that tag unsafe and fail the whole link, so it is written
+			// as a string. Leading zeros must stay strings too: "0123" is not
+			// the same id as 123.
+			if (n >= 0 && Number.isSafeInteger(n + 2) && String(n) === raw) {
+				this.writeVarint(out, n + 2);
+				return;
+			}
+		}
+		this.writeVarint(out, 1);
+		const utf8 = typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(raw) : new Uint8Array();
+		this.writeVarint(out, utf8.length);
+		for (const b of utf8) out.push(b);
+	}
+
+	private readTaggedId(bytes: Uint8Array, ref: { i: number }): string | null {
+		const tag = this.readVarint(bytes, ref);
+		if (tag === 0) return null;
+		if (tag === 1) {
+			const len = this.readVarint(bytes, ref);
+			if (len > this.MAX_ID_BYTES) throw new Error('Id string too long');
+			const end = ref.i + len;
+			if (end > bytes.length) throw new Error('Truncated string');
+			const slice = bytes.subarray(ref.i, end);
+			ref.i = end;
+			if (typeof TextDecoder === 'undefined') return null;
+			return new TextDecoder().decode(slice);
+		}
+		if (!Number.isSafeInteger(tag - 2) || tag < 2) throw new Error('Bad id tag');
+		return String(tag - 2);
+	}
+
+	private writeVarint(out: number[], n: number): void {
+		let v = Math.max(0, Math.trunc(Number(n) || 0));
+		while (v >= 0x80) {
+			out.push((v % 0x80) | 0x80);
+			v = Math.floor(v / 0x80);
+		}
+		out.push(v);
+	}
+
+	private readVarint(bytes: Uint8Array, ref: { i: number }): number {
+		let result = 0;
+		let factor = 1;
+		for (let n = 0; n < 8; n++) {
+			if (ref.i >= bytes.length) throw new Error('Truncated varint');
+			const b = bytes[ref.i++];
+			result += (b & 0x7f) * factor;
+			if ((b & 0x80) === 0) {
+				if (!Number.isSafeInteger(result)) throw new Error('Varint too large');
+				return result;
+			}
+			factor *= 128;
+		}
+		throw new Error('Varint too large');
+	}
+
+	private bytesToBase64Url(bin: Uint8Array): string {
+		const b64 = (() => {
+			type BufferLike = { from(input: string | Uint8Array, enc?: string): { toString(enc: string): string } | Uint8Array };
+			if (typeof btoa === 'function') {
+				const binStr = Array.from(bin).map((b) => String.fromCharCode(b)).join('');
+				return btoa(binStr);
+			}
+			const Buf = (globalThis as unknown as { Buffer?: BufferLike }).Buffer;
+			if (Buf) return (Buf.from(bin) as unknown as { toString(enc: string): string }).toString('base64');
+			return '';
+		})();
+		return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	}
+
+	private base64UrlToBytes(packed: string): Uint8Array {
+		try {
+			const b64 = packed.replace(/-/g, '+').replace(/_/g, '/');
+			const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
+			const normalized = `${b64}${pad}`;
+			if (typeof atob === 'function') {
+				const binStr = atob(normalized);
+				return new Uint8Array(Array.from(binStr).map((ch) => ch.charCodeAt(0)));
+			}
+			const Buf = (globalThis as unknown as { Buffer?: { from(input: string, enc: string): Uint8Array } }).Buffer;
+			if (Buf) return Buf.from(normalized, 'base64');
+			return new Uint8Array();
+		} catch {
+			return new Uint8Array();
+		}
+	}
+
+	private encodePackedBytes(bin: Uint8Array): string {
+		try {
+			const deflated = deflateSync(bin, { level: 9 });
+			return `${this.SHARE_PACK_COMPRESSED_PREFIX}${this.bytesToBase64Url(deflated)}`;
+		} catch {
+			return this.bytesToBase64Url(bin);
+		}
+	}
+
+	private decodePackedBytes(packed: string): Uint8Array {
+		if (!packed) return new Uint8Array();
+		if (packed.startsWith(this.SHARE_PACK_COMPRESSED_PREFIX)) {
+			const raw = this.base64UrlToBytes(packed.slice(this.SHARE_PACK_COMPRESSED_PREFIX.length));
+			if (raw.length === 0) throw new Error('Empty deflate block');
+			// One byte past the cap: a full buffer means the stream met or
+			// exceeded it. fflate truncates into `out` instead of allocating
+			// the whole inflated size. Callers catch this and return null.
+			const limit = this.MAX_PACKED_BYTES;
+			const inflated = inflateSync(raw, { out: new Uint8Array(limit + 1) });
+			if (inflated.length > limit) throw new Error('Inflated share payload too large');
+			return inflated;
+		}
+		const raw = this.base64UrlToBytes(packed);
+		if (raw.length > this.MAX_PACKED_BYTES) throw new Error('Share payload too large');
+		return raw;
 	}
 }
 
