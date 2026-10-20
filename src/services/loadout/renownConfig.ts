@@ -77,8 +77,18 @@ export function emptyRenownAbilities(): NonNullable<Loadout['renownAbilities']> 
 }
 
 /**
- * Packed share-URL order. `regeneration` is a retired slot kept so old `ra=`
- * strings stay aligned; encode/decode always treat it as 0.
+ * Bit order for legacy `ra=` strings and for the renown block inside packed `p=`.
+ *
+ * Each entry is one 3-bit slot (levels 0–5), read from the first byte upward.
+ * Append new abilities at the end. Do not insert, delete, or reorder a key:
+ * existing links are decoded by position, not by name. The packed payload
+ * stores this block's byte length, so a longer list only adds trailing bits.
+ * An older payload leaves newly appended keys at 0, and a newer payload still
+ * lines up for a reader that knows a shorter prefix.
+ *
+ * `regeneration` is retired (patch 17/09/2026) and stays in its original slot
+ * so pre-patch `ra=` strings stay aligned. Encode and decode always store 0.
+ * `focusedPower` was appended after that retirement and is a live ability.
  */
 export const RENOWN_PACK_KEYS = [
   'might', 'bladeMaster', 'marksman', 'impetus', 'acumen', 'resolve', 'fortitude', 'vigor',

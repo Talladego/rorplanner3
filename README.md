@@ -5,7 +5,7 @@ A modern, high‑performance planner for Warhammer Online: Return of Reckoning c
 ## Features
 
 - ⚔️ Equipment & talisman planning for all careers (eligibility + unique‑equipped enforcement)
-- ⭐ Renown planner with caps, per‑ability levels (0–5), packed share encoding
+- ⭐ Renown planner with caps, per‑ability levels (0–5), packed share URLs (`p=`)
 - 🔁 Dual A/B compare with per‑side career mapping and provisional character import (no name flicker)
 - 📊 Real‑time stat aggregation (items, sets, talismans, renown, derived; multiplicative combinations for damage/healing modifiers)
 - 🪄 Collapsible stat sections and Offense subsections (Melee / Ranged / Magic) with chevron toggles
@@ -60,6 +60,7 @@ Open http://localhost:3001
 
 Notes:
 - HashRouter is used; state lives after `#/?`.
+- Share URLs pack each side into one `p=` value (version byte, deflate, base64url, `.` prefix). Stats toggles stay in `s=`. Legacy `a.*` / `b.*` links still decode.
 - URL auto‑update and back/forward parsing are disabled by default. You can enable them via `urlService.setAutoUpdateEnabled(true)` and `urlService.setNavigationHandlingEnabled(true)`.
 
 ### Build for Production
