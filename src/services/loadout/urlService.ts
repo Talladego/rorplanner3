@@ -31,7 +31,12 @@ class UrlService {
 	 * `URLSearchParams`; `.` is left as-is.
 	 */
 	private readonly SHARE_PACK_COMPRESSED_PREFIX = '.';
-	private readonly MAX_PACKED_BYTES = 8192;
+	/**
+	 * Decoded packed-payload cap. A real loadout is a few hundred bytes;
+	 * 64 KiB stays well above that and is also the inflate output limit,
+	 * so a crafted `p=` cannot expand to megabytes.
+	 */
+	private readonly MAX_PACKED_BYTES = 64 * 1024;
 	private readonly MAX_RENOWN_BYTES = 64;
 	private readonly MAX_TALISMANS = 32;
 	private readonly MAX_ID_BYTES = 256;
@@ -516,6 +521,7 @@ class UrlService {
 			const ref = { i: 2 };
 			const a = hasA ? this.readPackedLoadout(bin, ref) : null;
 			const b = hasB ? this.readPackedLoadout(bin, ref) : null;
+			if (ref.i !== bin.length) return null;
 			return { a, b, activeSide };
 		} catch {
 			return null;
@@ -636,7 +642,11 @@ class UrlService {
 		const raw = String(id);
 		if (/^\d+$/.test(raw)) {
 			const n = Number(raw);
-			if (Number.isSafeInteger(n) && n >= 0) {
+			// The stored tag is n + 2. An id next to MAX_SAFE_INTEGER would
+			// make that tag unsafe and fail the whole link, so it is written
+			// as a string. Leading zeros must stay strings too: "0123" is not
+			// the same id as 123.
+			if (n >= 0 && Number.isSafeInteger(n + 2) && String(n) === raw) {
 				this.writeVarint(out, n + 2);
 				return;
 			}
@@ -734,8 +744,12 @@ class UrlService {
 		if (packed.startsWith(this.SHARE_PACK_COMPRESSED_PREFIX)) {
 			const raw = this.base64UrlToBytes(packed.slice(this.SHARE_PACK_COMPRESSED_PREFIX.length));
 			if (raw.length === 0) throw new Error('Empty deflate block');
-			const inflated = inflateSync(raw);
-			if (inflated.length > this.MAX_PACKED_BYTES) throw new Error('Inflated share payload too large');
+			// One byte past the cap: a full buffer means the stream met or
+			// exceeded it. fflate truncates into `out` instead of allocating
+			// the whole inflated size. Callers catch this and return null.
+			const limit = this.MAX_PACKED_BYTES;
+			const inflated = inflateSync(raw, { out: new Uint8Array(limit + 1) });
+			if (inflated.length > limit) throw new Error('Inflated share payload too large');
 			return inflated;
 		}
 		const raw = this.base64UrlToBytes(packed);

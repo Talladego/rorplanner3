@@ -1,3 +1,4 @@
+import { deflateSync, inflateSync } from 'fflate';
 import { urlService, type DecodedShareLoadout } from '../services/loadout/urlService';
 import { RENOWN_PACK_KEYS } from '../services/loadout/renownConfig';
 import { makeItem } from './factories';
@@ -93,6 +94,53 @@ function withParams<T>(qs: string, run: () => T): T {
   } finally {
     urlService.getSearchParams = orig;
   }
+}
+
+/** Mirrors UrlService.MAX_PACKED_BYTES. Real loadouts sit far below this. */
+const INFLATE_CAP = 64 * 1024;
+/** Version-1 packed sides use this fixed slot sequence. */
+const PACKED_SLOT_COUNT = 19;
+
+function writeVarint(out: number[], n: number): void {
+  let v = Math.max(0, Math.trunc(n));
+  while (v >= 0x80) {
+    out.push((v % 0x80) | 0x80);
+    v = Math.floor(v / 0x80);
+  }
+  out.push(v);
+}
+
+function writeStringId(out: number[], id: string): void {
+  writeVarint(out, 1);
+  const utf8 = new TextEncoder().encode(id);
+  writeVarint(out, utf8.length);
+  for (const b of utf8) out.push(b);
+}
+
+function writeEmptySlots(out: number[], fromSlot: number): void {
+  for (let slot = fromSlot; slot < PACKED_SLOT_COUNT; slot++) {
+    writeVarint(out, 0);
+    writeVarint(out, 0);
+  }
+}
+
+function bytesToBase64Url(bin: Uint8Array): string {
+  let binStr = '';
+  for (let i = 0; i < bin.length; i++) binStr += String.fromCharCode(bin[i]);
+  return btoa(binStr).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlToBytes(packed: string): Uint8Array {
+  const b64 = packed.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
+  const binStr = atob(`${b64}${pad}`);
+  const out = new Uint8Array(binStr.length);
+  for (let i = 0; i < binStr.length; i++) out[i] = binStr.charCodeAt(i);
+  return out;
+}
+
+function packedParam(bytes: number[]): string {
+  return `.${bytesToBase64Url(deflateSync(new Uint8Array(bytes), { level: 9 }))}`;
 }
 
 function expectSide(decoded: DecodedShareLoadout | null, src: Loadout | null): void {
@@ -377,5 +425,80 @@ describe('packed share links', () => {
     expect(decoded?.activeSide).toBe('B');
     expectSide(decoded?.a ?? null, a);
     expect(new URLSearchParams(sp.toString()).get('s')).toBe('6');
+  });
+
+  it('returns null when a packed payload inflates past the output cap', () => {
+    const chunk = 'y'.repeat(200);
+    const under: number[] = [1, 1];
+    writeVarint(under, 0);
+    writeVarint(under, 40);
+    writeVarint(under, 0);
+    writeVarint(under, 0);
+    writeStringId(under, chunk);
+    writeVarint(under, 32);
+    for (let i = 0; i < 32; i++) writeStringId(under, chunk);
+    writeEmptySlots(under, 1);
+    expect(under.length).toBeLessThan(INFLATE_CAP);
+    const underDecoded = withParams(`p=${packedParam(under)}`, () => urlService.decodeCompareShare());
+    expect(underDecoded?.a?.level).toBe(40);
+    expect(underDecoded?.a?.items.MAIN_HAND?.item?.id).toBe(chunk);
+    expect(underDecoded?.a?.items.MAIN_HAND?.talismans).toHaveLength(32);
+    expect(underDecoded?.a?.items.MAIN_HAND?.talismans[31]?.id).toBe(chunk);
+
+    const over: number[] = [1, 1];
+    writeVarint(over, 0);
+    writeVarint(over, 40);
+    writeVarint(over, 0);
+    writeVarint(over, 0);
+    for (let slot = 0; slot < PACKED_SLOT_COUNT; slot++) {
+      writeStringId(over, chunk);
+      writeVarint(over, 32);
+      for (let i = 0; i < 32; i++) writeStringId(over, chunk);
+    }
+    expect(over.length).toBeGreaterThan(INFLATE_CAP);
+    const overQuery = `p=${packedParam(over)}`;
+    expect(() => withParams(overQuery, () => urlService.decodeCompareShare())).not.toThrow();
+    expect(withParams(overQuery, () => urlService.decodeCompareShare())).toBeNull();
+  });
+
+  it('round-trips an id next to MAX_SAFE_INTEGER instead of failing the link', () => {
+    const nearMax = String(Number.MAX_SAFE_INTEGER - 1);
+    expect(nearMax).toBe('9007199254740990');
+    const items = blankItems();
+    put(items, EquipSlot.MAIN_HAND, nearMax);
+    const decoded = withParams(
+      shareQuery(makeLoadout({ career: Career.SLAYER, items }), null),
+      () => urlService.decodeCompareShare(),
+    );
+    expect(decoded).not.toBeNull();
+    expect(decoded?.a?.career).toBe(Career.SLAYER);
+    expect(decoded?.a?.items.MAIN_HAND?.item?.id).toBe(nearMax);
+  });
+
+  it('round-trips item ids with leading zeros', () => {
+    const items = blankItems();
+    put(items, EquipSlot.MAIN_HAND, '0123', ['007']);
+    const decoded = withParams(
+      shareQuery(makeLoadout({ career: Career.SLAYER, items }), null),
+      () => urlService.decodeCompareShare(),
+    );
+    expect(decoded?.a?.items.MAIN_HAND?.item?.id).toBe('0123');
+    expect(decoded?.a?.items.MAIN_HAND?.talismans[0]?.id).toBe('007');
+  });
+
+  it('rejects trailing bytes after the packed payload', () => {
+    const qs = shareQuery(makeLoadout({ career: Career.SLAYER }), null);
+    const p = new URLSearchParams(qs).get('p') ?? '';
+    expect(p.startsWith('.')).toBe(true);
+    const intact = withParams(qs, () => urlService.decodeCompareShare());
+    expect(intact?.a?.career).toBe(Career.SLAYER);
+
+    const raw = inflateSync(base64UrlToBytes(p.slice(1)));
+    const extra = new Uint8Array(raw.length + 1);
+    extra.set(raw);
+    extra[extra.length - 1] = 0x7f;
+    const tampered = `p=.${bytesToBase64Url(deflateSync(extra))}`;
+    expect(() => withParams(tampered, () => urlService.decodeCompareShare())).not.toThrow();
+    expect(withParams(tampered, () => urlService.decodeCompareShare())).toBeNull();
   });
 });
