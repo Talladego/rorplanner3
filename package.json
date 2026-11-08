@@ -2,7 +2,7 @@
   "name": "rorplanner3",
   "version": "0.1.0",
   "private": true,
-  "license": "MIT (original code only; excludes game icons, other game data/assets, and characterwindowstats.lua; see LICENSE)",
+  "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

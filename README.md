@@ -208,7 +208,7 @@ Boundary guardrails:
 
 Original code in this repository is under the MIT License, Copyright (c) 2026 Talladego. See [LICENSE](LICENSE).
 
-That grant does not cover third-party code, data, or assets. Rights remain with their owners. Excluded materials include the 41 game icons in `public/icons/careers/` (24) and `public/icons/slots/` (17), used on the live site (Warhammer Online client art; Mythic Entertainment / Electronic Arts), other game data and assets, and `characterwindowstats.lua` (game-client character-window UI script; the app does not load it, and the file names no copyright holder). Dependencies stay under their own licenses.
+That grant does not cover third-party code, data, or assets. Rights remain with their owners. Excluded materials include the 41 game icons in `public/icons/careers/` (24) and `public/icons/slots/` (17), used on the live site (Warhammer Online client art; Mythic Entertainment / Electronic Arts / Games Workshop), other game data and assets, and `characterwindowstats.lua` (game-client character-window UI script; the app does not load it, and the file names no copyright holder). Dependencies stay under their own licenses.
 
 ## Tablet Roadmap (Future Work / Not Implemented)
 

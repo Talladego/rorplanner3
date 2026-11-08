@@ -32,7 +32,7 @@ Excluded materials include:
 
 - Game icons used on the live site: public/icons/careers/*.png (24 files) and
   public/icons/slots/*.png (17 files). These are Warhammer Online client icons
-  (Mythic Entertainment / Electronic Arts).
+  (Mythic Entertainment / Electronic Arts / Games Workshop).
 - Other game data and assets.
 - characterwindowstats.lua, a game-client character-window UI script kept in
   the tree. The application does not load it. The file names no copyright
